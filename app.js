@@ -1,35 +1,30 @@
 /**
  * ==============================================================================
- * UNG DUNG QUAN LY CONG VIEC (TASK MANAGEMENT WEB APP)
- * Frontend Logic: Single Page Application Engine (Vanilla JS)
+ * TTHT Tasks - Quản Lý Công Việc & Hồ Sơ (Vanilla JS Engine - Dark Theme)
  * ==============================================================================
  */
 
-// Application State
 const appState = {
   tasks: [],
   users: [],
   cvluuy: [],
   documents: [],
-  currentTab: 'congviec',
-  currentView: 'kanban',
+  currentTab: 'tongquan',
   filters: {
     search: '',
-    priority: '',
-    status: '',
-    assignee: '',
-    dateStart: '',
-    dateEnd: ''
+    user: '',
+    group: '',
+    kanbanAssignee: '',
+    kanbanPriority: ''
   },
   sortColumn: 'ID',
   sortAscending: false,
   apiUrl: localStorage.getItem('GAS_WEB_APP_URL') || '',
-  isGAS: typeof google !== 'undefined' && google.script && google.script.run
+  isGAS: typeof google !== 'undefined' && google.script && google.script.run,
+  donutChart: null
 };
 
-// DOM Initialization
 document.addEventListener('DOMContentLoaded', () => {
-  // Check if API URL stored
   const urlInput = document.getElementById('gas-api-url-input');
   if (urlInput && appState.apiUrl) {
     urlInput.value = appState.apiUrl;
@@ -40,10 +35,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * Universal Backend Call Wrapper (Supports GAS google.script.run & Vercel fetch)
+ * Data Loader Wrapper
  */
 appState.loadData = function (forceRefresh = false) {
-  showToast('Đang tải dữ liệu từ Google Sheets...', 'info');
+  showToast('Đang đồng bộ dữ liệu với Google Sheets...', 'info');
   
   if (appState.isGAS) {
     google.script.run
@@ -51,7 +46,6 @@ appState.loadData = function (forceRefresh = false) {
       .withFailureHandler(onDataError)
       .getInitialData(forceRefresh);
   } else {
-    // External Vercel API fetch call
     const fetchUrl = appState.apiUrl || window.location.href;
     fetch(fetchUrl + '?action=getInitialData&t=' + new Date().getTime())
       .then(res => res.json())
@@ -91,163 +85,273 @@ function onDataLoaded(response) {
     appState.cvluuy = response.cvluuy || [];
     appState.documents = response.documents || [];
     
-    // Parse subtasks JSON if string
+    // Parse subtasks
     appState.tasks.forEach(t => {
       if (typeof t['Danh sách công việc con'] === 'string' && t['Danh sách công việc con']) {
-        try {
-          t.subtasks = JSON.parse(t['Danh sách công việc con']);
-        } catch (e) {
-          t.subtasks = [];
-        }
+        try { t.subtasks = JSON.parse(t['Danh sách công việc con']); } catch (e) { t.subtasks = []; }
       } else {
         t.subtasks = t.subtasks || [];
       }
     });
 
-    populateAssigneeSelects();
-    renderAllViews();
-    showToast('Đã đồng bộ dữ liệu mới nhất!', 'success');
+    populateSelects();
+    renderActiveTab();
+    showToast('Đồng bộ dữ liệu thành công!', 'success');
   } else {
-    showToast('Lỗi nạp dữ liệu: ' + (response.message || 'Unknown'), 'error');
+    showToast('Lỗi: ' + (response.message || 'Unknown'), 'error');
   }
 }
 
 function onDataError(error) {
   console.error('API Error:', error);
-  showToast('Không thể kết nối Backend. Vui lòng kiểm tra lại URL API Google Apps Script.', 'error');
+  showToast('Không thể kết nối với Backend Google Apps Script.', 'error');
 }
 
 /**
- * Populate User selects across filter & forms
+ * Populate Dropdowns (Users, Groups)
  */
-function populateAssigneeSelects() {
-  const filterSelect = document.getElementById('filter-assignee');
-  const taskSelect = document.getElementById('task-assignee-input');
+function populateSelects() {
+  const groupSelect = document.getElementById('global-group-select');
+  const cvluuyGroupSelect = document.getElementById('cvluuy-group-select');
+  const kanbanAssigneeSelect = document.getElementById('kanban-assignee-filter');
+  const taskAssigneeSelect = document.getElementById('task-assignee-input');
   
-  if (!filterSelect || !taskSelect) return;
-  
-  const currentFilterVal = filterSelect.value;
-  const currentTaskVal = taskSelect.value;
-  
-  filterSelect.innerHTML = '<option value="">-- Tất cả người thực hiện --</option>';
-  taskSelect.innerHTML = '<option value="">-- Chọn người thực hiện --</option>';
+  const groups = new Set();
+  const assignees = new Set();
   
   appState.users.forEach(u => {
-    const name = u['Tên'] || u.name;
-    if (name) {
-      filterSelect.innerHTML += `<option value="${name}">${name}</option>`;
-      taskSelect.innerHTML += `<option value="${name}">${name}</option>`;
-    }
+    if (u['Tổ'] || u.group) groups.add(u['Tổ'] || u.group);
+    if (u['Tên'] || u.name) assignees.add(u['Tên'] || u.name);
   });
-  
-  filterSelect.value = currentFilterVal;
-  taskSelect.value = currentTaskVal;
+  appState.cvluuy.forEach(item => { if (item['Tổ']) groups.add(item['Tổ']); });
+
+  if (groupSelect) {
+    groupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
+    groups.forEach(g => groupSelect.innerHTML += `<option value="${g}">${g}</option>`);
+  }
+  if (cvluuyGroupSelect) {
+    cvluuyGroupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
+    groups.forEach(g => cvluuyGroupSelect.innerHTML += `<option value="${g}">${g}</option>`);
+  }
+  if (kanbanAssigneeSelect) {
+    kanbanAssigneeSelect.innerHTML = '<option value="">Tất cả người phụ trách</option>';
+    assignees.forEach(a => kanbanAssigneeSelect.innerHTML += `<option value="${a}">${a}</option>`);
+  }
+  if (taskAssigneeSelect) {
+    taskAssigneeSelect.innerHTML = '<option value="">-- Chọn người thực hiện --</option>';
+    assignees.forEach(a => taskAssigneeSelect.innerHTML += `<option value="${a}">${a}</option>`);
+  }
 }
 
 /**
- * Filter & Sort Logic
+ * Sidebar Navigation Router
  */
+function switchSidebarTab(tabName) {
+  appState.currentTab = tabName;
+  
+  // Highlight Active Item in Sidebar
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.tab === tabName);
+  });
+
+  // Toggle Page Sections
+  document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
+  const activeSec = document.getElementById('section-' + tabName);
+  if (activeSec) activeSec.classList.add('active');
+
+  // Update Top Title
+  const titles = {
+    tongquan: 'Tổng quan',
+    kanban: 'Bảng Kanban',
+    danhsach: 'Danh sách công việc',
+    gantt: 'Biểu đồ Gantt',
+    tailieu: 'Quản lý tài liệu',
+    nguoidung: 'Quản lý người dùng',
+    thongke: 'Đánh giá & Thống kê',
+    cvluuy: 'Công việc lưu ý'
+  };
+  document.getElementById('page-title-display').innerText = titles[tabName] || 'TTHT Tasks';
+
+  renderActiveTab();
+}
+
+function handleGlobalFilter() {
+  appState.filters.search = document.getElementById('global-search-input').value.trim();
+  appState.filters.user = document.getElementById('global-user-search').value.trim();
+  appState.filters.group = document.getElementById('global-group-select').value;
+  renderActiveTab();
+}
+
+function handleKanbanFilter() {
+  appState.filters.kanbanAssignee = document.getElementById('kanban-assignee-filter').value;
+  appState.filters.kanbanPriority = document.getElementById('kanban-priority-filter').value;
+  renderKanbanBoard();
+}
+
 function getFilteredTasks() {
   return appState.tasks.filter(t => {
-    const f = appState.filters;
+    const search = appState.filters.search.toLowerCase();
     const title = (t['Tiêu đề'] || '').toLowerCase();
     const desc = (t['Mô tả'] || '').toLowerCase();
-    const search = f.search.toLowerCase();
     
     if (search && !title.includes(search) && !desc.includes(search)) return false;
-    if (f.priority && t['Mức độ ưu tiên'] !== f.priority) return false;
-    if (f.status && t['Trạng thái'] !== f.status) return false;
-    if (f.assignee && t['Người thực hiện'] !== f.assignee) return false;
     
-    if (f.dateStart && t['Ngày bắt đầu'] && t['Ngày bắt đầu'] < f.dateStart) return false;
-    if (f.dateEnd && t['Ngày kết thúc'] && t['Ngày kết thúc'] > f.dateEnd) return false;
-    
+    const user = appState.filters.user.toLowerCase();
+    const assignee = (t['Người thực hiện'] || '').toLowerCase();
+    if (user && !assignee.includes(user)) return false;
+
+    if (appState.filters.kanbanAssignee && t['Người thực hiện'] !== appState.filters.kanbanAssignee) return false;
+    if (appState.filters.kanbanPriority && t['Mức độ ưu tiên'] !== appState.filters.kanbanPriority) return false;
+
     return true;
   });
 }
 
-function handleFilterChange() {
-  appState.filters.search = document.getElementById('search-input').value;
-  appState.filters.assignee = document.getElementById('filter-assignee').value;
-  appState.filters.priority = document.getElementById('filter-priority').value;
-  appState.filters.status = document.getElementById('filter-status').value;
-  appState.filters.dateStart = document.getElementById('filter-date-start').value;
-  appState.filters.dateEnd = document.getElementById('filter-date-end').value;
-  
-  renderAllViews();
-}
-
-function resetFilters() {
-  document.getElementById('search-input').value = '';
-  document.getElementById('filter-assignee').value = '';
-  document.getElementById('filter-priority').value = '';
-  document.getElementById('filter-status').value = '';
-  document.getElementById('filter-date-start').value = '';
-  document.getElementById('filter-date-end').value = '';
-  
-  appState.filters = { search: '', priority: '', status: '', assignee: '', dateStart: '', dateEnd: '' };
-  renderAllViews();
-}
-
 /**
- * Tab and View Switchers
+ * Render Router
  */
-function switchMainTab(tabName) {
-  appState.currentTab = tabName;
-  
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tab === tabName);
-  });
-  
-  document.querySelectorAll('.view-section').forEach(sec => sec.style.display = 'none');
-  const viewSwitcherGroup = document.getElementById('view-switcher-group');
-  const filterBar = document.getElementById('filter-bar');
-  
-  if (tabName === 'congviec') {
-    viewSwitcherGroup.style.display = 'flex';
-    filterBar.style.display = 'flex';
-    switchTaskView(appState.currentView);
-  } else {
-    viewSwitcherGroup.style.display = 'none';
-    filterBar.style.display = 'none';
-    document.getElementById('view-' + tabName.toLowerCase()).style.display = 'block';
-  }
-}
-
-function switchTaskView(viewName) {
-  appState.currentView = viewName;
-  document.querySelectorAll('.view-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.view === viewName);
-  });
-  
-  document.getElementById('view-kanban').style.display = viewName === 'kanban' ? 'block' : 'none';
-  document.getElementById('view-list').style.display = viewName === 'list' ? 'block' : 'none';
-  document.getElementById('view-gantt').style.display = viewName === 'gantt' ? 'block' : 'none';
-  
-  renderAllViews();
-}
-
-/**
- * Render All Views Router
- */
-function renderAllViews() {
-  if (appState.currentTab === 'congviec') {
-    if (appState.currentView === 'kanban') renderKanban();
-    else if (appState.currentView === 'list') renderListTable();
-    else if (appState.currentView === 'gantt') renderGanttChart();
-  } else if (appState.currentTab === 'cvluuy') {
-    renderCvLuuYTable();
-  } else if (appState.currentTab === 'Documents') {
-    renderDocumentsTable();
-  } else if (appState.currentTab === 'Users') {
-    renderUsersTable();
-  }
+function renderActiveTab() {
+  const tab = appState.currentTab;
+  if (tab === 'tongquan') renderDashboard();
+  else if (tab === 'kanban') renderKanbanBoard();
+  else if (tab === 'danhsach') renderTaskListTable();
+  else if (tab === 'gantt') renderGanttChart();
+  else if (tab === 'tailieu') renderDocumentsTable();
+  else if (tab === 'nguoidung') renderUsersTable();
+  else if (tab === 'thongke') renderOrgStatistics();
+  else if (tab === 'cvluuy') renderCvLuuYTable();
 }
 
 /* ==============================================================================
-   1. KANBAN BOARD RENDER & DRAG DROP
+   1. DASHBOARD TỔNG QUAN RENDER
    ============================================================================== */
-function renderKanban() {
+function renderDashboard() {
+  const filtered = getFilteredTasks();
+  
+  let countDoing = 0, countDone = 0, countOverdue = 0, countCanceled = 0;
+  filtered.forEach(t => {
+    const st = t['Trạng thái'] || 'Đang thực hiện';
+    if (st === 'Đang thực hiện') countDoing++;
+    else if (st === 'Hoàn thành') countDone++;
+    else if (st === 'Quá hạn') countOverdue++;
+    else if (st === 'Đã hủy') countCanceled++;
+  });
+  
+  const total = filtered.length;
+  document.getElementById('kpi-total-val').innerText = total;
+  document.getElementById('kpi-doing-val').innerText = countDoing;
+  document.getElementById('kpi-done-val').innerText = countDone;
+  document.getElementById('kpi-overdue-val').innerText = countOverdue;
+
+  // Donut Chart Legend & Percent
+  const pctDone = total > 0 ? Math.round((countDone / total) * 100) : 0;
+  document.getElementById('donut-percent').innerText = pctDone + '%';
+  document.getElementById('lg-doing').innerText = countDoing;
+  document.getElementById('lg-done').innerText = countDone;
+  document.getElementById('lg-overdue').innerText = countOverdue;
+  document.getElementById('lg-canceled').innerText = countCanceled;
+
+  renderDonutChart(countDoing, countDone, countOverdue, countCanceled);
+  renderHighPriorityTasks(filtered);
+  renderRecentTasks(filtered);
+}
+
+function renderDonutChart(doing, done, overdue, canceled) {
+  const ctx = document.getElementById('statusDonutChart');
+  if (!ctx) return;
+  
+  if (appState.donutChart) {
+    appState.donutChart.destroy();
+  }
+  
+  appState.donutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Đang thực hiện', 'Hoàn thành', 'Quá hạn', 'Đã hủy'],
+      datasets: [{
+        data: [doing, done, overdue, canceled],
+        backgroundColor: ['#38bdf8', '#10b981', '#ef4444', '#64748b'],
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      cutout: '78%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: true }
+      },
+      responsive: true,
+      maintainAspectRatio: false
+    }
+  });
+}
+
+function renderHighPriorityTasks(tasks) {
+  const container = document.getElementById('high-priority-container');
+  if (!container) return;
+  
+  const highPriority = tasks.filter(t => t['Mức độ ưu tiên'] === 'Cao');
+  if (highPriority.length === 0) {
+    container.innerHTML = `<div class="empty-widget-state"><i class="fa-solid fa-angles-down"></i> Không có công việc ưu tiên cao</div>`;
+    return;
+  }
+  
+  let html = '';
+  highPriority.slice(0, 5).forEach(t => {
+    html += `
+      <div class="recent-row-item" onclick="openTaskModal('${t.ID || t.id}')" style="cursor:pointer;">
+        <div class="recent-title-group">
+          <i class="fa-solid fa-circle-exclamation" style="color:#f43f5e;"></i>
+          <span>${escapeHtml(t['Tiêu đề'])}</span>
+        </div>
+        <div class="recent-meta-group">
+          <span class="tag-priority tag-p-high">Cao</span>
+          <span style="font-size:0.75rem; color:#94a3b8;">${t['Ngày kết thúc'] || ''}</span>
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function renderRecentTasks(tasks) {
+  const container = document.getElementById('recent-tasks-container');
+  if (!container) return;
+  
+  if (tasks.length === 0) {
+    container.innerHTML = `<div class="empty-widget-state">Chưa có dữ liệu công việc</div>`;
+    return;
+  }
+  
+  let html = '';
+  tasks.slice(0, 8).forEach(t => {
+    const priority = t['Mức độ ưu tiên'] || 'Trung bình';
+    const tagPClass = priority === 'Cao' ? 'tag-p-high' : priority === 'Trung bình' ? 'tag-p-med' : 'tag-p-low';
+    const status = t['Trạng thái'] || '';
+    const statusHtml = status === 'Quá hạn' ? `<span class="tag-status-overdue">Quá hạn</span>` : `<span style="font-size:0.75rem; color:#94a3b8;">${status}</span>`;
+
+    html += `
+      <div class="recent-row-item" onclick="openTaskModal('${t.ID || t.id}')" style="cursor:pointer;">
+        <div class="recent-title-group">
+          <span>${escapeHtml(t['Tiêu đề'])}</span>
+          <span class="tag-org">VNPT</span>
+        </div>
+        <div class="recent-meta-group">
+          <span class="tag-priority ${tagPClass}">${priority}</span>
+          ${statusHtml}
+          <span style="font-size:0.75rem; color:#64748b;">${t['Ngày kết thúc'] || ''}</span>
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+/* ==============================================================================
+   2. BẢNG KANBAN DARK RENDER
+   ============================================================================== */
+function renderKanbanBoard() {
   const filtered = getFilteredTasks();
   const cols = {
     'Đang thực hiện': document.getElementById('cards-doing'),
@@ -257,73 +361,46 @@ function renderKanban() {
   };
   
   const counts = { 'Đang thực hiện': 0, 'Hoàn thành': 0, 'Quá hạn': 0, 'Đã hủy': 0 };
-  
-  Object.values(cols).forEach(c => { if(c) c.innerHTML = ''; });
+  Object.values(cols).forEach(c => { if (c) c.innerHTML = ''; });
   
   filtered.forEach(t => {
-    const status = t['Trạng thái'] || 'Đang thực hiện';
-    if (cols[status]) {
-      counts[status]++;
-      cols[status].appendChild(createTaskCardElement(t));
+    const st = t['Trạng thái'] || 'Đang thực hiện';
+    if (cols[st]) {
+      counts[st]++;
+      cols[st].appendChild(createDarkTaskCard(t));
     }
   });
-  
-  document.getElementById('count-doing').innerText = counts['Đang thực hiện'];
-  document.getElementById('count-done').innerText = counts['Hoàn thành'];
-  document.getElementById('count-overdue').innerText = counts['Quá hạn'];
-  document.getElementById('count-canceled').innerText = counts['Đã hủy'];
+
+  document.getElementById('kb-count-doing').innerText = counts['Đang thực hiện'];
+  document.getElementById('kb-count-done').innerText = counts['Hoàn thành'];
+  document.getElementById('kb-count-overdue').innerText = counts['Quá hạn'];
+  document.getElementById('kb-count-canceled').innerText = counts['Đã hủy'];
 }
 
-function createTaskCardElement(task) {
+function createDarkTaskCard(task) {
   const card = document.createElement('div');
-  card.className = 'task-card';
+  card.className = 'dark-card';
   card.draggable = true;
   card.dataset.id = task.ID || task.id;
   
   const priority = task['Mức độ ưu tiên'] || 'Trung bình';
-  const badgeClass = priority === 'Cao' ? 'badge-high' : priority === 'Trung bình' ? 'badge-med' : 'badge-low';
+  const tagPClass = priority === 'Cao' ? 'tag-p-high' : priority === 'Trung bình' ? 'tag-p-med' : 'tag-p-low';
   
   const assignee = task['Người thực hiện'] || 'Chưa gán';
   const avatarLetter = assignee.charAt(0).toUpperCase();
-  const progress = Number(task['Tiến độ (%)'] || 0);
-  
-  const endDateStr = task['Ngày kết thúc'] || '';
-  const isOverdue = task['Trạng thái'] === 'Quá hạn';
-
-  const subtasks = task.subtasks || [];
-  const completedSubtasks = subtasks.filter(s => s.completed).length;
-  const subtasksText = subtasks.length > 0 ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;"><i class="fa-solid fa-list-check"></i> ${completedSubtasks}/${subtasks.length} việc con</div>` : '';
-
-  const attachmentBtn = task['Tệp đính kèm'] ? `<a href="${task['Tệp đính kèm']}" target="_blank" class="btn btn-secondary btn-sm" style="padding:2px 6px;" title="Mở tệp đính kèm" onclick="event.stopPropagation();"><i class="fa-solid fa-paperclip"></i></a>` : '';
 
   card.innerHTML = `
-    <div class="card-header">
-      <div class="card-title">${escapeHtml(task['Tiêu đề'] || '')}</div>
-      <span class="badge ${badgeClass}">${priority}</span>
+    <div class="dark-card-tags">
+      <span class="tag-priority ${tagPClass}">${priority}</span>
+      <span class="tag-org">VNPT</span>
     </div>
-    ${task['Mô tả'] ? `<div class="card-desc">${escapeHtml(task['Mô tả'])}</div>` : ''}
-    ${subtasksText}
-    <div class="progress-container">
-      <div class="progress-info">
-        <span>Tiến độ</span>
-        <span>${progress}%</span>
-      </div>
-      <div class="progress-bar-bg">
-        <div class="progress-bar-fill" style="width: ${progress}%;"></div>
-      </div>
-    </div>
-    <div class="card-footer">
-      <div class="assignee-info">
-        <div class="avatar">${avatarLetter}</div>
-        <span>${escapeHtml(assignee)}</span>
-      </div>
-      <div class="due-date ${isOverdue ? 'is-overdue' : ''}">
-        <i class="fa-regular fa-clock"></i> ${endDateStr || 'N/A'}
-      </div>
-      <div style="display:flex; gap:4px;">
-        ${attachmentBtn}
-        <button class="btn btn-secondary btn-sm" style="padding:2px 6px;" onclick="openTaskModal('${task.ID || task.id}'); event.stopPropagation();"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn btn-danger btn-sm" style="padding:2px 6px;" onclick="confirmDeleteTask('${task.ID || task.id}'); event.stopPropagation();"><i class="fa-solid fa-trash"></i></button>
+    <div class="dark-card-title">${escapeHtml(task['Tiêu đề'] || '')}</div>
+    ${task['Mô tả'] ? `<div class="dark-card-sub">${escapeHtml(task['Mô tả'])}</div>` : ''}
+    <div class="dark-card-footer">
+      <div><i class="fa-regular fa-calendar"></i> ${task['Ngày kết thúc'] || 'N/A'}</div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <div style="width:22px; height:22px; border-radius:50%; background:var(--emerald-primary); color:#0b0f19; font-weight:700; font-size:0.7rem; display:flex; align-items:center; justify-content:center;">${avatarLetter}</div>
+        <button class="btn-dark-sec btn-sm" style="padding:2px 6px;" onclick="openTaskModal('${task.ID || task.id}'); event.stopPropagation();"><i class="fa-solid fa-pen"></i></button>
       </div>
     </div>
   `;
@@ -341,29 +418,28 @@ function createTaskCardElement(task) {
 }
 
 function setupKanbanDragAndDrop() {
-  document.querySelectorAll('.kanban-cards').forEach(container => {
+  document.querySelectorAll('.kanban-cards-dark').forEach(container => {
     container.addEventListener('dragover', (e) => {
       e.preventDefault();
-      container.classList.add('drag-over');
+      container.style.background = 'rgba(0, 200, 151, 0.08)';
     });
     
     container.addEventListener('dragleave', () => {
-      container.classList.remove('drag-over');
+      container.style.background = 'transparent';
     });
     
     container.addEventListener('drop', (e) => {
       e.preventDefault();
-      container.classList.remove('drag-over');
+      container.style.background = 'transparent';
       const taskId = e.dataTransfer.getData('text/plain');
       const newStatus = container.dataset.status;
       
       if (taskId && newStatus) {
-        // Optimistic UI update
-        const task = appState.tasks.find(t => (t.ID || t.id) === taskId);
+        const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
         if (task) {
           task['Trạng thái'] = newStatus;
           if (newStatus === 'Hoàn thành') task['Tiến độ (%)'] = 100;
-          renderKanban();
+          renderKanbanBoard();
           callBackend('updateTaskStatus', { id: taskId, status: newStatus });
           showToast(`Đã chuyển công việc sang "${newStatus}"`, 'success');
         }
@@ -373,44 +449,43 @@ function setupKanbanDragAndDrop() {
 }
 
 /* ==============================================================================
-   2. LIST VIEW (TABLE RENDER)
+   3. DANH SÁCH (TABLE RENDER)
    ============================================================================== */
-function renderListTable() {
+function renderTaskListTable() {
   const filtered = getFilteredTasks();
-  const tbody = document.getElementById('task-table-body');
+  const tbody = document.getElementById('task-list-tbody');
   if (!tbody) return;
   
   tbody.innerHTML = '';
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Không tìm thấy công việc phù hợp</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
     return;
   }
   
   filtered.forEach(t => {
-    const priority = t['Mức độ ưu tiên'] || 'Trung bình';
-    const badgeClass = priority === 'Cao' ? 'badge-high' : priority === 'Trung bình' ? 'badge-med' : 'badge-low';
+    const status = t['Trạng thái'] || 'Đang thực hiện';
+    const statusBadge = status === 'Quá hạn' 
+      ? `<span class="tag-status-overdue">Quá hạn</span>`
+      : status === 'Hoàn thành'
+      ? `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`
+      : `<span style="color:#38bdf8; font-weight:600;">${status}</span>`;
+
     const progress = Number(t['Tiến độ (%)'] || 0);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${t.ID || t.id}</strong></td>
-      <td>
-        <div style="font-weight:600;">${escapeHtml(t['Tiêu đề'] || '')}</div>
-        <div style="font-size:0.8rem; color:var(--text-muted);">${escapeHtml(t['Mô tả'] || '').substring(0, 50)}</div>
-      </td>
-      <td><span class="badge ${badgeClass}">${priority}</span></td>
-      <td><strong>${t['Trạng thái']}</strong></td>
+      <td><strong>${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
+      <td style="max-width:220px; font-size:0.78rem; color:#94a3b8;">${escapeHtml(t['Mô tả'] || '').substring(0, 60)}</td>
+      <td>${statusBadge}</td>
       <td>${escapeHtml(t['Người thực hiện'] || 'Chưa gán')}</td>
+      <td>${t['Ngày bắt đầu'] || ''}</td>
       <td>${t['Ngày kết thúc'] || ''}</td>
-      <td>
-        <div style="width:100px;">
-          <div style="font-size:0.75rem; text-align:right;">${progress}%</div>
-          <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${progress}%;"></div></div>
-        </div>
-      </td>
+      <td><input type="date" class="dark-form-control" style="padding:4px 8px; font-size:0.75rem;" value="${t['Ngày làm xong'] || ''}"></td>
+      <td>${progress}%</td>
+      <td>1</td>
       <td style="text-align:right;">
-        <button class="btn btn-secondary btn-sm" onclick="openTaskModal('${t.ID || t.id}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDeleteTask('${t.ID || t.id}')"><i class="fa-solid fa-trash"></i></button>
+        <button class="btn-dark-sec btn-sm" onclick="openTaskModal('${t.ID || t.id}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn-dark-sec btn-sm" style="color:#ef4444;" onclick="confirmDeleteTask('${t.ID || t.id}')"><i class="fa-solid fa-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -433,11 +508,11 @@ function sortTable(columnName) {
     return 0;
   });
   
-  renderAllViews();
+  renderTaskListTable();
 }
 
 /* ==============================================================================
-   3. GANTT CHART TIMELINE RENDER
+   4. GANTT CHART RENDER
    ============================================================================== */
 function renderGanttChart() {
   const container = document.getElementById('gantt-chart-container');
@@ -445,42 +520,32 @@ function renderGanttChart() {
   
   const filtered = getFilteredTasks();
   if (filtered.length === 0) {
-    container.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted);">Không có dữ liệu công việc hiển thị trên biểu đồ Gantt</div>`;
+    container.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted);">Không có dữ liệu công việc</div>`;
     return;
   }
   
-  // Calculate Timeline Month Range
   const months = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
-  const currentMonthIdx = new Date().getMonth();
-  const displayMonths = months.slice(currentMonthIdx, currentMonthIdx + 4); // Display 4 months window
+  const curM = new Date().getMonth();
+  const displayMonths = months.slice(curM, curM + 4);
   
   let html = `
-    <div class="gantt-header-months">
-      <div style="width:240px; min-width:240px; font-weight:700; padding:10px; background:#f8fafc; border-right:1px solid var(--border-color);">Tên Công Việc</div>
-      <div style="flex:1; display:flex;">
+    <div style="display:flex; background:#141b2d; border-bottom:1px solid var(--card-border); padding:10px 16px; font-weight:600;">
+      <div style="width:240px;">Tên Công Việc</div>
+      <div style="flex:1; display:flex; justify-content:space-around;">
+        ${displayMonths.map(m => `<div>${m}</div>`).join('')}
+      </div>
+    </div>
+    <div style="padding:16px;">
   `;
-  
-  displayMonths.forEach(m => {
-    html += `<div class="gantt-month-cell">${m}</div>`;
-  });
-  html += `</div></div><div class="gantt-rows">`;
 
-  filtered.forEach((t, idx) => {
-    // Simple visual position calculation for timeline bar span
-    const startMonth = t['Ngày bắt đầu'] ? new Date(t['Ngày bắt đầu']).getMonth() : currentMonthIdx;
-    const endMonth = t['Ngày kết thúc'] ? new Date(t['Ngày kết thúc']).getMonth() : currentMonthIdx + 1;
-    
-    let leftOffsetPercent = Math.max(0, ((startMonth - currentMonthIdx) / 4) * 100);
-    let widthPercent = Math.min(100 - leftOffsetPercent, Math.max(15, (((endMonth - startMonth + 1) / 4) * 100)));
-    
+  filtered.forEach(t => {
     const progress = Number(t['Tiến độ (%)'] || 0);
-
     html += `
-      <div class="gantt-row">
-        <div class="gantt-label" title="${escapeHtml(t['Tiêu đề'])}">${escapeHtml(t['Tiêu đề'])}</div>
-        <div class="gantt-timeline-track">
-          <div class="gantt-bar" style="left: ${leftOffsetPercent}%; width: ${widthPercent}%;" onclick="openTaskModal('${t.ID || t.id}')">
-            <span>${escapeHtml(t['Tiêu đề'])} (${progress}%)</span>
+      <div style="display:flex; align-items:center; height:44px; border-bottom:1px dashed rgba(255,255,255,0.06);">
+        <div style="width:240px; font-size:0.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(t['Tiêu đề'])}</div>
+        <div style="flex:1; position:relative; height:100%;">
+          <div style="position:absolute; left:20%; width:50%; top:8px; height:26px; background:var(--emerald-primary); color:#0b0f19; font-weight:700; font-size:0.75rem; border-radius:13px; display:flex; align-items:center; padding:0 12px; cursor:pointer;" onclick="openTaskModal('${t.ID || t.id}')">
+            ${escapeHtml(t['Tiêu đề'])} (${progress}%)
           </div>
         </div>
       </div>
@@ -492,36 +557,49 @@ function renderGanttChart() {
 }
 
 /* ==============================================================================
-   4. CÔNG VIỆC LƯU Ý & DOCUMENTS & USERS TABLES
+   5. CÔNG VIỆC LƯU Ý TABLE RENDER
    ============================================================================== */
 function renderCvLuuYTable() {
-  const tbody = document.getElementById('cvluuy-table-body');
+  const tbody = document.getElementById('cvluuy-tbody');
   if (!tbody) return;
   tbody.innerHTML = '';
   
-  appState.cvluuy.forEach(item => {
+  const search = (document.getElementById('cvluuy-search-input')?.value || '').toLowerCase();
+  const group = document.getElementById('cvluuy-group-select')?.value || '';
+
+  const filtered = appState.cvluuy.filter(item => {
+    const task = (item['Công việc'] || '').toLowerCase();
+    const desc = (item['Mô tả'] || '').toLowerCase();
+    if (search && !task.includes(search) && !desc.includes(search)) return false;
+    if (group && item['Tổ'] !== group) return false;
+    return true;
+  });
+
+  filtered.forEach(item => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${item.ID || item.id}</strong></td>
       <td><strong>${escapeHtml(item['Công việc'] || '')}</strong></td>
-      <td>${escapeHtml(item['Mô tả'] || '')}</td>
-      <td>${escapeHtml(item['Tổ'] || '')}</td>
+      <td style="max-width:250px; font-size:0.78rem; color:#94a3b8;">${escapeHtml(item['Mô tả'] || '')}</td>
+      <td><span class="tag-org">${escapeHtml(item['Tổ'] || 'Chung')}</span></td>
       <td>${item['Ngày bắt đầu'] || ''}</td>
       <td>${item['Ngày kết thúc'] || ''}</td>
-      <td>${item['Ngày làm xong'] || ''}</td>
-      <td><span class="badge badge-high">${item['Trạng thái'] || 'Cần lưu ý'}</span></td>
-      <td>${escapeHtml(item['Ghi chú'] || '')}</td>
+      <td><input type="date" class="dark-form-control" style="padding:4px 8px; font-size:0.75rem;" value="${item['Ngày làm xong'] || ''}"></td>
+      <td><span class="tag-priority tag-p-low">${item['Trạng thái'] || 'Cần lưu ý'}</span></td>
+      <td><input type="text" class="dark-form-control" style="padding:4px 8px; font-size:0.75rem;" value="${escapeHtml(item['Ghi chú'] || '')}"></td>
       <td style="text-align:right;">
-        <button class="btn btn-secondary btn-sm" onclick="openCvLuuYModal('${item.ID || item.id}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDeleteCvLuuY('${item.ID || item.id}')"><i class="fa-solid fa-trash"></i></button>
+        <button class="btn-dark-sec btn-sm" onclick="openCvLuuYModal('${item.ID || item.id}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn-dark-sec btn-sm" style="color:#ef4444;" onclick="confirmDeleteCvLuuY('${item.ID || item.id}')"><i class="fa-solid fa-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
   });
 }
 
+/* ==============================================================================
+   6. DOCUMENTS & USERS & STATS TABLES RENDER
+   ============================================================================== */
 function renderDocumentsTable() {
-  const tbody = document.getElementById('documents-table-body');
+  const tbody = document.getElementById('documents-tbody');
   if (!tbody) return;
   tbody.innerHTML = '';
   
@@ -530,7 +608,7 @@ function renderDocumentsTable() {
     const valTH = Number(doc['Giá trị thực hiện'] || 0).toLocaleString('vi-VN');
     const diffVal = Number(doc['Chênh lệch'] || 0).toLocaleString('vi-VN');
     
-    const fileLink = doc['File URL'] ? `<a href="${doc['File URL']}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-pdf"></i> Tệp</a>` : 'Không có';
+    const fileBtn = doc['File URL'] ? `<a href="${doc['File URL']}" target="_blank" class="btn-dark-sec btn-sm"><i class="fa-solid fa-file-pdf"></i> Tệp</a>` : 'N/A';
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -539,14 +617,14 @@ function renderDocumentsTable() {
       <td>${escapeHtml(doc['Danh mục'] || '')}</td>
       <td>${escapeHtml(doc['Phòng ban'] || '')}</td>
       <td>${escapeHtml(doc['Nhà cung cấp'] || '')}</td>
-      <td><span class="badge badge-low">${doc['Tình trạng'] || 'Hiệu lực'}</span></td>
+      <td><span class="tag-priority tag-p-low">${doc['Tình trạng'] || 'Hiệu lực'}</span></td>
       <td>${valHD} đ</td>
       <td>${valTH} đ</td>
       <td>${diffVal} đ</td>
-      <td>${fileLink}</td>
+      <td>${fileBtn}</td>
       <td style="text-align:right;">
-        <button class="btn btn-secondary btn-sm" onclick="openDocumentModal('${doc.ID || doc.id}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDeleteDoc('${doc.ID || doc.id}')"><i class="fa-solid fa-trash"></i></button>
+        <button class="btn-dark-sec btn-sm" onclick="openDocumentModal('${doc.ID || doc.id}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn-dark-sec btn-sm" style="color:#ef4444;" onclick="confirmDeleteDoc('${doc.ID || doc.id}')"><i class="fa-solid fa-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -554,7 +632,7 @@ function renderDocumentsTable() {
 }
 
 function renderUsersTable() {
-  const tbody = document.getElementById('users-table-body');
+  const tbody = document.getElementById('users-tbody');
   if (!tbody) return;
   tbody.innerHTML = '';
   
@@ -565,16 +643,55 @@ function renderUsersTable() {
       <td><strong>${escapeHtml(usr['Tên'] || '')}</strong></td>
       <td>${escapeHtml(usr['Tổ'] || '')}</td>
       <td style="text-align:right;">
-        <button class="btn btn-secondary btn-sm" onclick="openUserModal('${usr.ID || usr.id}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDeleteUser('${usr.ID || usr.id}')"><i class="fa-solid fa-trash"></i></button>
+        <button class="btn-dark-sec btn-sm" onclick="openUserModal('${usr.ID || usr.id}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn-dark-sec btn-sm" style="color:#ef4444;" onclick="confirmDeleteUser('${usr.ID || usr.id}')"><i class="fa-solid fa-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
   });
 }
 
+function renderOrgStatistics() {
+  const container = document.getElementById('stats-org-container');
+  if (!container) return;
+  
+  const orgMap = {};
+  appState.users.forEach(u => {
+    const org = u['Tổ'] || 'Chưa phân tổ';
+    if (!orgMap[org]) orgMap[org] = { total: 0, done: 0 };
+  });
+
+  appState.tasks.forEach(t => {
+    const assignee = t['Người thực hiện'];
+    const usr = appState.users.find(u => u['Tên'] === assignee);
+    const org = usr ? (usr['Tổ'] || 'Khác') : 'Khác';
+    if (!orgMap[org]) orgMap[org] = { total: 0, done: 0 };
+    orgMap[org].total++;
+    if (t['Trạng thái'] === 'Hoàn thành') orgMap[org].done++;
+  });
+
+  let html = `<div style="display:flex; flex-direction:column; gap:16px;">`;
+  Object.keys(orgMap).forEach(org => {
+    const data = orgMap[org];
+    const pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
+    html += `
+      <div>
+        <div style="display:flex; justify-content:space-between; font-size:0.88rem; margin-bottom:6px;">
+          <span><strong>${org}</strong> (${data.done}/${data.total} hoàn thành)</span>
+          <span>${pct}%</span>
+        </div>
+        <div style="height:8px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;">
+          <div style="height:100%; width:${pct}%; background:var(--emerald-primary);"></div>
+        </div>
+      </div>
+    `;
+  });
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
 /* ==============================================================================
-   5. TASK FORM & SUBTASKS HANDLERS
+   7. MODAL ACTIONS & SUBTASKS
    ============================================================================== */
 function openTaskModal(taskId = null) {
   const form = document.getElementById('form-task');
@@ -612,25 +729,23 @@ function openTaskModal(taskId = null) {
 function addSubtaskRow(title = '', completed = false) {
   const container = document.getElementById('subtasks-container');
   const div = document.createElement('div');
-  div.className = 'subtask-item';
+  div.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:8px;';
   div.innerHTML = `
     <input type="checkbox" ${completed ? 'checked' : ''} onchange="recalculateSubtasksProgress()">
-    <input type="text" class="form-control" value="${escapeHtml(title)}" placeholder="Tên việc con..." oninput="recalculateSubtasksProgress()">
-    <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove(); recalculateSubtasksProgress();">&times;</button>
+    <input type="text" class="dark-form-control" value="${escapeHtml(title)}" placeholder="Tên việc con..." oninput="recalculateSubtasksProgress()">
+    <button type="button" class="btn-dark-sec btn-sm" style="color:#ef4444;" onclick="this.parentElement.remove(); recalculateSubtasksProgress();">&times;</button>
   `;
   container.appendChild(div);
 }
 
 function recalculateSubtasksProgress() {
-  const items = document.querySelectorAll('#subtasks-container .subtask-item');
+  const items = document.querySelectorAll('#subtasks-container div');
   if (items.length === 0) return;
-  
   let checkedCount = 0;
   items.forEach(item => {
     const cb = item.querySelector('input[type="checkbox"]');
     if (cb && cb.checked) checkedCount++;
   });
-  
   const calcProgress = Math.round((checkedCount / items.length) * 100);
   document.getElementById('task-progress-input').value = calcProgress;
   document.getElementById('progress-val-display').innerText = calcProgress;
@@ -638,14 +753,11 @@ function recalculateSubtasksProgress() {
 
 function handleTaskFormSubmit(e) {
   e.preventDefault();
-  
   const subtasks = [];
-  document.querySelectorAll('#subtasks-container .subtask-item').forEach((item, idx) => {
+  document.querySelectorAll('#subtasks-container div').forEach((item, idx) => {
     const title = item.querySelector('input[type="text"]').value.trim();
     const completed = item.querySelector('input[type="checkbox"]').checked;
-    if (title) {
-      subtasks.push({ id: idx + 1, title: title, completed: completed });
-    }
+    if (title) subtasks.push({ id: idx + 1, title: title, completed: completed });
   });
 
   const payload = {
@@ -664,7 +776,7 @@ function handleTaskFormSubmit(e) {
 
   closeModal('modal-task');
   showToast('Đang lưu công việc...', 'info');
-  callBackend('saveTask', payload, () => showToast('Đã lưu công việc thành công!', 'success'));
+  callBackend('saveTask', payload, () => showToast('Đã lưu công việc!', 'success'));
 }
 
 function confirmDeleteTask(id) {
@@ -673,9 +785,6 @@ function confirmDeleteTask(id) {
   }
 }
 
-/* ==============================================================================
-   6. OTHER MODALS HANDLERS (CvLuuY, Document, User)
-   ============================================================================== */
 function openCvLuuYModal(id = null) {
   document.getElementById('form-cvluuy').reset();
   if (id) {
@@ -709,12 +818,12 @@ function handleCvLuuYSubmit(e) {
     'Ghi chú': document.getElementById('ly-note').value
   };
   closeModal('modal-cvluuy');
-  callBackend('saveCvLuuY', payload, () => showToast('Đã lưu công việc lưu ý!', 'success'));
+  callBackend('saveCvLuuY', payload, () => showToast('Đã lưu lưu ý!', 'success'));
 }
 
 function confirmDeleteCvLuuY(id) {
-  if (confirm('Bạn có chắc chắn muốn xóa mục này?')) {
-    callBackend('deleteCvLuuY', { id: id }, () => showToast('Đã xóa thành công!', 'success'));
+  if (confirm('Xóa mục này?')) {
+    callBackend('deleteCvLuuY', { id: id }, () => showToast('Đã xóa lưu ý!', 'success'));
   }
 }
 
@@ -755,11 +864,11 @@ function handleDocSubmit(e) {
     'File URL': document.getElementById('doc-file-url').value
   };
   closeModal('modal-doc');
-  callBackend('saveDocument', payload, () => showToast('Đã lưu hồ sơ thành công!', 'success'));
+  callBackend('saveDocument', payload, () => showToast('Đã lưu hồ sơ!', 'success'));
 }
 
 function confirmDeleteDoc(id) {
-  if (confirm('Bạn có chắc chắn muốn xóa hồ sơ tài liệu này?')) {
+  if (confirm('Xóa hồ sơ này?')) {
     callBackend('deleteDocument', { id: id }, () => showToast('Đã xóa hồ sơ!', 'success'));
   }
 }
@@ -791,14 +900,11 @@ function handleUserSubmit(e) {
 }
 
 function confirmDeleteUser(id) {
-  if (confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
+  if (confirm('Xóa người dùng này?')) {
     callBackend('deleteUser', { id: id }, () => showToast('Đã xóa người dùng!', 'success'));
   }
 }
 
-/* ==============================================================================
-   7. UTILITY & TOAST NOTIFICATIONS
-   ============================================================================== */
 function openModal(id) {
   document.getElementById(id).classList.add('active');
 }
@@ -816,7 +922,7 @@ function saveSettings() {
   localStorage.setItem('GAS_WEB_APP_URL', url);
   appState.apiUrl = url;
   closeModal('modal-settings');
-  showToast('Đã lưu URL kết nối API thành công!', 'success');
+  showToast('Đã lưu cấu hình API thành công!', 'success');
   appState.loadData(true);
 }
 
@@ -825,15 +931,15 @@ function showToast(message, type = 'info') {
   if (!container) return;
   
   const toast = document.createElement('div');
-  const bg = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#4568dc';
+  const bg = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#0284c7';
   
   toast.style.cssText = `
     background: ${bg};
     color: #ffffff;
-    padding: 12px 20px;
+    padding: 10px 18px;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    font-size: 0.88rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    font-size: 0.85rem;
     font-weight: 500;
     display: flex;
     align-items: center;
