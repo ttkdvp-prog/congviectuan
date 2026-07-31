@@ -663,7 +663,8 @@ function switchSidebarTab(tabName) {
     gantt: 'Biểu đồ Gantt',
     tailieu: 'Quản lý tài liệu',
     nguoidung: 'Quản lý người dùng',
-    thongke: 'Đánh giá & Thống kê',
+    thongke: 'Thống kê theo tổ',
+    danhgiacanhan: 'Đánh giá cá nhân',
     cvluuy: 'Công việc lưu ý'
   };
   const titleDisplay = document.getElementById('page-title-display');
@@ -738,7 +739,8 @@ function renderActiveTab() {
   else if (tab === 'gantt') renderGanttChart();
   else if (tab === 'tailieu') renderDocumentsTable();
   else if (tab === 'nguoidung') renderUsersTable();
-  else if (tab === 'thongke') switchStatsSubTab(currentStatsSubTab || 'org');
+  else if (tab === 'thongke') renderOrgStatistics();
+  else if (tab === 'danhgiacanhan') { populateStatsUserFilters(); renderUserStatistics(); }
   else if (tab === 'cvluuy') renderCvLuuYTable();
 }
 
