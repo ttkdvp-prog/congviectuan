@@ -817,7 +817,7 @@ function renderTaskListTable() {
     } else if (status === 'Hoàn thành') {
       statusBadge = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
     } else {
-      statusBadge = `<span style="color:#38bdf8; font-weight:600;">${status}</span>`;
+      statusBadge = `<span style="color:#94a3b8; font-size:0.78rem;">${escapeHtml(status)}</span>`;
     }
 
     const progress = Number(t['Tiến độ (%)'] || 0);
