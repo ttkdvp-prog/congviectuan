@@ -7,7 +7,7 @@
  */
 
 const SPREADSHEET_ID = '13ggsO-iGlpspavwuBk8g6ZmAqcRsOmE8dZZZl8t_oLE';
-const CACHE_KEY = 'TASK_MGMT_DATA_CACHE_V2';
+const CACHE_KEY = 'TASK_MGMT_DATA_CACHE_V3';
 const CACHE_TTL_SECONDS = 600;
 
 function doGet(e) {
@@ -110,25 +110,21 @@ function getSpreadsheet() {
 function setupSheetsAndSampleData() {
   const ss = getSpreadsheet();
   
+  const expectedTaskHeaders = [
+    'ID', 'Tiêu đề', 'Mô tả', 'Trạng thái', 'Mức độ ưu tiên',
+    'Ngày bắt đầu', 'Ngày kết thúc', 'Tiến độ (%)', 'Người thực hiện',
+    'Danh sách công việc con', 'Tệp đính kèm', 'Ngày làm xong', 'Kế hoạch', 'Thực hiện', 'Tỷ lệ', 'Ghi chú'
+  ];
+
   // 1. Sheet congviec
   let cvSheet = ss.getSheetByName('congviec');
   if (!cvSheet) {
     cvSheet = ss.insertSheet('congviec');
   }
   
-  // Check headers
   if (cvSheet.getLastRow() === 0) {
-    cvSheet.appendRow([
-      'ID', 'Tiêu đề', 'Mô tả', 'Trạng thái', 'Mức độ ưu tiên',
-      'Ngày bắt đầu', 'Ngày kết thúc', 'Tiến độ (%)', 'Người thực hiện',
-      'Danh sách công việc con', 'Tệp đính kèm', 'Ngày làm xong', 'Kế hoạch', 'Thực hiện', 'Tỷ lệ', 'Ghi chú'
-    ]);
-    cvSheet.getRange(1, 1, 1, 16).setFontWeight('bold').setBackground('#141b2d').setFontColor('#ffffff');
-    
-    const formatDate = (d) => Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-    const today = new Date();
-    const d1 = new Date(today.getTime() - 2 * 86400000);
-    const d2 = new Date(today.getTime() + 5 * 86400000);
+    cvSheet.appendRow(expectedTaskHeaders);
+    cvSheet.getRange(1, 1, 1, expectedTaskHeaders.length).setFontWeight('bold').setBackground('#141b2d').setFontColor('#ffffff');
     
     cvSheet.appendRow([
       'TASK-001',
@@ -148,44 +144,21 @@ function setupSheetsAndSampleData() {
       '0%',
       'Nhập ghi chú...'
     ]);
-    
-    cvSheet.appendRow([
-      'TASK-002',
-      'Lắp điện 3 pha tủ đổi Pin',
-      'Tổ Hạ tầng Lương Sơn_Trạm VT Kim Bôi_điện lực Điện lực kim bôi',
-      'Quá hạn',
-      'Trung bình',
-      '2026-07-20',
-      '2026-07-24',
-      0,
-      'Vũ Mạnh Khương',
-      JSON.stringify([]),
-      '',
-      '',
-      1,
-      0,
-      '0%',
-      ''
-    ]);
-
-    cvSheet.appendRow([
-      'TASK-003',
-      'Lắp điện 3 pha tủ đổi Pin',
-      'Tổ Hạ tầng Phúc Yên_Trạm VT Quang Hà_điện lực Điện lực BX',
-      'Quá hạn',
-      'Trung bình',
-      '2026-07-20',
-      '2026-07-24',
-      0,
-      'Ngô Tiến Mạnh',
-      JSON.stringify([]),
-      '',
-      '',
-      1,
-      0,
-      '0%',
-      ''
-    ]);
+  } else {
+    // Auto update row 1 headers if sheet already exists but missing new columns
+    const currentLastCol = Math.max(cvSheet.getLastColumn(), expectedTaskHeaders.length);
+    const currentHeaders = cvSheet.getRange(1, 1, 1, currentLastCol).getValues()[0];
+    let needUpdate = false;
+    for (let h = 0; h < expectedTaskHeaders.length; h++) {
+      if (String(currentHeaders[h] || '').trim() !== expectedTaskHeaders[h]) {
+        needUpdate = true;
+        break;
+      }
+    }
+    if (needUpdate) {
+      cvSheet.getRange(1, 1, 1, expectedTaskHeaders.length).setValues([expectedTaskHeaders])
+        .setFontWeight('bold').setBackground('#141b2d').setFontColor('#ffffff');
+    }
   }
 
   // 2. Sheet Users
@@ -199,7 +172,6 @@ function setupSheetsAndSampleData() {
     usersSheet.appendRow(['USR-01', 'Đỗ Chu Đẳng', 'Tổ Hạ tầng Hòa Bình']);
     usersSheet.appendRow(['USR-02', 'Vũ Mạnh Khương', 'Tổ Hạ tầng Lương Sơn']);
     usersSheet.appendRow(['USR-03', 'Ngô Tiến Mạnh', 'Tổ Hạ tầng Phúc Yên']);
-    usersSheet.appendRow(['USR-04', 'Lê Minh Thuyết', 'Tổ Hạ tầng Tam Đảo']);
   }
 
   // 3. Sheet cvluuy
@@ -387,6 +359,7 @@ function saveTask(taskData) {
 }
 
 function updateTaskInline(payload) {
+  setupSheetsAndSampleData();
   const ss = getSpreadsheet();
   const sheet = ss.getSheetByName('congviec');
   if (!sheet) return { success: false };
@@ -406,8 +379,8 @@ function updateTaskInline(payload) {
     if (payload.thucHien !== undefined) {
       const th = Number(payload.thucHien);
       sheet.getRange(rowIndex, 14).setValue(th);
-      const keHoachVal = sheet.getRange(rowIndex, 13).getValue() || 1;
-      const pct = Math.round((th / keHoachVal) * 100) + '%';
+      const keHoachVal = Number(sheet.getRange(rowIndex, 13).getValue()) || 1;
+      const pct = (keHoachVal > 0 ? Math.round((th / keHoachVal) * 100) : 0) + '%';
       sheet.getRange(rowIndex, 15).setValue(pct);
     }
     if (payload.ghiChu !== undefined) sheet.getRange(rowIndex, 16).setValue(payload.ghiChu);

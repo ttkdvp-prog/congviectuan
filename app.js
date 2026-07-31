@@ -1,3 +1,4 @@
+<script>
 /**
  * ==============================================================================
  * TTHT Tasks - Quản Lý Công Việc & Hồ Sơ (Vanilla JS Engine - Dark Theme)
@@ -72,6 +73,23 @@ function callBackend(action, payload, successCallback) {
         appState.loadData(true);
       })
       .catch(err => onDataError(err));
+  }
+}
+
+function callBackendSilent(action, payload) {
+  if (appState.isGAS) {
+    google.script.run
+      .withSuccessHandler(res => {
+        console.log('Silent sync success:', action, res);
+      })
+      .withFailureHandler(err => console.error('Silent sync error:', err))[action](payload);
+  } else {
+    const fetchUrl = appState.apiUrl || window.location.href;
+    fetch(fetchUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: action, payload: payload })
+    }).catch(err => console.error('Silent sync error:', err));
   }
 }
 
@@ -206,7 +224,6 @@ function renderActiveTab() {
   else if (tab === 'cvluuy') renderCvLuuYTable();
 }
 
-/* 1. DASHBOARD */
 function renderDashboard() {
   const filtered = getFilteredTasks();
   let countDoing = 0, countDone = 0, countOverdue = 0, countCanceled = 0;
@@ -318,7 +335,6 @@ function renderRecentTasks(tasks) {
   container.innerHTML = html;
 }
 
-/* 2. KANBAN BOARD */
 function renderKanbanBoard() {
   const filtered = getFilteredTasks();
   const cols = {
@@ -399,7 +415,7 @@ function setupKanbanDragAndDrop() {
           task['Trạng thái'] = newStatus;
           if (newStatus === 'Hoàn thành') task['Tiến độ (%)'] = 100;
           renderKanbanBoard();
-          callBackend('updateTaskStatus', { id: taskId, status: newStatus });
+          callBackendSilent('updateTaskStatus', { id: taskId, status: newStatus });
           showToast(`Đã chuyển công việc sang "${newStatus}"`, 'success');
         }
       }
@@ -407,7 +423,6 @@ function setupKanbanDragAndDrop() {
   });
 }
 
-/* 3. DANH SÁCH */
 function renderTaskListTable() {
   const filtered = getFilteredTasks();
   const tbody = document.getElementById('task-list-tbody');
@@ -444,7 +459,7 @@ function renderTaskListTable() {
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(t['Ngày kết thúc'])}</td>
       <td>
-        <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleInlineTaskChange('${taskId}', 'ngayLamXong', this.value)">
+        <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleInlineTaskChange('${taskId}', 'ngayLamXong', this.value, this)">
       </td>
       <td>
         <div style="display:flex; align-items:center; gap:6px;">
@@ -456,11 +471,11 @@ function renderTaskListTable() {
       </td>
       <td><span class="number-pill">${keHoach}</span></td>
       <td>
-        <input type="number" class="inline-note-input" style="width:50px; text-align:center;" value="${thucHien}" onchange="handleInlineTaskChange('${taskId}', 'thucHien', this.value)">
+        <input type="number" class="inline-note-input" style="width:55px; text-align:center;" value="${thucHien}" onchange="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)" oninput="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)">
       </td>
-      <td><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
+      <td class="ty-le-col-cell"><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
       <td>
-        <input type="text" class="inline-note-input" value="${escapeHtml(ghiChu)}" placeholder="Nhập ghi chú..." onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value)">
+        <input type="text" class="inline-note-input" value="${escapeHtml(ghiChu)}" placeholder="Nhập ghi chú..." onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)">
       </td>
       <td style="text-align:center;">
         <div style="display:flex; gap:6px; justify-content:center;">
@@ -473,22 +488,32 @@ function renderTaskListTable() {
   });
 }
 
-function handleInlineTaskChange(taskId, field, value) {
+function handleInlineTaskChange(taskId, field, value, element) {
   const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
   if (task) {
     if (field === 'ngayLamXong') task['Ngày làm xong'] = value;
     if (field === 'thucHien') {
-      task['Thực hiện'] = Number(value);
-      const kh = task['Kế hoạch'] || 1;
-      task['Tỷ lệ'] = Math.round((Number(value) / kh) * 100) + '%';
+      const numVal = Number(value);
+      task['Thực hiện'] = numVal;
+      const kh = task['Kế hoạch'] !== undefined && task['Kế hoạch'] !== '' ? Number(task['Kế hoạch']) : 1;
+      const pct = kh > 0 ? Math.round((numVal / kh) * 100) : 0;
+      task['Tỷ lệ'] = pct + '%';
+      
+      if (element) {
+        const tr = element.closest('tr');
+        if (tr) {
+          const tyLeTd = tr.querySelector('.ty-le-col-cell');
+          if (tyLeTd) {
+            tyLeTd.innerHTML = `<strong style="color:var(--emerald-primary);">${task['Tỷ lệ']}</strong>`;
+          }
+        }
+      }
     }
     if (field === 'ghiChu') task['Ghi chú'] = value;
     
-    renderTaskListTable();
-    
     const payload = { id: taskId };
     payload[field] = value;
-    callBackend('updateTaskInline', payload);
+    callBackendSilent('updateTaskInline', payload);
   }
 }
 
@@ -511,17 +536,14 @@ function sortTable(columnName) {
   renderTaskListTable();
 }
 
-/* 4. GANTT CHART */
 function renderGanttChart() {
   const container = document.getElementById('gantt-chart-container');
   if (!container) return;
-  
   const filtered = getFilteredTasks();
   if (filtered.length === 0) {
     container.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted);">Không có dữ liệu công việc</div>`;
     return;
   }
-  
   const months = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
   const curM = new Date().getMonth();
   const displayMonths = months.slice(curM, curM + 4);
@@ -554,7 +576,6 @@ function renderGanttChart() {
   container.innerHTML = html;
 }
 
-/* 5. CÔNG VIỆC LƯU Ý */
 function renderCvLuuYTable() {
   const tbody = document.getElementById('cvluuy-tbody');
   if (!tbody) return;
@@ -593,7 +614,6 @@ function renderCvLuuYTable() {
   });
 }
 
-/* 6. DOCUMENTS & USERS & STATS */
 function renderDocumentsTable() {
   const tbody = document.getElementById('documents-tbody');
   if (!tbody) return;
