@@ -194,39 +194,41 @@ document.addEventListener('DOMContentLoaded', () => {
   if (uSelect) uSelect.addEventListener('change', handleGlobalFilter);
   if (gSelect) gSelect.addEventListener('change', onGlobalGroupChange);
 
-  // Restore local cache for zero-latency initial view on F5
+  // Restore local cache for zero-latency initial view on F5 across all devices
   const cachedTasks = localStorage.getItem('TTHT_TASKS_CACHE');
   const cachedUsers = localStorage.getItem('TTHT_USERS_CACHE');
-  if (cachedTasks) {
-    try { appState.tasks = JSON.parse(cachedTasks); } catch(e) {}
-  }
-  if (cachedUsers) {
-    try { appState.users = JSON.parse(cachedUsers); } catch(e) {}
-  }
+  const cachedCvLuuY = localStorage.getItem('TTHT_CVLUUY_CACHE');
+  const cachedDocs = localStorage.getItem('TTHT_DOCUMENTS_CACHE');
 
-  if (appState.tasks.length > 0 || appState.users.length > 0) {
-    populateSelects();
-    renderActiveTab();
-  }
+  if (cachedTasks) { try { appState.tasks = JSON.parse(cachedTasks); } catch(e) {} }
+  if (cachedUsers) { try { appState.users = JSON.parse(cachedUsers); } catch(e) {} }
+  if (cachedCvLuuY) { try { appState.cvluuy = JSON.parse(cachedCvLuuY); } catch(e) {} }
+  if (cachedDocs) { try { appState.documents = JSON.parse(cachedDocs); } catch(e) {} }
 
+  populateSelects();
+  renderActiveTab();
+
+  // Background silent sync with backend if available
   appState.loadData();
   setupKanbanDragAndDrop();
 });
 
-appState.loadData = function (forceRefresh = false) {
-  showToast('Đang đồng bộ dữ liệu với Google Sheets...', 'info');
-  
+appState.loadData = function (forceRefresh = false, showNotification = false) {
   if (appState.isGAS) {
     google.script.run
-      .withSuccessHandler(onDataLoaded)
-      .withFailureHandler(onDataError)
+      .withSuccessHandler(data => onDataLoaded(data, showNotification))
+      .withFailureHandler(err => console.warn('Background GAS sync failed, using local cache:', err))
       .getInitialData(forceRefresh);
   } else {
-    const fetchUrl = appState.apiUrl || window.location.href;
+    const fetchUrl = appState.apiUrl;
+    if (!fetchUrl) {
+      console.log('Running in local offline mode (no apiUrl configured).');
+      return;
+    }
     fetch(fetchUrl + '?action=getInitialData&t=' + new Date().getTime())
       .then(res => res.json())
-      .then(data => onDataLoaded(data))
-      .catch(err => onDataError(err));
+      .then(data => onDataLoaded(data, showNotification))
+      .catch(err => console.warn('Background fetch failed, using local cache:', err));
   }
 };
 
@@ -271,7 +273,8 @@ function callBackendSilent(action, payload) {
       })
       .withFailureHandler(err => console.error('Silent sync error:', err))[action](payload);
   } else {
-    const fetchUrl = appState.apiUrl || window.location.href;
+    const fetchUrl = appState.apiUrl;
+    if (!fetchUrl) return;
     fetch(fetchUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
@@ -280,12 +283,12 @@ function callBackendSilent(action, payload) {
   }
 }
 
-function onDataLoaded(response) {
+function onDataLoaded(response, showNotification = false) {
   if (response && response.success) {
-    appState.tasks = response.tasks || [];
-    appState.users = response.users || [];
-    appState.cvluuy = response.cvluuy || [];
-    appState.documents = response.documents || [];
+    if (response.tasks && response.tasks.length > 0) appState.tasks = response.tasks;
+    if (response.users && response.users.length > 0) appState.users = response.users;
+    if (response.cvluuy && response.cvluuy.length > 0) appState.cvluuy = response.cvluuy;
+    if (response.documents && response.documents.length > 0) appState.documents = response.documents;
     
     appState.tasks.forEach(t => {
       if (typeof t['Danh sách công việc con'] === 'string' && t['Danh sách công việc con']) {
@@ -305,19 +308,20 @@ function onDataLoaded(response) {
     try {
       localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks));
       localStorage.setItem('TTHT_USERS_CACHE', JSON.stringify(appState.users));
+      localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy));
+      localStorage.setItem('TTHT_DOCUMENTS_CACHE', JSON.stringify(appState.documents));
     } catch(e) {}
 
     populateSelects();
     renderActiveTab();
-    showToast('Đồng bộ dữ liệu thành công!', 'success');
-  } else {
-    showToast('Lỗi: ' + (response.message || 'Unknown'), 'error');
+    if (showNotification) {
+      showToast('Đồng bộ dữ liệu thành công!', 'success');
+    }
   }
 }
 
 function onDataError(error) {
-  console.error('API Error:', error);
-  showToast('Không thể kết nối với Backend Google Apps Script.', 'error');
+  console.warn('API Warning:', error);
 }
 
 function getUserNameAndGroup(u) {
