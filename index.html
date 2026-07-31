@@ -430,15 +430,21 @@
             </div>
             <div class="dark-form-group">
               <label>Người chủ trì</label>
-              <input type="text" class="dark-form-control" id="task-chutri-input" list="chutri-datalist" placeholder="Gõ tên hoặc chọn người chủ trì..." autocomplete="off">
-              <datalist id="chutri-datalist"></datalist>
+              <div class="custom-select-box" id="box-chutri">
+                <input type="text" class="dark-form-control custom-select-input" id="task-chutri-input" placeholder="Nhấp chọn hoặc gõ tìm người chủ trì..." autocomplete="off" onfocus="showCustomDropdown('chutri')" oninput="filterCustomDropdown('chutri', this.value)">
+                <i class="fa-solid fa-chevron-down custom-select-arrow" onclick="toggleCustomDropdown('chutri', event)"></i>
+                <div class="custom-dropdown-list" id="dropdown-chutri"></div>
+              </div>
             </div>
           </div>
 
           <div class="dark-form-group">
             <label>Người phối hợp</label>
-            <input type="text" class="dark-form-control" id="task-phoihop-input" list="phoihop-datalist" placeholder="Gõ tên hoặc chọn người phối hợp..." autocomplete="off">
-            <datalist id="phoihop-datalist"></datalist>
+            <div class="custom-select-box" id="box-phoihop">
+              <input type="text" class="dark-form-control custom-select-input" id="task-phoihop-input" placeholder="Nhấp chọn hoặc gõ tìm người phối hợp..." autocomplete="off" onfocus="showCustomDropdown('phoihop')" oninput="filterCustomDropdown('phoihop', this.value)">
+              <i class="fa-solid fa-chevron-down custom-select-arrow" onclick="toggleCustomDropdown('phoihop', event)"></i>
+              <div class="custom-dropdown-list" id="dropdown-phoihop"></div>
+            </div>
           </div>
 
           <div class="dark-form-group">

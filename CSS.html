@@ -1004,6 +1004,76 @@ select option {
 
 .dark-form-control:focus { border-color: var(--emerald-primary); }
 
+/* CUSTOM SEARCHABLE DROPDOWN COMPONENT */
+.custom-select-box {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-input {
+  padding-right: 36px !important;
+}
+
+.custom-select-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: auto;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.custom-select-arrow:hover {
+  color: var(--emerald-primary);
+}
+
+.custom-dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #161c2a;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 1200;
+  display: none;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+}
+
+.custom-dropdown-list.active {
+  display: block;
+}
+
+.custom-dropdown-item {
+  padding: 10px 14px;
+  color: #ffffff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.custom-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.custom-dropdown-item:hover {
+  background: rgba(0, 200, 151, 0.18);
+  color: var(--emerald-primary);
+}
+
+.custom-dropdown-empty {
+  padding: 12px;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
 .dark-form-row {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

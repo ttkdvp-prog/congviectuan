@@ -453,44 +453,16 @@ function populateSelects() {
     if (curVal) taskToChuTriSelect.value = curVal;
   }
 
-  const chuTriDatalist = document.getElementById('chutri-datalist');
-  if (chuTriDatalist) {
-    chuTriDatalist.innerHTML = '';
-    Array.from(assignees).sort().forEach(a => {
-      if (a) chuTriDatalist.innerHTML += `<option value="${escapeHtml(a)}"></option>`;
-    });
-  } else if (taskChuTriSelect && taskChuTriSelect.tagName === 'SELECT') {
-    const curVal = taskChuTriSelect.value;
-    taskChuTriSelect.innerHTML = '<option value="">-- Chọn người chủ trì --</option>';
-    Array.from(assignees).sort().forEach(a => {
-      if (a) taskChuTriSelect.innerHTML += `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`;
-    });
-    if (curVal) taskChuTriSelect.value = curVal;
-  }
-
-  const phoiHopDatalist = document.getElementById('phoihop-datalist');
-  if (phoiHopDatalist) {
-    phoiHopDatalist.innerHTML = '';
-    Array.from(assignees).sort().forEach(a => {
-      if (a) phoiHopDatalist.innerHTML += `<option value="${escapeHtml(a)}"></option>`;
-    });
-  } else if (taskPhoiHopSelect && taskPhoiHopSelect.tagName === 'SELECT') {
-    const curVal = taskPhoiHopSelect.value;
-    taskPhoiHopSelect.innerHTML = '<option value="">-- Chọn người phối hợp --</option>';
-    Array.from(assignees).sort().forEach(a => {
-      if (a) taskPhoiHopSelect.innerHTML += `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`;
-    });
-    if (curVal) taskPhoiHopSelect.value = curVal;
-  }
+  if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
+  appState.dropdownData.phoihop = Array.from(assignees).sort();
+  appState.dropdownData.chutri = Array.from(assignees).sort();
 
   updateGlobalUserSelectOptions();
 }
 
 function handleModalGroupChange(selectedGroup) {
   const chuTriInput = document.getElementById('task-chutri-input');
-  const chuTriDatalist = document.getElementById('chutri-datalist');
   if (!chuTriInput) return;
-  const currentVal = chuTriInput.value;
 
   const filteredUsers = new Set();
   const selGrpClean = cleanKey(selectedGroup);
@@ -541,21 +513,72 @@ function handleModalGroupChange(selectedGroup) {
     }
   }
 
-  if (chuTriDatalist) {
-    chuTriDatalist.innerHTML = '';
-    Array.from(filteredUsers).sort().forEach(u => {
-      chuTriDatalist.innerHTML += `<option value="${escapeHtml(u)}"></option>`;
-    });
-  } else if (chuTriInput.tagName === 'SELECT') {
-    chuTriInput.innerHTML = '<option value="">-- Chọn người chủ trì --</option>';
-    Array.from(filteredUsers).sort().forEach(u => {
-      chuTriInput.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
-    });
-    if (currentVal && Array.from(filteredUsers).includes(currentVal)) {
-      chuTriInput.value = currentVal;
-    }
+  if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
+  appState.dropdownData.chutri = Array.from(filteredUsers).sort();
+}
+
+/* CUSTOM SEARCHABLE DROPDOWN JS ENGINE */
+function showCustomDropdown(type) {
+  closeAllCustomDropdowns();
+  const listEl = document.getElementById('dropdown-' + type);
+  const inputEl = document.getElementById('task-' + type + '-input');
+  if (!listEl || !inputEl) return;
+
+  filterCustomDropdown(type, inputEl.value);
+  listEl.classList.add('active');
+}
+
+function toggleCustomDropdown(type, event) {
+  if (event) event.stopPropagation();
+  const listEl = document.getElementById('dropdown-' + type);
+  if (!listEl) return;
+  if (listEl.classList.contains('active')) {
+    listEl.classList.remove('active');
+  } else {
+    showCustomDropdown(type);
   }
 }
+
+function filterCustomDropdown(type, query) {
+  const listEl = document.getElementById('dropdown-' + type);
+  if (!listEl) return;
+
+  const rawList = (appState.dropdownData && appState.dropdownData[type]) ? appState.dropdownData[type] : [];
+  const qClean = cleanKey(query);
+
+  let filtered = rawList;
+  if (qClean) {
+    filtered = rawList.filter(item => cleanKey(item).includes(qClean));
+  }
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = `<div class="custom-dropdown-empty">Không tìm thấy kết quả phù hợp</div>`;
+  } else {
+    listEl.innerHTML = filtered.map(item => `
+      <div class="custom-dropdown-item" onclick="selectCustomDropdownItem('${type}', '${escapeHtml(item)}')">
+        ${escapeHtml(item)}
+      </div>
+    `).join('');
+  }
+  listEl.classList.add('active');
+}
+
+function selectCustomDropdownItem(type, val) {
+  const inputEl = document.getElementById('task-' + type + '-input');
+  if (inputEl) inputEl.value = val;
+  const listEl = document.getElementById('dropdown-' + type);
+  if (listEl) listEl.classList.remove('active');
+}
+
+function closeAllCustomDropdowns() {
+  document.querySelectorAll('.custom-dropdown-list').forEach(el => el.classList.remove('active'));
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.custom-select-box')) {
+    closeAllCustomDropdowns();
+  }
+});
 
 function onGlobalGroupChange() {
   updateGlobalUserSelectOptions();
