@@ -985,12 +985,21 @@ body.dark-theme {
 .dark-form-control {
   width: 100%;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.05);
+  background: #1a2338;
   border: 1px solid var(--card-border);
   border-radius: var(--radius-md);
   color: var(--text-white);
   font-size: 0.88rem;
   outline: none;
+}
+
+select.dark-form-control option,
+select.header-select option,
+.dark-form-control option,
+select option {
+  background-color: #1a2338 !important;
+  color: #ffffff !important;
+  padding: 10px !important;
 }
 
 .dark-form-control:focus { border-color: var(--emerald-primary); }
