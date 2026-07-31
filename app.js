@@ -85,42 +85,63 @@ function getTaskCollaborator(task) {
   return '';
 }
 
+function formatUniqueGroups(groupStr) {
+  if (!groupStr) return '';
+  const parts = String(groupStr).split(',').map(p => p.trim()).filter(Boolean);
+  const unique = Array.from(new Set(parts));
+  return unique.join(', ');
+}
+
 function getTaskGroup(task) {
   if (!task) return '';
   
+  let rawGroup = '';
   for (let k in task) {
     const ck = cleanKey(k);
     if (ck === 'tochutri' || ck === 'to' || ck === 'tentocutri' || ck === 'tengroup') {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
+        rawGroup = String(task[k]).trim();
+        break;
       }
     }
   }
 
-  const assignee = getTaskAssignee(task);
-  if (assignee && assignee !== 'Chưa gán') {
-    const usr = appState.users.find(u => {
-      const name = u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u.name;
-      return cleanKey(name) === cleanKey(assignee);
-    });
-    if (usr) {
-      for (let k in usr) {
-        const ck = cleanKey(k);
-        if (ck === 'to' || ck === 'tochutri' || ck === 'tento') {
-          if (usr[k] && String(usr[k]).trim()) return String(usr[k]).trim();
+  if (!rawGroup) {
+    const assignee = getTaskAssignee(task);
+    if (assignee && assignee !== 'Chưa gán') {
+      const names = assignee.split(',').map(n => n.trim()).filter(Boolean);
+      const groups = new Set();
+      names.forEach(name => {
+        const usr = appState.users.find(u => {
+          const uName = u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u.name;
+          return cleanKey(uName) === cleanKey(name);
+        });
+        if (usr) {
+          for (let k in usr) {
+            const ck = cleanKey(k);
+            if (ck === 'to' || ck === 'tochutri' || ck === 'tento') {
+              if (usr[k] && String(usr[k]).trim()) groups.add(String(usr[k]).trim());
+            }
+          }
+        }
+      });
+      if (groups.size > 0) rawGroup = Array.from(groups).join(', ');
+    }
+  }
+
+  if (!rawGroup) {
+    for (let k in task) {
+      const ck = cleanKey(k);
+      if (ck.includes('chutri') && ck.includes('to')) {
+        if (task[k] && String(task[k]).trim()) {
+          rawGroup = String(task[k]).trim();
+          break;
         }
       }
     }
   }
 
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck.includes('chutri') && ck.includes('to')) {
-      if (task[k] && String(task[k]).trim()) return String(task[k]).trim();
-    }
-  }
-
-  return '';
+  return formatUniqueGroups(rawGroup);
 }
 
 function getTaskCollaboratorGroup(task) {
