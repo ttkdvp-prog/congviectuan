@@ -452,7 +452,13 @@ function populateSelects() {
     if (curVal) taskToChuTriSelect.value = curVal;
   }
 
-  if (taskChuTriSelect) {
+  const chuTriDatalist = document.getElementById('chutri-datalist');
+  if (chuTriDatalist) {
+    chuTriDatalist.innerHTML = '';
+    Array.from(assignees).sort().forEach(a => {
+      if (a) chuTriDatalist.innerHTML += `<option value="${escapeHtml(a)}"></option>`;
+    });
+  } else if (taskChuTriSelect && taskChuTriSelect.tagName === 'SELECT') {
     const curVal = taskChuTriSelect.value;
     taskChuTriSelect.innerHTML = '<option value="">-- Chọn người chủ trì --</option>';
     Array.from(assignees).sort().forEach(a => {
@@ -461,7 +467,13 @@ function populateSelects() {
     if (curVal) taskChuTriSelect.value = curVal;
   }
 
-  if (taskPhoiHopSelect) {
+  const phoiHopDatalist = document.getElementById('phoihop-datalist');
+  if (phoiHopDatalist) {
+    phoiHopDatalist.innerHTML = '';
+    Array.from(assignees).sort().forEach(a => {
+      if (a) phoiHopDatalist.innerHTML += `<option value="${escapeHtml(a)}"></option>`;
+    });
+  } else if (taskPhoiHopSelect && taskPhoiHopSelect.tagName === 'SELECT') {
     const curVal = taskPhoiHopSelect.value;
     taskPhoiHopSelect.innerHTML = '<option value="">-- Chọn người phối hợp --</option>';
     Array.from(assignees).sort().forEach(a => {
@@ -474,9 +486,10 @@ function populateSelects() {
 }
 
 function handleModalGroupChange(selectedGroup) {
-  const chuTriSelect = document.getElementById('task-chutri-input');
-  if (!chuTriSelect) return;
-  const currentVal = chuTriSelect.value;
+  const chuTriInput = document.getElementById('task-chutri-input');
+  const chuTriDatalist = document.getElementById('chutri-datalist');
+  if (!chuTriInput) return;
+  const currentVal = chuTriInput.value;
 
   const filteredUsers = new Set();
   const selGrpClean = cleanKey(selectedGroup);
@@ -527,13 +540,19 @@ function handleModalGroupChange(selectedGroup) {
     }
   }
 
-  chuTriSelect.innerHTML = '<option value="">-- Chọn người chủ trì --</option>';
-  Array.from(filteredUsers).sort().forEach(u => {
-    chuTriSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
-  });
-
-  if (currentVal && Array.from(filteredUsers).includes(currentVal)) {
-    chuTriSelect.value = currentVal;
+  if (chuTriDatalist) {
+    chuTriDatalist.innerHTML = '';
+    Array.from(filteredUsers).sort().forEach(u => {
+      chuTriDatalist.innerHTML += `<option value="${escapeHtml(u)}"></option>`;
+    });
+  } else if (chuTriInput.tagName === 'SELECT') {
+    chuTriInput.innerHTML = '<option value="">-- Chọn người chủ trì --</option>';
+    Array.from(filteredUsers).sort().forEach(u => {
+      chuTriInput.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
+    });
+    if (currentVal && Array.from(filteredUsers).includes(currentVal)) {
+      chuTriInput.value = currentVal;
+    }
   }
 }
 
