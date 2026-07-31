@@ -25,6 +25,11 @@ const appState = {
   donutChart: null
 };
 
+function getTaskAssignee(task) {
+  if (!task) return 'Chưa gán';
+  return task['Người thực hiện'] || task['Người phụ trách'] || task['NguoiThucHien'] || task['Assignee'] || 'Chưa gán';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const urlInput = document.getElementById('gas-api-url-input');
   if (urlInput && appState.apiUrl) {
@@ -39,6 +44,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tabName) switchSidebarTab(tabName);
     });
   });
+
+  // Attach search & group filter event listeners
+  const sInput = document.getElementById('global-search-input');
+  const uInput = document.getElementById('global-user-search');
+  const gSelect = document.getElementById('global-group-select');
+
+  if (sInput) sInput.addEventListener('input', handleGlobalFilter);
+  if (uInput) uInput.addEventListener('input', handleGlobalFilter);
+  if (gSelect) gSelect.addEventListener('change', handleGlobalFilter);
 
   appState.loadData();
   setupKanbanDragAndDrop();
@@ -140,26 +154,43 @@ function populateSelects() {
   const assignees = new Set();
   
   appState.users.forEach(u => {
-    if (u['Tổ'] || u.group) groups.add(u['Tổ'] || u.group);
-    if (u['Tên'] || u.name) assignees.add(u['Tên'] || u.name);
+    const g = u['Tổ'] || u.group;
+    const n = u['Tên'] || u.name;
+    if (g) groups.add(g);
+    if (n) assignees.add(n);
   });
+
+  appState.tasks.forEach(t => {
+    const a = getTaskAssignee(t);
+    if (a && a !== 'Chưa gán') assignees.add(a);
+    if (t['Tổ']) groups.add(t['Tổ']);
+  });
+
   appState.cvluuy.forEach(item => { if (item['Tổ']) groups.add(item['Tổ']); });
 
   if (groupSelect) {
+    const curVal = groupSelect.value;
     groupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
     groups.forEach(g => groupSelect.innerHTML += `<option value="${g}">${g}</option>`);
+    if (curVal) groupSelect.value = curVal;
   }
   if (cvluuyGroupSelect) {
+    const curVal = cvluuyGroupSelect.value;
     cvluuyGroupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
     groups.forEach(g => cvluuyGroupSelect.innerHTML += `<option value="${g}">${g}</option>`);
+    if (curVal) cvluuyGroupSelect.value = curVal;
   }
   if (kanbanAssigneeSelect) {
+    const curVal = kanbanAssigneeSelect.value;
     kanbanAssigneeSelect.innerHTML = '<option value="">Tất cả người phụ trách</option>';
     assignees.forEach(a => kanbanAssigneeSelect.innerHTML += `<option value="${a}">${a}</option>`);
+    if (curVal) kanbanAssigneeSelect.value = curVal;
   }
   if (taskAssigneeSelect) {
+    const curVal = taskAssigneeSelect.value;
     taskAssigneeSelect.innerHTML = '<option value="">-- Chọn người thực hiện --</option>';
     assignees.forEach(a => taskAssigneeSelect.innerHTML += `<option value="${a}">${a}</option>`);
+    if (curVal) taskAssigneeSelect.value = curVal;
   }
 }
 
@@ -195,9 +226,14 @@ function switchSidebarTab(tabName) {
 }
 
 function handleGlobalFilter() {
-  appState.filters.search = document.getElementById('global-search-input').value.trim();
-  appState.filters.user = document.getElementById('global-user-search').value.trim();
-  appState.filters.group = document.getElementById('global-group-select').value;
+  const sEl = document.getElementById('global-search-input');
+  const uEl = document.getElementById('global-user-search');
+  const gEl = document.getElementById('global-group-select');
+
+  appState.filters.search = sEl ? sEl.value.trim() : '';
+  appState.filters.user = uEl ? uEl.value.trim() : '';
+  appState.filters.group = gEl ? gEl.value : '';
+  
   renderActiveTab();
 }
 
@@ -212,14 +248,22 @@ function getFilteredTasks() {
     const search = appState.filters.search.toLowerCase();
     const title = (t['Tiêu đề'] || '').toLowerCase();
     const desc = (t['Mô tả'] || '').toLowerCase();
+    const assignee = getTaskAssignee(t).toLowerCase();
     
-    if (search && !title.includes(search) && !desc.includes(search)) return false;
+    if (search && !title.includes(search) && !desc.includes(search) && !assignee.includes(search)) return false;
     
-    const user = appState.filters.user.toLowerCase();
-    const assignee = (t['Người thực hiện'] || '').toLowerCase();
-    if (user && !assignee.includes(user)) return false;
+    const userSearch = appState.filters.user.toLowerCase();
+    if (userSearch && !assignee.includes(userSearch)) return false;
 
-    if (appState.filters.kanbanAssignee && t['Người thực hiện'] !== appState.filters.kanbanAssignee) return false;
+    const groupFilter = appState.filters.group;
+    if (groupFilter) {
+      const taskAssignee = getTaskAssignee(t);
+      const userObj = appState.users.find(u => (u['Tên'] || u.name) === taskAssignee);
+      const taskGroup = userObj ? (userObj['Tổ'] || userObj.group) : (t['Tổ'] || '');
+      if (taskGroup !== groupFilter) return false;
+    }
+
+    if (appState.filters.kanbanAssignee && getTaskAssignee(t) !== appState.filters.kanbanAssignee) return false;
     if (appState.filters.kanbanPriority && t['Mức độ ưu tiên'] !== appState.filters.kanbanPriority) return false;
 
     return true;
@@ -386,7 +430,7 @@ function createDarkTaskCard(task) {
   
   const priority = task['Mức độ ưu tiên'] || 'Trung bình';
   const tagPClass = priority === 'Cao' ? 'tag-p-high' : priority === 'Trung bình' ? 'tag-p-med' : 'tag-p-low';
-  const assignee = task['Người thực hiện'] || 'Chưa gán';
+  const assignee = getTaskAssignee(task);
   const avatarLetter = assignee.charAt(0).toUpperCase();
 
   card.innerHTML = `
@@ -467,19 +511,20 @@ function renderTaskListTable() {
     const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
     const ghiChu = t['Ghi chú'] || '';
     const ngayLamXong = t['Ngày làm xong'] || '';
+    const assigneeName = getTaskAssignee(t);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
       <td style="max-width:240px; font-size:0.78rem; color:#94a3b8; white-space:normal;">${escapeHtml(t['Mô tả'] || '')}</td>
-      <td>${statusBadge}</td>
-      <td>${escapeHtml(t['Người thực hiện'] || 'Chưa gán')}</td>
+      <td class="status-col-cell">${statusBadge}</td>
+      <td>${escapeHtml(assigneeName)}</td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(t['Ngày kết thúc'])}</td>
       <td>
         <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleInlineTaskChange('${taskId}', 'ngayLamXong', this.value, this)">
       </td>
-      <td>
+      <td class="progress-col-cell">
         <div style="display:flex; align-items:center; gap:6px;">
           <div style="width:50px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
             <div style="width:${progress}%; height:100%; background:var(--emerald-primary);"></div>
@@ -492,7 +537,7 @@ function renderTaskListTable() {
         <input type="number" class="inline-note-input" style="width:55px; text-align:center;" value="${thucHien}" onchange="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)" oninput="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)">
       </td>
       <td class="ty-le-col-cell"><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
-      <td>
+      <td class="col-note-cell">
         <input type="text" class="inline-note-input" value="${escapeHtml(ghiChu)}" placeholder="Nhập ghi chú..." onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)">
       </td>
       <td style="text-align:center;">
@@ -509,14 +554,64 @@ function renderTaskListTable() {
 function handleInlineTaskChange(taskId, field, value, element) {
   const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
   if (task) {
-    if (field === 'ngayLamXong') task['Ngày làm xong'] = value;
+    const payload = { id: taskId };
+
+    if (field === 'ngayLamXong') {
+      task['Ngày làm xong'] = value;
+      payload.ngayLamXong = value;
+
+      if (value) {
+        task['Tiến độ (%)'] = 100;
+        task['Trạng thái'] = 'Hoàn thành';
+      } else {
+        const kh = Number(task['Kế hoạch'] || 1);
+        const th = Number(task['Thực hiện'] || 0);
+        task['Tiến độ (%)'] = kh > 0 ? Math.min(100, Math.round((th / kh) * 100)) : 0;
+        if (task['Tiến độ (%)'] < 100) task['Trạng thái'] = 'Đang thực hiện';
+      }
+
+      payload.progress = task['Tiến độ (%)'];
+      payload.status = task['Trạng thái'];
+
+      if (element) {
+        const tr = element.closest('tr');
+        if (tr) {
+          const progressCell = tr.querySelector('.progress-col-cell');
+          if (progressCell) {
+            progressCell.innerHTML = `
+              <div style="display:flex; align-items:center; gap:6px;">
+                <div style="width:50px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+                  <div style="width:${task['Tiến độ (%)']}%; height:100%; background:var(--emerald-primary);"></div>
+                </div>
+                <span style="font-size:0.75rem; color:#94a3b8;">${task['Tiến độ (%)']}%</span>
+              </div>
+            `;
+          }
+          const statusCell = tr.querySelector('.status-col-cell');
+          if (statusCell) {
+            const st = task['Trạng thái'];
+            statusCell.innerHTML = st === 'Hoàn thành' 
+              ? `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>` 
+              : `<span style="color:#38bdf8; font-weight:600;">${st}</span>`;
+          }
+        }
+      }
+    }
+
     if (field === 'thucHien') {
       const numVal = Number(value);
       task['Thực hiện'] = numVal;
+      payload.thucHien = numVal;
+
       const kh = task['Kế hoạch'] !== undefined && task['Kế hoạch'] !== '' ? Number(task['Kế hoạch']) : 1;
       const pct = kh > 0 ? Math.round((numVal / kh) * 100) : 0;
       task['Tỷ lệ'] = pct + '%';
       
+      if (!task['Ngày làm xong']) {
+        task['Tiến độ (%)'] = Math.min(100, pct);
+        payload.progress = task['Tiến độ (%)'];
+      }
+
       if (element) {
         const tr = element.closest('tr');
         if (tr) {
@@ -524,13 +619,26 @@ function handleInlineTaskChange(taskId, field, value, element) {
           if (tyLeTd) {
             tyLeTd.innerHTML = `<strong style="color:var(--emerald-primary);">${task['Tỷ lệ']}</strong>`;
           }
+          const progressCell = tr.querySelector('.progress-col-cell');
+          if (progressCell) {
+            progressCell.innerHTML = `
+              <div style="display:flex; align-items:center; gap:6px;">
+                <div style="width:50px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+                  <div style="width:${task['Tiến độ (%)']}%; height:100%; background:var(--emerald-primary);"></div>
+                </div>
+                <span style="font-size:0.75rem; color:#94a3b8;">${task['Tiến độ (%)']}%</span>
+              </div>
+            `;
+          }
         }
       }
     }
-    if (field === 'ghiChu') task['Ghi chú'] = value;
+
+    if (field === 'ghiChu') {
+      task['Ghi chú'] = value;
+      payload.ghiChu = value;
+    }
     
-    const payload = { id: taskId };
-    payload[field] = value;
     callBackendSilent('updateTaskInline', payload);
   }
 }
@@ -620,7 +728,7 @@ function renderCvLuuYTable() {
       <td>${formatDateVN(item['Ngày kết thúc'])}</td>
       <td><input type="date" class="inline-date-picker" value="${item['Ngày làm xong'] || ''}"></td>
       <td><span class="tag-priority tag-p-low">${item['Trạng thái'] || 'Cần lưu ý'}</span></td>
-      <td><input type="text" class="inline-note-input" value="${escapeHtml(item['Ghi chú'] || '')}"></td>
+      <td class="col-note-cell"><input type="text" class="inline-note-input" value="${escapeHtml(item['Ghi chú'] || '')}"></td>
       <td style="text-align:right;">
         <div style="display:flex; gap:6px; justify-content:flex-end;">
           <button class="btn-action-edit" onclick="openCvLuuYModal('${item.ID || item.id}')"><i class="fa-solid fa-pen"></i></button>
@@ -699,7 +807,7 @@ function renderOrgStatistics() {
   });
 
   appState.tasks.forEach(t => {
-    const assignee = t['Người thực hiện'];
+    const assignee = getTaskAssignee(t);
     const usr = appState.users.find(u => u['Tên'] === assignee);
     const org = usr ? (usr['Tổ'] || 'Khác') : 'Khác';
     if (!orgMap[org]) orgMap[org] = { total: 0, done: 0 };
@@ -745,7 +853,7 @@ function openTaskModal(taskId = null) {
       document.getElementById('task-end-input').value = task['Ngày kết thúc'] || '';
       document.getElementById('task-kehoach-input').value = task['Kế hoạch'] !== undefined ? task['Kế hoạch'] : 1;
       document.getElementById('task-thuchien-input').value = task['Thực hiện'] !== undefined ? task['Thực hiện'] : 0;
-      document.getElementById('task-assignee-input').value = task['Người thực hiện'] || '';
+      document.getElementById('task-assignee-input').value = getTaskAssignee(task);
       document.getElementById('task-progress-input').value = task['Tiến độ (%)'] || 0;
       document.getElementById('progress-val-display').innerText = task['Tiến độ (%)'] || 0;
       document.getElementById('task-ghichu-input').value = task['Ghi chú'] || '';
@@ -808,6 +916,7 @@ function handleTaskFormSubmit(e) {
     'Kế hoạch': Number(document.getElementById('task-kehoach-input').value),
     'Thực hiện': Number(document.getElementById('task-thuchien-input').value),
     'Người thực hiện': document.getElementById('task-assignee-input').value,
+    'Người phụ trách': document.getElementById('task-assignee-input').value,
     'Tiến độ (%)': Number(document.getElementById('task-progress-input').value),
     'Ghi chú': document.getElementById('task-ghichu-input').value,
     'Tệp đính kèm': document.getElementById('task-attachment-input').value,

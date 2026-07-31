@@ -680,6 +680,14 @@ body.dark-theme {
   font-weight: 600;
 }
 
+/* Wide Note Column Styling */
+.dark-table td.col-note-cell,
+.dark-table th.col-note-header {
+  min-width: 200px !important;
+  width: 240px !important;
+  white-space: normal !important;
+}
+
 .dark-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.03);
 }
@@ -732,11 +740,20 @@ body.dark-theme {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--card-border);
   border-radius: 6px;
-  color: var(--text-white);
-  padding: 4px 8px;
+  color: #94a3b8;
+  padding: 6px 10px;
   font-size: 0.78rem;
+  font-family: inherit;
   outline: none;
-  width: 140px;
+  width: 100%;
+  min-width: 180px;
+  transition: var(--transition);
+}
+
+.inline-note-input:focus {
+  border-color: var(--emerald-primary);
+  color: var(--text-white);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .number-pill {
