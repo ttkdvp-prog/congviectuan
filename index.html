@@ -319,9 +319,32 @@
 
         <!-- TAB 7: ĐÁNH GIÁ & THỐNG KÊ -->
         <section id="section-thongke" class="page-section">
-          <div class="widget-card">
-            <div class="widget-header"><i class="fa-solid fa-chart-bar icon-green"></i> Thống Kê Tiến Độ Theo Tổ</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn-subtab active" id="btn-subtab-org" onclick="switchStatsSubTab('org')">
+                <i class="fa-solid fa-users icon-green"></i> Thống Kê Theo Tổ
+              </button>
+              <button type="button" class="btn-subtab" id="btn-subtab-user" onclick="switchStatsSubTab('user')">
+                <i class="fa-solid fa-user-check icon-green"></i> Đánh Giá Theo Cá Nhân
+              </button>
+            </div>
+            
+            <div id="stats-user-filter-bar" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
+              <select class="dark-form-control" id="stats-user-group-filter" onchange="onStatsUserGroupChange()" style="width:auto; min-width:180px;">
+                <option value="">Tất cả tổ</option>
+              </select>
+              <select class="dark-form-control" id="stats-user-person-filter" onchange="renderUserStatistics()" style="width:auto; min-width:200px;">
+                <option value="">Tất cả cá nhân</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="subtab-org-content" class="widget-card">
             <div id="stats-org-container" style="padding:20px;"></div>
+          </div>
+
+          <div id="subtab-user-content" class="widget-card" style="display:none;">
+            <div id="stats-user-container" style="padding:20px;"></div>
           </div>
         </section>
 

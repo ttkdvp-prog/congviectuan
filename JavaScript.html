@@ -738,7 +738,7 @@ function renderActiveTab() {
   else if (tab === 'gantt') renderGanttChart();
   else if (tab === 'tailieu') renderDocumentsTable();
   else if (tab === 'nguoidung') renderUsersTable();
-  else if (tab === 'thongke') renderOrgStatistics();
+  else if (tab === 'thongke') switchStatsSubTab(currentStatsSubTab || 'org');
   else if (tab === 'cvluuy') renderCvLuuYTable();
 }
 
@@ -1473,6 +1473,336 @@ function renderOrgStatistics() {
           </table>
         </div>
       </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+let currentStatsSubTab = 'org';
+
+function switchStatsSubTab(type) {
+  currentStatsSubTab = type;
+  const btnOrg = document.getElementById('btn-subtab-org');
+  const btnUser = document.getElementById('btn-subtab-user');
+  const contentOrg = document.getElementById('subtab-org-content');
+  const contentUser = document.getElementById('subtab-user-content');
+  const filterBar = document.getElementById('stats-user-filter-bar');
+
+  if (type === 'org') {
+    if (btnOrg) btnOrg.classList.add('active');
+    if (btnUser) btnUser.classList.remove('active');
+    if (contentOrg) contentOrg.style.display = 'block';
+    if (contentUser) contentUser.style.display = 'none';
+    if (filterBar) filterBar.style.display = 'none';
+    renderOrgStatistics();
+  } else {
+    if (btnUser) btnUser.classList.add('active');
+    if (btnOrg) btnOrg.classList.remove('active');
+    if (contentUser) contentUser.style.display = 'block';
+    if (contentOrg) contentOrg.style.display = 'none';
+    if (filterBar) filterBar.style.display = 'flex';
+    populateStatsUserFilters();
+    renderUserStatistics();
+  }
+}
+
+function populateStatsUserFilters() {
+  const grpSelect = document.getElementById('stats-user-group-filter');
+  const usrSelect = document.getElementById('stats-user-person-filter');
+  if (!grpSelect || !usrSelect) return;
+
+  const currentGrp = grpSelect.value;
+  const hostGroups = new Set();
+
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { group } = getUserNameAndGroup(u);
+      if (group) hostGroups.add(group);
+    });
+  }
+
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const tg = getTaskGroup(t);
+      if (tg) hostGroups.add(tg);
+    });
+  }
+
+  grpSelect.innerHTML = '<option value="">Tất cả tổ</option>';
+  Array.from(hostGroups).sort().forEach(g => {
+    grpSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+  });
+  if (currentGrp) grpSelect.value = currentGrp;
+
+  onStatsUserGroupChange();
+}
+
+function onStatsUserGroupChange() {
+  const grpSelect = document.getElementById('stats-user-group-filter');
+  const usrSelect = document.getElementById('stats-user-person-filter');
+  if (!grpSelect || !usrSelect) return;
+
+  const selGrp = grpSelect.value;
+  const selGrpClean = cleanKey(selGrp);
+  const currentUsr = usrSelect.value;
+
+  const usersInGrp = new Set();
+
+  if (selGrpClean) {
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        const { name, group } = getUserNameAndGroup(u);
+        const ckG = cleanKey(group);
+        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
+          usersInGrp.add(name);
+        }
+      });
+    }
+
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        const tg = getTaskGroup(t);
+        const ckTg = cleanKey(tg);
+        const a = getTaskAssignee(t);
+        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
+          a.split(',').forEach(n => { if (n.trim()) usersInGrp.add(n.trim()); });
+        }
+      });
+    }
+  } else {
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        const { name } = getUserNameAndGroup(u);
+        if (name) usersInGrp.add(name);
+      });
+    }
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        const a = getTaskAssignee(t);
+        const c = getTaskCollaborator(t);
+        if (a && a !== 'Chưa gán') a.split(',').forEach(n => { if (n.trim()) usersInGrp.add(n.trim()); });
+        if (c && String(c).trim()) c.split(',').forEach(n => { if (n.trim()) usersInGrp.add(n.trim()); });
+      });
+    }
+  }
+
+  usrSelect.innerHTML = '<option value="">Tất cả cá nhân</option>';
+  Array.from(usersInGrp).sort().forEach(u => {
+    usrSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
+  });
+
+  if (currentUsr && Array.from(usersInGrp).includes(currentUsr)) {
+    usrSelect.value = currentUsr;
+  }
+
+  renderUserStatistics();
+}
+
+function renderUserStatistics() {
+  const container = document.getElementById('stats-user-container');
+  if (!container) return;
+
+  const grpFilter = document.getElementById('stats-user-group-filter')?.value || '';
+  const grpClean = cleanKey(grpFilter);
+  const usrFilter = document.getElementById('stats-user-person-filter')?.value || '';
+  const usrClean = cleanKey(usrFilter);
+
+  const userStatsMap = {};
+
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { name, group } = getUserNameAndGroup(u);
+      if (name && !userStatsMap[name]) {
+        userStatsMap[name] = {
+          name: name,
+          group: group || 'Chưa phân tổ',
+          hostTasks: 0,
+          collabTasks: 0,
+          total: 0,
+          inProgress: 0,
+          done: 0,
+          overdue: 0
+        };
+      }
+    });
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const assigneeStr = getTaskAssignee(t);
+      const collabStr = getTaskCollaborator(t);
+      const tg = getTaskGroup(t);
+      const st = t['Trạng thái'] || '';
+      const endDate = t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '';
+
+      const isDone = (st === 'Hoàn thành');
+      const isDoneOverdue = (st === 'Hoàn thành quá hạn');
+      const isOverdue = isDoneOverdue || (!isDone && endDate && endDate < todayStr);
+
+      if (assigneeStr && assigneeStr !== 'Chưa gán') {
+        assigneeStr.split(',').forEach(rawName => {
+          const uName = rawName.trim();
+          if (uName) {
+            if (!userStatsMap[uName]) {
+              userStatsMap[uName] = {
+                name: uName,
+                group: tg || 'Khác',
+                hostTasks: 0,
+                collabTasks: 0,
+                total: 0,
+                inProgress: 0,
+                done: 0,
+                overdue: 0
+              };
+            }
+            const stat = userStatsMap[uName];
+            stat.hostTasks++;
+            stat.total++;
+            if (isDone) stat.done++;
+            else if (isDoneOverdue) { stat.done++; stat.overdue++; }
+            else if (isOverdue) { stat.overdue++; stat.inProgress++; }
+            else stat.inProgress++;
+          }
+        });
+      }
+
+      if (collabStr && String(collabStr).trim()) {
+        collabStr.split(',').forEach(rawName => {
+          const uName = rawName.trim();
+          if (uName) {
+            if (!userStatsMap[uName]) {
+              userStatsMap[uName] = {
+                name: uName,
+                group: tg || 'Khác',
+                hostTasks: 0,
+                collabTasks: 0,
+                total: 0,
+                inProgress: 0,
+                done: 0,
+                overdue: 0
+              };
+            }
+            const stat = userStatsMap[uName];
+            stat.collabTasks++;
+            stat.total++;
+            if (isDone) stat.done++;
+            else if (isDoneOverdue) { stat.done++; stat.overdue++; }
+            else if (isOverdue) { stat.overdue++; stat.inProgress++; }
+            else stat.inProgress++;
+          }
+        });
+      }
+    });
+  }
+
+  let userList = Object.values(userStatsMap);
+  if (grpClean) {
+    userList = userList.filter(u => {
+      const ckG = cleanKey(u.group);
+      return ckG.includes(grpClean) || grpClean.includes(ckG);
+    });
+  }
+  if (usrClean) {
+    userList = userList.filter(u => cleanKey(u.name) === usrClean || cleanKey(u.name).includes(usrClean));
+  }
+
+  userList.sort((a, b) => a.name.localeCompare(b.name));
+
+  let totalTasksSum = 0, totalInProgressSum = 0, totalDoneSum = 0, totalOverdueSum = 0;
+  userList.forEach(u => {
+    totalTasksSum += u.total;
+    totalInProgressSum += u.inProgress;
+    totalDoneSum += u.done;
+    totalOverdueSum += u.overdue;
+  });
+
+  let html = `
+    <div style="overflow-x:auto;">
+      <table class="dark-table" style="width:100%; border-collapse:collapse; text-align:center; font-size:0.85rem;">
+        <thead>
+          <tr style="background:#251652; color:#ffffff;">
+            <th style="padding:12px 14px; text-align:center; width:50px;">STT</th>
+            <th style="padding:12px 14px; text-align:left;">Họ Và Tên Nhân Viên</th>
+            <th style="padding:12px 14px; text-align:left;">Tổ Công Tác</th>
+            <th style="padding:12px 14px; text-align:center;">Tổng Việc Được Giao</th>
+            <th style="padding:12px 14px; text-align:center; color:#38bdf8;">Chủ Trì</th>
+            <th style="padding:12px 14px; text-align:center; color:#a78bfa;">Phối Hợp</th>
+            <th style="padding:12px 14px; text-align:center; color:#38bdf8;">Đang Làm</th>
+            <th style="padding:12px 14px; text-align:center; color:#00c897;">Đã Xong</th>
+            <th style="padding:12px 14px; text-align:center; color:#ef4444;">Quá Hạn</th>
+            <th style="padding:12px 14px; text-align:center;">Tỷ Lệ Hoàn Thành</th>
+            <th style="padding:12px 14px; text-align:center;">Đánh Giá Xếp Loại</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  if (userList.length === 0) {
+    html += `
+      <tr>
+        <td colspan="11" style="padding:20px; color:#94a3b8;">Không tìm thấy nhân viên nào phù hợp với bộ lọc.</td>
+      </tr>
+    `;
+  } else {
+    userList.forEach((u, idx) => {
+      const pct = u.total > 0 ? Math.round((u.done / u.total) * 100) : 0;
+      let gradeBadge = '';
+      if (u.total === 0) {
+        gradeBadge = `<span style="color:#94a3b8; font-size:0.78rem;">Chưa giao việc</span>`;
+      } else if (pct >= 90 && u.overdue === 0) {
+        gradeBadge = `<span class="badge-grade grade-a"><i class="fa-solid fa-trophy" style="margin-right:4px;"></i>Xuất sắc (A)</span>`;
+      } else if (pct >= 75 && u.overdue <= 1) {
+        gradeBadge = `<span class="badge-grade grade-b"><i class="fa-solid fa-star" style="margin-right:4px;"></i>Tốt (B)</span>`;
+      } else if (pct >= 50) {
+        gradeBadge = `<span class="badge-grade grade-c">Hoàn thành (C)</span>`;
+      } else {
+        gradeBadge = `<span class="badge-grade grade-d"><i class="fa-solid fa-circle-exclamation" style="margin-right:4px;"></i>Cần cố gắng (D)</span>`;
+      }
+
+      html += `
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:10px 14px; font-weight:700; color:#38bdf8;">${idx + 1}</td>
+          <td style="padding:10px 14px; text-align:left; font-weight:700; color:#ffffff;">${escapeHtml(u.name)}</td>
+          <td style="padding:10px 14px; text-align:left; color:#94a3b8;">${escapeHtml(u.group)}</td>
+          <td style="padding:10px 14px;"><span class="number-pill" style="background:rgba(255,255,255,0.1); font-weight:700;">${u.total}</span></td>
+          <td style="padding:10px 14px; font-weight:600; color:#38bdf8;">${u.hostTasks}</td>
+          <td style="padding:10px 14px; font-weight:600; color:#a78bfa;">${u.collabTasks}</td>
+          <td style="padding:10px 14px; font-weight:600; color:#38bdf8;">${u.inProgress}</td>
+          <td style="padding:10px 14px; font-weight:600; color:#00c897;">${u.done}</td>
+          <td style="padding:10px 14px; font-weight:600; color:${u.overdue > 0 ? '#ef4444' : 'var(--text-sub)'};">${u.overdue > 0 ? `<span style="background:rgba(239,68,68,0.2); color:#ef4444; padding:2px 8px; border-radius:10px; font-weight:700;">${u.overdue}</span>` : '0'}</td>
+          <td style="padding:10px 14px;">
+            <div style="display:flex; align-items:center; gap:8px; justify-content:center;">
+              <div style="width:70px; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden;">
+                <div style="height:100%; width:${pct}%; background:var(--emerald-primary);"></div>
+              </div>
+              <strong style="color:var(--emerald-primary); font-size:0.8rem;">${pct}%</strong>
+            </div>
+          </td>
+          <td style="padding:10px 14px;">${gradeBadge}</td>
+        </tr>
+      `;
+    });
+  }
+
+  const grandPct = totalTasksSum > 0 ? Math.round((totalDoneSum / totalTasksSum) * 100) : 0;
+  html += `
+        </tbody>
+        <tfoot>
+          <tr style="background:rgba(0,200,151,0.1); font-weight:700; color:#ffffff; border-top:2px solid var(--card-border);">
+            <td colspan="3" style="padding:12px 14px; text-align:left; font-size:0.9rem; color:var(--emerald-primary);">TỔNG CỘNG DANH SÁCH (${userList.length} nhân viên)</td>
+            <td style="padding:12px 14px;"><span class="number-pill" style="background:var(--emerald-primary); color:#0f172a; font-weight:800;">${totalTasksSum}</span></td>
+            <td colspan="2" style="padding:12px 14px; color:var(--text-sub);">--</td>
+            <td style="padding:12px 14px; color:#38bdf8; font-size:0.9rem;">${totalInProgressSum}</td>
+            <td style="padding:12px 14px; color:#00c897; font-size:0.9rem;">${totalDoneSum}</td>
+            <td style="padding:12px 14px; color:#ef4444; font-size:0.9rem;">${totalOverdueSum}</td>
+            <td style="padding:12px 14px; color:var(--emerald-primary); font-size:0.9rem;">${grandPct}%</td>
+            <td style="padding:12px 14px; color:var(--emerald-primary); font-size:0.9rem;">--</td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   `;
 

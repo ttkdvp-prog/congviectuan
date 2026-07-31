@@ -1072,6 +1072,46 @@ select option {
   padding: 12px;
 }
 
+/* STATS SUBTABS & INDIVIDUAL RATING BADGES */
+.btn-subtab {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-sub);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-subtab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-white);
+}
+
+.btn-subtab.active {
+  background: rgba(0, 200, 151, 0.16) !important;
+  color: var(--emerald-primary) !important;
+  border-color: var(--emerald-primary) !important;
+}
+
+.badge-grade {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.grade-a { background: rgba(0, 200, 151, 0.2); color: #00c897; border: 1px solid rgba(0, 200, 151, 0.4); }
+.grade-b { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+.grade-c { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); }
+.grade-d { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); }
+
 @media (max-width: 1024px) {
   .sidebar { width: 70px; min-width: 70px; padding: 16px 8px; }
   .brand-name, .brand-sub, .sidebar-footer, .nav-item span { display: none; }
