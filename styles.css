@@ -641,7 +641,7 @@ body.dark-theme {
 }
 
 .dark-table th {
-  background: #251652; /* Purple/Navy header matching user screenshot */
+  background: #251652;
   padding: 12px 14px;
   font-weight: 700;
   color: #ffffff;
@@ -659,11 +659,22 @@ body.dark-theme {
   white-space: nowrap;
 }
 
+/* Specific styling for Narrow & Wrapped Title Column */
+.dark-table td.col-title-cell,
+.dark-table th.col-title-header {
+  width: 120px !important;
+  max-width: 130px !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  line-height: 1.4 !important;
+  font-weight: 600;
+}
+
 .dark-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.03);
 }
 
-/* Action Icon Buttons for List View Table */
 .btn-action-edit {
   background: #0284c7;
   color: #ffffff;
@@ -679,9 +690,7 @@ body.dark-theme {
   transition: var(--transition);
 }
 
-.btn-action-edit:hover {
-  background: #0369a1;
-}
+.btn-action-edit:hover { background: #0369a1; }
 
 .btn-action-delete {
   background: #ef4444;
@@ -698,9 +707,7 @@ body.dark-theme {
   transition: var(--transition);
 }
 
-.btn-action-delete:hover {
-  background: #dc2626;
-}
+.btn-action-delete:hover { background: #dc2626; }
 
 .inline-date-picker {
   background: rgba(255, 255, 255, 0.06);
@@ -762,7 +769,6 @@ body.dark-theme {
   color: var(--text-muted);
 }
 
-/* MODALS DARK */
 .dark-modal-overlay {
   position: fixed;
   top: 0;
@@ -780,10 +786,7 @@ body.dark-theme {
   transition: var(--transition);
 }
 
-.dark-modal-overlay.active {
-  opacity: 1;
-  visibility: visible;
-}
+.dark-modal-overlay.active { opacity: 1; visibility: visible; }
 
 .dark-modal-card {
   background: #161c2a;
@@ -814,7 +817,6 @@ body.dark-theme {
 }
 
 .dark-modal-body { padding: 24px; }
-
 .dark-form-group { margin-bottom: 16px; }
 
 .dark-form-group label {

@@ -78,34 +78,28 @@
         </div>
 
         <div class="header-right">
-          <!-- Quick Search -->
           <div class="header-search">
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="text" id="global-search-input" placeholder="Tìm kiếm công việc..." oninput="handleGlobalFilter()">
           </div>
 
-          <!-- Assignee Search -->
           <div class="header-search">
             <i class="fa-solid fa-user"></i>
             <input type="text" id="global-user-search" placeholder="Tìm người phụ trách..." oninput="handleGlobalFilter()">
           </div>
 
-          <!-- Group Select -->
           <select class="header-select" id="global-group-select" onchange="handleGlobalFilter()">
             <option value="">Tất cả tổ</option>
           </select>
 
-          <!-- Refresh Button -->
           <button class="btn-icon-btn" onclick="appState.loadData(true)" title="Làm mới dữ liệu">
             <i class="fa-solid fa-rotate-right"></i>
           </button>
 
-          <!-- Config API Button -->
           <button class="btn-icon-btn" onclick="openSettingsModal()" title="Cấu hình API">
             <i class="fa-solid fa-gear"></i>
           </button>
 
-          <!-- Add New Task Button -->
           <button class="btn-add-primary" onclick="openTaskModal()">
             <i class="fa-solid fa-plus"></i> Thêm mới
           </button>
@@ -115,11 +109,8 @@
       <!-- PAGE SECTIONS -->
       <main class="content-body">
 
-        <!-- ==============================================================================
-             TAB 1: TỔNG QUAN (DASHBOARD)
-             ============================================================================== -->
+        <!-- TAB 1: TỔNG QUAN -->
         <section id="section-tongquan" class="page-section active">
-          
           <div class="kpi-grid">
             <div class="kpi-card kpi-total">
               <div class="kpi-icon"><i class="fa-solid fa-calendar-check"></i></div>
@@ -194,12 +185,9 @@
             </div>
             <div class="recent-list-rows" id="recent-tasks-container"></div>
           </div>
-
         </section>
 
-        <!-- ==============================================================================
-             TAB 2: BẢNG KANBAN
-             ============================================================================== -->
+        <!-- TAB 2: BẢNG KANBAN -->
         <section id="section-kanban" class="page-section">
           <div class="kanban-filter-header">
             <select class="select-dark" id="kanban-assignee-filter" onchange="handleKanbanFilter()">
@@ -248,15 +236,13 @@
           </div>
         </section>
 
-        <!-- ==============================================================================
-             TAB 3: DANH SÁCH (TABLE - EXACT MATCH TO USER SCREENSHOT)
-             ============================================================================== -->
+        <!-- TAB 3: DANH SÁCH -->
         <section id="section-danhsach" class="page-section">
           <div class="dark-table-container">
             <table class="dark-table list-view-table">
               <thead>
                 <tr>
-                  <th onclick="sortTable('Tiêu đề')">TIÊU ĐỀ <i class="fa-solid fa-sort"></i></th>
+                  <th class="col-title-header" onclick="sortTable('Tiêu đề')">TIÊU ĐỀ <i class="fa-solid fa-sort"></i></th>
                   <th onclick="sortTable('Mô tả')">MÔ TẢ</th>
                   <th onclick="sortTable('Trạng thái')">TRẠNG THÁI</th>
                   <th onclick="sortTable('Người thực hiện')">NGƯỜI PHỤ TRÁCH</th>
@@ -276,16 +262,12 @@
           </div>
         </section>
 
-        <!-- ==============================================================================
-             TAB 4: BIỂU ĐỒ GANTT
-             ============================================================================== -->
+        <!-- TAB 4: BIỂU ĐỒ GANTT -->
         <section id="section-gantt" class="page-section">
           <div class="dark-gantt-container" id="gantt-chart-container"></div>
         </section>
 
-        <!-- ==============================================================================
-             TAB 5: QUẢN LÝ TÀI LIỆU
-             ============================================================================== -->
+        <!-- TAB 5: QUẢN LÝ TÀI LIỆU -->
         <section id="section-tailieu" class="page-section">
           <div class="dark-table-container">
             <div class="section-action-header">
@@ -313,9 +295,7 @@
           </div>
         </section>
 
-        <!-- ==============================================================================
-             TAB 6: NGƯỜI DÙNG
-             ============================================================================== -->
+        <!-- TAB 6: NGƯỜI DÙNG -->
         <section id="section-nguoidung" class="page-section">
           <div class="dark-table-container" style="max-width:800px; margin:0 auto;">
             <div class="section-action-header">
@@ -336,9 +316,7 @@
           </div>
         </section>
 
-        <!-- ==============================================================================
-             TAB 7: ĐÁNH GIÁ & THỐNG KÊ
-             ============================================================================== -->
+        <!-- TAB 7: ĐÁNH GIÁ & THỐNG KÊ -->
         <section id="section-thongke" class="page-section">
           <div class="widget-card">
             <div class="widget-header"><i class="fa-solid fa-chart-bar icon-green"></i> Thống Kê Tiến Độ Theo Tổ</div>
@@ -346,9 +324,7 @@
           </div>
         </section>
 
-        <!-- ==============================================================================
-             TAB 8: CÔNG VIỆC LƯU Ý
-             ============================================================================== -->
+        <!-- TAB 8: CÔNG VIỆC LƯU Ý -->
         <section id="section-cvluuy" class="page-section">
           <div class="cvluuy-filter-bar">
             <div class="cvluuy-search-box">
@@ -367,7 +343,7 @@
             <table class="dark-table">
               <thead>
                 <tr>
-                  <th>CÔNG VIỆC</th>
+                  <th class="col-title-header">CÔNG VIỆC</th>
                   <th>MÔ TẢ</th>
                   <th>TỔ</th>
                   <th>BẮT ĐẦU</th>
@@ -469,7 +445,6 @@
             <input type="text" class="dark-form-control" id="task-ghichu-input" placeholder="Nhập ghi chú...">
           </div>
 
-          <!-- Subtasks Builder -->
           <div class="dark-form-group">
             <label><i class="fa-solid fa-list-check icon-green"></i> Danh sách công việc con (Subtasks)</label>
             <div class="subtasks-dark-box">

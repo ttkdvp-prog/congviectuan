@@ -407,9 +407,7 @@ function setupKanbanDragAndDrop() {
   });
 }
 
-/* ==============================================================================
-   3. DANH SÁCH (TABLE - EXACT MATCH TO USER SCREENSHOT)
-   ============================================================================== */
+/* 3. DANH SÁCH */
 function renderTaskListTable() {
   const filtered = getFilteredTasks();
   const tbody = document.getElementById('task-list-tbody');
@@ -439,7 +437,7 @@ function renderTaskListTable() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
+      <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
       <td style="max-width:240px; font-size:0.78rem; color:#94a3b8; white-space:normal;">${escapeHtml(t['Mô tả'] || '')}</td>
       <td>${statusBadge}</td>
       <td>${escapeHtml(t['Người thực hiện'] || 'Chưa gán')}</td>
@@ -576,7 +574,7 @@ function renderCvLuuYTable() {
   filtered.forEach(item => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${escapeHtml(item['Công việc'] || '')}</strong></td>
+      <td class="col-title-cell"><strong>${escapeHtml(item['Công việc'] || '')}</strong></td>
       <td style="max-width:250px; font-size:0.78rem; color:#94a3b8; white-space:normal;">${escapeHtml(item['Mô tả'] || '')}</td>
       <td><span class="tag-org">${escapeHtml(item['Tổ'] || 'Chung')}</span></td>
       <td>${formatDateVN(item['Ngày bắt đầu'])}</td>
@@ -605,13 +603,12 @@ function renderDocumentsTable() {
     const valHD = Number(doc['Giá trị HĐ'] || 0).toLocaleString('vi-VN');
     const valTH = Number(doc['Giá trị thực hiện'] || 0).toLocaleString('vi-VN');
     const diffVal = Number(doc['Chênh lệch'] || 0).toLocaleString('vi-VN');
-    
     const fileBtn = doc['File URL'] ? `<a href="${doc['File URL']}" target="_blank" class="btn-dark-sec btn-sm"><i class="fa-solid fa-file-pdf"></i> Tệp</a>` : 'N/A';
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${escapeHtml(doc['Số hồ sơ'] || '')}</strong></td>
-      <td><strong>${escapeHtml(doc['Tên hồ sơ'] || '')}</strong></td>
+      <td class="col-title-cell"><strong>${escapeHtml(doc['Tên hồ sơ'] || '')}</strong></td>
       <td>${escapeHtml(doc['Danh mục'] || '')}</td>
       <td>${escapeHtml(doc['Phòng ban'] || '')}</td>
       <td>${escapeHtml(doc['Nhà cung cấp'] || '')}</td>
@@ -692,7 +689,6 @@ function renderOrgStatistics() {
   container.innerHTML = html;
 }
 
-/* 7. MODALS HANDLERS */
 function openTaskModal(taskId = null) {
   const form = document.getElementById('form-task');
   form.reset();
