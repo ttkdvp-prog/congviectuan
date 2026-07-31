@@ -35,37 +35,97 @@ function autoResizeTextarea(el) {
 
 function getTaskAssignee(task) {
   if (!task) return 'Chưa gán';
-  return task['Người chủ trì'] || task['Người phụ trách'] || task['Người thực hiện'] || task['NguoiThucHien'] || task['Assignee'] || 'Chưa gán';
+  for (let k in task) {
+    const cleanK = String(k).toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    if (cleanK === 'nguoichutri' || cleanK === 'nguoiphutrach' || cleanK === 'nguoithuchien' || cleanK === 'assignee') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  for (let k in task) {
+    const cleanK = String(k).toLowerCase().trim();
+    if (cleanK.includes('chủ trì') || cleanK.includes('phụ trách') || cleanK.includes('thực hiện')) {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  return 'Chưa gán';
 }
 
 function getTaskCollaborator(task) {
   if (!task) return '';
-  return task['Người phối hợp'] || task['NguoiPhoiHop'] || '';
+  for (let k in task) {
+    const cleanK = String(k).toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    if (cleanK === 'nguoiphoihop') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  for (let k in task) {
+    const cleanK = String(k).toLowerCase().trim();
+    if (cleanK.includes('phối hợp') && !cleanK.includes('tổ')) {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  return '';
 }
 
 function getTaskGroup(task) {
   if (!task) return '';
-  let g = task['Tổ chủ trì'] || task['Tổ'] || task['TỔ'] || task['Tên tổ'] || task['To'];
-  if (g) return String(g).trim();
+  
+  for (let k in task) {
+    const cleanK = String(k).toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    if (cleanK === 'tochutri' || cleanK === 'to' || cleanK === 'tentocutri' || cleanK === 'tengroup') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
 
   const assignee = getTaskAssignee(task);
   if (assignee && assignee !== 'Chưa gán') {
     const usr = appState.users.find(u => {
       const name = u['Tên'] || u['Tên nhân viên'] || u.name;
-      return String(name).trim() === String(assignee).trim();
+      return String(name).trim().toLowerCase() === String(assignee).trim().toLowerCase();
     });
     if (usr) {
       let ug = usr['Tổ'] || usr['TỔ'] || usr['Tên tổ'] || usr.group;
       if (ug) return String(ug).trim();
     }
   }
+
+  for (let k in task) {
+    const cleanK = String(k).toLowerCase().trim();
+    if (cleanK.includes('chủ trì') && (cleanK.includes('tổ') || cleanK.includes('to'))) {
+      if (task[k]) return String(task[k]).trim();
+    }
+  }
+
   return '';
 }
 
 function getTaskCollaboratorGroup(task) {
   if (!task) return '';
-  let g = task['Tổ phối hợp'] || '';
-  return String(g).trim();
+  for (let k in task) {
+    const cleanK = String(k).toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    if (cleanK === 'tophoihop') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  for (let k in task) {
+    const cleanK = String(k).toLowerCase().trim();
+    if (cleanK.includes('phối hợp') && (cleanK.includes('tổ') || cleanK.includes('to'))) {
+      if (task[k]) return String(task[k]).trim();
+    }
+  }
+  return '';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -386,33 +446,40 @@ function handleKanbanFilter() {
 }
 
 function getFilteredTasks() {
+  const search = (appState.filters.search || '').trim().toLowerCase();
+  const groupFilter = (appState.filters.group || '').trim().toLowerCase();
+  const userFilter = (appState.filters.user || '').trim().toLowerCase();
+  const kanbanAssignee = (appState.filters.kanbanAssignee || '').trim().toLowerCase();
+  const kanbanPriority = (appState.filters.kanbanPriority || '').trim();
+
   return appState.tasks.filter(t => {
-    const search = appState.filters.search.toLowerCase();
-    const title = (t['Tiêu đề'] || '').toLowerCase();
-    const desc = (t['Mô tả'] || '').toLowerCase();
-    const note = (t['Ghi chú'] || '').toLowerCase();
-    const assignee = getTaskAssignee(t).toLowerCase();
-    const collaborator = getTaskCollaborator(t).toLowerCase();
+    const chuTri = getTaskAssignee(t);
+    const toChuTri = getTaskGroup(t);
+    const phoiHop = getTaskCollaborator(t);
+    const toPhoiHop = getTaskCollaboratorGroup(t);
+
+    // 1. Text search box filter
+    if (search) {
+      const allTextValues = Object.values(t).join(' ').toLowerCase();
+      const combinedText = `${allTextValues} ${chuTri.toLowerCase()} ${toChuTri.toLowerCase()} ${phoiHop.toLowerCase()} ${toPhoiHop.toLowerCase()}`;
+      if (!combinedText.includes(search)) return false;
+    }
     
-    if (search && !title.includes(search) && !desc.includes(search) && !note.includes(search) && !assignee.includes(search) && !collaborator.includes(search)) return false;
-    
-    // Group filter (Tổ chủ trì)
-    const groupFilter = appState.filters.group;
+    // 2. Group filter (Tổ chủ trì)
     if (groupFilter) {
-      const taskGroup = getTaskGroup(t);
-      if (taskGroup !== groupFilter) return false;
+      if (toChuTri.toLowerCase() !== groupFilter) return false;
     }
 
-    // User / Person in charge filter
-    const userFilter = appState.filters.user;
+    // 3. User / Person in charge filter (Chủ trì hoặc Phối hợp)
     if (userFilter) {
-      const chuTri = getTaskAssignee(t);
-      const phoiHop = getTaskCollaborator(t);
-      if (chuTri !== userFilter && phoiHop !== userFilter) return false;
+      const matchChuTri = chuTri.toLowerCase() === userFilter;
+      const matchPhoiHop = phoiHop.toLowerCase() === userFilter;
+      if (!matchChuTri && !matchPhoiHop) return false;
     }
 
-    if (appState.filters.kanbanAssignee && getTaskAssignee(t) !== appState.filters.kanbanAssignee) return false;
-    if (appState.filters.kanbanPriority && t['Mức độ ưu tiên'] !== appState.filters.kanbanPriority) return false;
+    // 4. Kanban specific filters
+    if (kanbanAssignee && chuTri.toLowerCase() !== kanbanAssignee) return false;
+    if (kanbanPriority && String(t['Mức độ ưu tiên'] || '').trim() !== kanbanPriority) return false;
 
     return true;
   });
