@@ -1699,7 +1699,11 @@ function renderUserStatistics() {
     });
   }
 
-  let userList = Object.values(userStatsMap);
+  let userList = Object.values(userStatsMap).filter(u => {
+    const n = String(u.name || '').trim();
+    return n !== '' && n !== '0' && n !== 'undefined' && n !== 'null';
+  });
+
   if (grpClean) {
     userList = userList.filter(u => {
       const ckG = cleanKey(u.group);
@@ -1760,7 +1764,7 @@ function renderUserStatistics() {
       } else if (pct >= 50) {
         gradeBadge = `<span class="badge-grade grade-c">Hoàn thành (C)</span>`;
       } else {
-        gradeBadge = `<span class="badge-grade grade-d"><i class="fa-solid fa-circle-exclamation" style="margin-right:4px;"></i>Cần cố gắng (D)</span>`;
+        gradeBadge = `<span class="badge-grade grade-d"><i class="fa-solid fa-circle-exclamation" style="margin-right:4px;"></i>Chưa đạt (D)</span>`;
       }
 
       html += `
