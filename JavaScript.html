@@ -625,7 +625,6 @@ function renderHighPriorityTasks(tasks) {
           <span><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span>${escapeHtml(t['Tiêu đề'])}</span>
         </div>
         <div class="recent-meta-group">
-          <span class="tag-priority tag-p-high">Cao</span>
           <span style="font-size:0.75rem; color:#94a3b8;">${formatDateVN(t['Ngày kết thúc'])}</span>
         </div>
       </div>
@@ -643,8 +642,6 @@ function renderRecentTasks(tasks) {
   }
   let html = '';
   tasks.slice(0, 8).forEach((t, idx) => {
-    const priority = t['Mức độ ưu tiên'] || 'Trung bình';
-    const tagPClass = priority === 'Cao' ? 'tag-p-high' : priority === 'Trung bình' ? 'tag-p-med' : 'tag-p-low';
     const status = t['Trạng thái'] || '';
     
     let statusHtml = `<span style="font-size:0.75rem; color:#94a3b8;">${status}</span>`;
@@ -660,7 +657,6 @@ function renderRecentTasks(tasks) {
           <span><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span>${escapeHtml(t['Tiêu đề'])}</span>
         </div>
         <div class="recent-meta-group">
-          <span class="tag-priority ${tagPClass}">${priority}</span>
           ${statusHtml}
           <span style="font-size:0.75rem; color:#64748b;">${formatDateVN(t['Ngày kết thúc'])}</span>
         </div>
@@ -703,17 +699,12 @@ function createDarkTaskCard(task, index) {
   card.draggable = true;
   card.dataset.id = task.ID || task.id;
   
-  const priority = task['Mức độ ưu tiên'] || 'Trung bình';
-  const tagPClass = priority === 'Cao' ? 'tag-p-high' : priority === 'Trung bình' ? 'tag-p-med' : 'tag-p-low';
   const assignee = getTaskAssignee(task);
   const avatarLetter = assignee.charAt(0).toUpperCase();
 
   const numPrefix = index ? `<span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index}.</span>` : '';
 
   card.innerHTML = `
-    <div class="dark-card-tags">
-      <span class="tag-priority ${tagPClass}">${priority}</span>
-    </div>
     <div class="dark-card-title">${numPrefix}${escapeHtml(task['Tiêu đề'] || '')}</div>
     ${task['Mô tả'] ? `<div class="dark-card-sub">${escapeHtml(task['Mô tả'])}</div>` : ''}
     <div class="dark-card-footer">
