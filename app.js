@@ -773,7 +773,7 @@ function renderTaskListTable() {
   
   tbody.innerHTML = '';
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="16" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="15" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
     return;
   }
   
@@ -801,7 +801,6 @@ function renderTaskListTable() {
     const chuTriName = getTaskAssignee(t);
     const toChuTriName = getTaskGroup(t);
     const phoiHopName = getTaskCollaborator(t);
-    const toPhoiHopName = getTaskCollaboratorGroup(t);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -811,7 +810,6 @@ function renderTaskListTable() {
       <td>${escapeHtml(chuTriName)}</td>
       <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
       <td>${escapeHtml(phoiHopName)}</td>
-      <td><span class="tag-org" style="background:rgba(56, 189, 248, 0.15); color:#38bdf8;">${escapeHtml(toPhoiHopName || '')}</span></td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(t['Ngày kết thúc'])}</td>
       <td>

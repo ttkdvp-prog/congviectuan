@@ -76,7 +76,7 @@ function ensureTaskHeaders(sheet) {
   const data = sheet.getDataRange().getValues();
   const standardHeaders = [
     'ID', 'Mã nhân viên', 'Tiêu đề', 'Mô tả', 'Người chủ trì', 'Tổ chủ trì',
-    'Người phối hợp', 'Tổ phối hợp', 'Trạng thái', 'Mức độ ưu tiên',
+    'Người phối hợp', 'Trạng thái', 'Mức độ ưu tiên',
     'Ngày bắt đầu', 'Ngày kết thúc', 'Tiến độ (%)', 'Tệp đính kèm', 'Ngày làm xong',
     'Kế hoạch', 'Thực hiện', 'Tỷ lệ', 'Ghi chú', 'Danh sách công việc con'
   ];
