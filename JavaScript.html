@@ -688,7 +688,7 @@ function renderKanbanBoard() {
     if (st === 'Hoàn thành quá hạn') st = 'Hoàn thành';
     if (cols[st]) {
       counts[st]++;
-      cols[st].appendChild(createDarkTaskCard(t));
+      cols[st].appendChild(createDarkTaskCard(t, counts[st]));
     }
   });
 
@@ -698,7 +698,7 @@ function renderKanbanBoard() {
   if (document.getElementById('kb-count-canceled')) document.getElementById('kb-count-canceled').innerText = counts['Đã hủy'];
 }
 
-function createDarkTaskCard(task) {
+function createDarkTaskCard(task, index) {
   const card = document.createElement('div');
   card.className = 'dark-card';
   card.draggable = true;
@@ -709,12 +709,14 @@ function createDarkTaskCard(task) {
   const assignee = getTaskAssignee(task);
   const avatarLetter = assignee.charAt(0).toUpperCase();
 
+  const numPrefix = index ? `<span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index}.</span>` : '';
+
   card.innerHTML = `
     <div class="dark-card-tags">
       <span class="tag-priority ${tagPClass}">${priority}</span>
       <span class="tag-org">VNPT</span>
     </div>
-    <div class="dark-card-title">${escapeHtml(task['Tiêu đề'] || '')}</div>
+    <div class="dark-card-title">${numPrefix}${escapeHtml(task['Tiêu đề'] || '')}</div>
     ${task['Mô tả'] ? `<div class="dark-card-sub">${escapeHtml(task['Mô tả'])}</div>` : ''}
     <div class="dark-card-footer">
       <div><i class="fa-regular fa-calendar"></i> ${formatDateVN(task['Ngày kết thúc'])}</div>
