@@ -655,15 +655,16 @@ body.dark-theme {
   white-space: nowrap;
 }
 
-/* Specific styling for Narrow & Wrapped Title Column */
+/* Balanced Title Column Styling */
 .dark-table td.col-title-cell,
 .dark-table th.col-title-header {
-  width: 120px !important;
-  max-width: 130px !important;
+  min-width: 180px !important;
+  width: 220px !important;
+  max-width: 260px !important;
   white-space: normal !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important;
-  line-height: 1.4 !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  line-height: 1.45 !important;
   font-weight: 600;
 }
 
