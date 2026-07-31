@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   appState.loadData();
   setupKanbanDragAndDrop();
+  setupTableScrollSync();
 });
 
 appState.loadData = function (forceRefresh = false) {
@@ -509,6 +510,7 @@ function renderTaskListTable() {
   tbody.innerHTML = '';
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
+    setupTableScrollSync();
     return;
   }
   
@@ -571,6 +573,39 @@ function renderTaskListTable() {
     `;
     tbody.appendChild(tr);
   });
+
+  setTimeout(setupTableScrollSync, 100);
+}
+
+function setupTableScrollSync() {
+  const topScroll = document.getElementById('task-table-top-scrollbar');
+  const topContent = document.getElementById('task-table-top-scrollbar-content');
+  const tableContainer = document.getElementById('task-table-scroll-body') || document.querySelector('.dark-table-container');
+
+  if (!topScroll || !tableContainer) return;
+  const table = tableContainer.querySelector('table');
+  if (!table) return;
+
+  topContent.style.width = table.scrollWidth + 'px';
+
+  let isSyncingTop = false;
+  let isSyncingBottom = false;
+
+  topScroll.onscroll = function() {
+    if (!isSyncingTop) {
+      isSyncingBottom = true;
+      tableContainer.scrollLeft = topScroll.scrollLeft;
+    }
+    isSyncingTop = false;
+  };
+
+  tableContainer.onscroll = function() {
+    if (!isSyncingBottom) {
+      isSyncingTop = true;
+      topScroll.scrollLeft = tableContainer.scrollLeft;
+    }
+    isSyncingBottom = false;
+  };
 }
 
 function handleInlineTaskChange(taskId, field, value, element) {
