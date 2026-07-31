@@ -641,12 +641,12 @@ function renderHighPriorityTasks(tasks) {
     return;
   }
   let html = '';
-  highPriority.slice(0, 5).forEach(t => {
+  highPriority.slice(0, 5).forEach((t, idx) => {
     html += `
       <div class="recent-row-item" onclick="openTaskModal('${t.ID || t.id}')" style="cursor:pointer;">
         <div class="recent-title-group">
           <i class="fa-solid fa-circle-exclamation" style="color:#f43f5e;"></i>
-          <span>${escapeHtml(t['Tiêu đề'])}</span>
+          <span><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span>${escapeHtml(t['Tiêu đề'])}</span>
         </div>
         <div class="recent-meta-group">
           <span class="tag-priority tag-p-high">Cao</span>
@@ -666,7 +666,7 @@ function renderRecentTasks(tasks) {
     return;
   }
   let html = '';
-  tasks.slice(0, 8).forEach(t => {
+  tasks.slice(0, 8).forEach((t, idx) => {
     const priority = t['Mức độ ưu tiên'] || 'Trung bình';
     const tagPClass = priority === 'Cao' ? 'tag-p-high' : priority === 'Trung bình' ? 'tag-p-med' : 'tag-p-low';
     const status = t['Trạng thái'] || '';
@@ -681,7 +681,7 @@ function renderRecentTasks(tasks) {
     html += `
       <div class="recent-row-item" onclick="openTaskModal('${t.ID || t.id}')" style="cursor:pointer;">
         <div class="recent-title-group">
-          <span>${escapeHtml(t['Tiêu đề'])}</span>
+          <span><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span>${escapeHtml(t['Tiêu đề'])}</span>
           <span class="tag-org">VNPT</span>
         </div>
         <div class="recent-meta-group">
@@ -1068,10 +1068,10 @@ function renderCvLuuYTable() {
     return true;
   });
 
-  filtered.forEach(item => {
+  filtered.forEach((item, idx) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="col-title-cell"><strong>${escapeHtml(item['Công việc'] || '')}</strong></td>
+      <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span><strong>${escapeHtml(item['Công việc'] || '')}</strong></td>
       <td class="col-desc-cell">${escapeHtml(item['Mô tả'] || '')}</td>
       <td><span class="tag-org">${escapeHtml(item['Tổ'] || 'Chung')}</span></td>
       <td>${formatDateVN(item['Ngày bắt đầu'])}</td>
@@ -1101,7 +1101,7 @@ function renderDocumentsTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
   
-  appState.documents.forEach(doc => {
+  appState.documents.forEach((doc, idx) => {
     const valHD = Number(doc['Giá trị HĐ'] || 0).toLocaleString('vi-VN');
     const valTH = Number(doc['Giá trị thực hiện'] || 0).toLocaleString('vi-VN');
     const diffVal = Number(doc['Chênh lệch'] || 0).toLocaleString('vi-VN');
@@ -1110,7 +1110,7 @@ function renderDocumentsTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${escapeHtml(doc['Số hồ sơ'] || '')}</strong></td>
-      <td class="col-title-cell"><strong>${escapeHtml(doc['Tên hồ sơ'] || '')}</strong></td>
+      <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span><strong>${escapeHtml(doc['Tên hồ sơ'] || '')}</strong></td>
       <td>${escapeHtml(doc['Danh mục'] || '')}</td>
       <td>${escapeHtml(doc['Phòng ban'] || '')}</td>
       <td>${escapeHtml(doc['Nhà cung cấp'] || '')}</td>
@@ -1135,11 +1135,11 @@ function renderUsersTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
   
-  appState.users.forEach(usr => {
+  appState.users.forEach((usr, idx) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${usr.ID || usr.id}</strong></td>
-      <td><strong>${escapeHtml(usr['Tên'] || '')}</strong></td>
+      <td><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span><strong>${escapeHtml(usr['Tên'] || '')}</strong></td>
       <td>${escapeHtml(usr['Tổ'] || '')}</td>
       <td style="text-align:right;">
         <div style="display:flex; gap:6px; justify-content:flex-end;">
