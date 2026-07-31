@@ -26,6 +26,12 @@ const appState = {
 
 const noteDebounceTimers = {};
 
+function autoResizeTextarea(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.max(38, el.scrollHeight) + 'px';
+}
+
 function getTaskAssignee(task) {
   if (!task) return 'Chưa gán';
   return task['Người thực hiện'] || task['Người phụ trách'] || task['NguoiThucHien'] || task['Assignee'] || 'Chưa gán';
@@ -562,7 +568,7 @@ function renderTaskListTable() {
       </td>
       <td class="ty-le-col-cell"><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
       <td class="col-note-cell">
-        <textarea class="inline-note-textarea" rows="2" placeholder="Nhập ghi chú..." oninput="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)" onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)">${escapeHtml(ghiChu)}</textarea>
+        <textarea class="inline-note-textarea" placeholder="Nhập ghi chú..." oninput="autoResizeTextarea(this); handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)" onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)">${escapeHtml(ghiChu)}</textarea>
       </td>
       <td style="text-align:center;">
         <div style="display:flex; gap:4px; justify-content:center;">
@@ -573,6 +579,10 @@ function renderTaskListTable() {
     `;
     tbody.appendChild(tr);
   });
+
+  setTimeout(() => {
+    document.querySelectorAll('.inline-note-textarea').forEach(autoResizeTextarea);
+  }, 50);
 }
 
 function handleInlineTaskChange(taskId, field, value, element) {
@@ -775,7 +785,7 @@ function renderCvLuuYTable() {
       <td><input type="date" class="inline-date-picker" value="${item['Ngày làm xong'] || ''}"></td>
       <td><span class="tag-priority tag-p-low">${item['Trạng thái'] || 'Cần lưu ý'}</span></td>
       <td class="col-note-cell">
-        <textarea class="inline-note-textarea" rows="2" placeholder="Nhập ghi chú..." oninput="handleInlineTaskChange('${item.ID || item.id}', 'cvluuy_ghiChu', this.value, this)" onchange="handleInlineTaskChange('${item.ID || item.id}', 'cvluuy_ghiChu', this.value, this)">${escapeHtml(item['Ghi chú'] || '')}</textarea>
+        <textarea class="inline-note-textarea" placeholder="Nhập ghi chú..." oninput="autoResizeTextarea(this); handleInlineTaskChange('${item.ID || item.id}', 'cvluuy_ghiChu', this.value, this)" onchange="handleInlineTaskChange('${item.ID || item.id}', 'cvluuy_ghiChu', this.value, this)">${escapeHtml(item['Ghi chú'] || '')}</textarea>
       </td>
       <td style="text-align:right;">
         <div style="display:flex; gap:6px; justify-content:flex-end;">
@@ -786,6 +796,10 @@ function renderCvLuuYTable() {
     `;
     tbody.appendChild(tr);
   });
+
+  setTimeout(() => {
+    document.querySelectorAll('.inline-note-textarea').forEach(autoResizeTextarea);
+  }, 50);
 }
 
 function renderDocumentsTable() {
