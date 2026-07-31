@@ -1,4 +1,3 @@
-<script>
 /**
  * ==============================================================================
  * TTHT Tasks - Quản Lý Công Việc & Hồ Sơ (Vanilla JS Engine - Dark Theme)
@@ -31,6 +30,15 @@ document.addEventListener('DOMContentLoaded', () => {
     urlInput.value = appState.apiUrl;
   }
   
+  // Attach event listeners to sidebar tab buttons
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const tabName = btn.getAttribute('data-tab');
+      if (tabName) switchSidebarTab(tabName);
+    });
+  });
+
   appState.loadData();
   setupKanbanDragAndDrop();
 });
@@ -158,7 +166,11 @@ function switchSidebarTab(tabName) {
   appState.currentTab = tabName;
   
   document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
-    item.classList.toggle('active', item.dataset.tab === tabName);
+    if (item.getAttribute('data-tab') === tabName) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
   });
 
   document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
@@ -175,7 +187,8 @@ function switchSidebarTab(tabName) {
     thongke: 'Đánh giá & Thống kê',
     cvluuy: 'Công việc lưu ý'
   };
-  document.getElementById('page-title-display').innerText = titles[tabName] || 'TTHT Tasks';
+  const titleDisplay = document.getElementById('page-title-display');
+  if (titleDisplay) titleDisplay.innerText = titles[tabName] || 'TTHT Tasks';
 
   renderActiveTab();
 }
@@ -224,6 +237,7 @@ function renderActiveTab() {
   else if (tab === 'cvluuy') renderCvLuuYTable();
 }
 
+/* 1. DASHBOARD */
 function renderDashboard() {
   const filtered = getFilteredTasks();
   let countDoing = 0, countDone = 0, countOverdue = 0, countCanceled = 0;
@@ -236,17 +250,17 @@ function renderDashboard() {
   });
   
   const total = filtered.length;
-  document.getElementById('kpi-total-val').innerText = total;
-  document.getElementById('kpi-doing-val').innerText = countDoing;
-  document.getElementById('kpi-done-val').innerText = countDone;
-  document.getElementById('kpi-overdue-val').innerText = countOverdue;
+  if (document.getElementById('kpi-total-val')) document.getElementById('kpi-total-val').innerText = total;
+  if (document.getElementById('kpi-doing-val')) document.getElementById('kpi-doing-val').innerText = countDoing;
+  if (document.getElementById('kpi-done-val')) document.getElementById('kpi-done-val').innerText = countDone;
+  if (document.getElementById('kpi-overdue-val')) document.getElementById('kpi-overdue-val').innerText = countOverdue;
 
   const pctDone = total > 0 ? Math.round((countDone / total) * 100) : 0;
-  document.getElementById('donut-percent').innerText = pctDone + '%';
-  document.getElementById('lg-doing').innerText = countDoing;
-  document.getElementById('lg-done').innerText = countDone;
-  document.getElementById('lg-overdue').innerText = countOverdue;
-  document.getElementById('lg-canceled').innerText = countCanceled;
+  if (document.getElementById('donut-percent')) document.getElementById('donut-percent').innerText = pctDone + '%';
+  if (document.getElementById('lg-doing')) document.getElementById('lg-doing').innerText = countDoing;
+  if (document.getElementById('lg-done')) document.getElementById('lg-done').innerText = countDone;
+  if (document.getElementById('lg-overdue')) document.getElementById('lg-overdue').innerText = countOverdue;
+  if (document.getElementById('lg-canceled')) document.getElementById('lg-canceled').innerText = countCanceled;
 
   renderDonutChart(countDoing, countDone, countOverdue, countCanceled);
   renderHighPriorityTasks(filtered);
@@ -255,27 +269,31 @@ function renderDashboard() {
 
 function renderDonutChart(doing, done, overdue, canceled) {
   const ctx = document.getElementById('statusDonutChart');
-  if (!ctx) return;
+  if (!ctx || typeof Chart === 'undefined') return;
   if (appState.donutChart) appState.donutChart.destroy();
   
-  appState.donutChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Đang thực hiện', 'Hoàn thành', 'Quá hạn', 'Đã hủy'],
-      datasets: [{
-        data: [doing, done, overdue, canceled],
-        backgroundColor: ['#38bdf8', '#10b981', '#ef4444', '#64748b'],
-        borderWidth: 0,
-        hoverOffset: 4
-      }]
-    },
-    options: {
-      cutout: '78%',
-      plugins: { legend: { display: false }, tooltip: { enabled: true } },
-      responsive: true,
-      maintainAspectRatio: false
-    }
-  });
+  try {
+    appState.donutChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Đang thực hiện', 'Hoàn thành', 'Quá hạn', 'Đã hủy'],
+        datasets: [{
+          data: [doing, done, overdue, canceled],
+          backgroundColor: ['#38bdf8', '#10b981', '#ef4444', '#64748b'],
+          borderWidth: 0,
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        cutout: '78%',
+        plugins: { legend: { display: false }, tooltip: { enabled: true } },
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+  } catch (e) {
+    console.error('Chart error:', e);
+  }
 }
 
 function renderHighPriorityTasks(tasks) {
@@ -335,6 +353,7 @@ function renderRecentTasks(tasks) {
   container.innerHTML = html;
 }
 
+/* 2. KANBAN BOARD */
 function renderKanbanBoard() {
   const filtered = getFilteredTasks();
   const cols = {
@@ -354,10 +373,10 @@ function renderKanbanBoard() {
     }
   });
 
-  document.getElementById('kb-count-doing').innerText = counts['Đang thực hiện'];
-  document.getElementById('kb-count-done').innerText = counts['Hoàn thành'];
-  document.getElementById('kb-count-overdue').innerText = counts['Quá hạn'];
-  document.getElementById('kb-count-canceled').innerText = counts['Đã hủy'];
+  if (document.getElementById('kb-count-doing')) document.getElementById('kb-count-doing').innerText = counts['Đang thực hiện'];
+  if (document.getElementById('kb-count-done')) document.getElementById('kb-count-done').innerText = counts['Hoàn thành'];
+  if (document.getElementById('kb-count-overdue')) document.getElementById('kb-count-overdue').innerText = counts['Quá hạn'];
+  if (document.getElementById('kb-count-canceled')) document.getElementById('kb-count-canceled').innerText = counts['Đã hủy'];
 }
 
 function createDarkTaskCard(task) {
@@ -423,6 +442,7 @@ function setupKanbanDragAndDrop() {
   });
 }
 
+/* 3. DANH SÁCH (TABLE) */
 function renderTaskListTable() {
   const filtered = getFilteredTasks();
   const tbody = document.getElementById('task-list-tbody');
@@ -927,8 +947,16 @@ function confirmDeleteUser(id) {
   }
 }
 
-function openModal(id) { document.getElementById(id).classList.add('active'); }
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('active');
+}
+
 function openSettingsModal() { openModal('modal-settings'); }
 
 function saveSettings() {

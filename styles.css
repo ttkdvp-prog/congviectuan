@@ -112,16 +112,22 @@ body.dark-theme {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 16px;
+  padding: 12px 16px;
   border: none;
   background: transparent;
   color: var(--text-sub);
   font-size: 0.88rem;
   font-weight: 500;
   border-radius: 10px;
-  cursor: pointer;
+  cursor: pointer !important;
   transition: var(--transition);
   text-align: left;
+  user-select: none;
+  width: 100%;
+}
+
+.nav-item i, .nav-item span {
+  pointer-events: none;
 }
 
 .nav-item i {
@@ -131,13 +137,13 @@ body.dark-theme {
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-white);
 }
 
 .nav-item.active {
-  background: rgba(0, 200, 151, 0.14);
-  color: var(--emerald-primary);
+  background: rgba(0, 200, 151, 0.16) !important;
+  color: var(--emerald-primary) !important;
   font-weight: 600;
 }
 
@@ -299,8 +305,13 @@ body.dark-theme {
   flex: 1;
 }
 
-.page-section { display: none; }
-.page-section.active { display: block; }
+.page-section {
+  display: none !important;
+}
+
+.page-section.active {
+  display: block !important;
+}
 
 /* KPI CARDS */
 .kpi-grid {
@@ -770,6 +781,7 @@ body.dark-theme {
   color: var(--text-muted);
 }
 
+/* MODALS DARK */
 .dark-modal-overlay {
   position: fixed;
   top: 0;
@@ -784,10 +796,15 @@ body.dark-theme {
   z-index: 1000;
   opacity: 0;
   visibility: hidden;
+  pointer-events: none;
   transition: var(--transition);
 }
 
-.dark-modal-overlay.active { opacity: 1; visibility: visible; }
+.dark-modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
 
 .dark-modal-card {
   background: #161c2a;
@@ -798,6 +815,7 @@ body.dark-theme {
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
 }
 
 .dark-modal-header {
