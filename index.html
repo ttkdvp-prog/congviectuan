@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hệ Thống Quản Lý Công Việc & Hồ Sơ - VNPT</title>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+  
+  <!-- Local / Vercel Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- GAS Template Include (Only evaluated when running inside Google Apps Script) -->
+  <?!= include('CSS'); ?>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-icon">
+        <i class="fa-solid fa-list-check"></i>
+      </div>
+      <div>
+        <div class="brand-title">TASK & DOCS MANAGER</div>
+        <div class="brand-subtitle">Hệ Thống Quản Lý Công Việc, Hồ Sơ & Nhân Sự</div>
+      </div>
+    </div>
+    
+    <div class="header-actions">
+      <button class="btn btn-secondary btn-sm" id="btn-refresh" onclick="appState.loadData(true)">
+        <i class="fa-solid fa-rotate-right"></i> Làm mới
+      </button>
+      <button class="btn btn-secondary btn-sm" id="btn-settings" onclick="openSettingsModal()">
+        <i class="fa-solid fa-gear"></i> Cấu hình API
+      </button>
+      <button class="btn btn-primary" onclick="openTaskModal()">
+        <i class="fa-solid fa-plus"></i> Tạo Công Việc Mới
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Bar & Views Switcher -->
+  <nav class="nav-container">
+    <div class="nav-tabs">
+      <button class="tab-btn active" data-tab="congviec" onclick="switchMainTab('congviec')">
+        <i class="fa-solid fa-kanban"></i> Quản Lý Công Việc
+      </button>
+      <button class="tab-btn" data-tab="cvluuy" onclick="switchMainTab('cvluuy')">
+        <i class="fa-solid fa-triangle-exclamation"></i> Công Việc Lưu Ý
+      </button>
+      <button class="tab-btn" data-tab="Documents" onclick="switchMainTab('Documents')">
+        <i class="fa-solid fa-folder-open"></i> Hồ Sơ - Tài Liệu
+      </button>
+      <button class="tab-btn" data-tab="Users" onclick="switchMainTab('Users')">
+        <i class="fa-solid fa-users"></i> Nhân Sự & Tổ
+      </button>
+    </div>
+    
+    <div class="view-switcher" id="view-switcher-group">
+      <button class="view-btn active" data-view="kanban" onclick="switchTaskView('kanban')">
+        <i class="fa-solid fa-table-columns"></i> Kanban
+      </button>
+      <button class="view-btn" data-view="list" onclick="switchTaskView('list')">
+        <i class="fa-solid fa-list-ul"></i> Danh Sách
+      </button>
+      <button class="view-btn" data-view="gantt" onclick="switchTaskView('gantt')">
+        <i class="fa-solid fa-chart-gantt"></i> Gantt Chart
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main App Layout -->
+  <main class="main-content">
+    
+    <!-- Filter & Search Bar -->
+    <div class="filter-bar" id="filter-bar">
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="search-input" placeholder="Tìm kiếm theo tiêu đề, mô tả, từ khóa..." oninput="handleFilterChange()">
+      </div>
+      
+      <div class="filter-group">
+        <select class="select-control" id="filter-assignee" onchange="handleFilterChange()">
+          <option value="">-- Tất cả người thực hiện --</option>
+        </select>
+        
+        <select class="select-control" id="filter-priority" onchange="handleFilterChange()">
+          <option value="">-- Tất cả ưu tiên --</option>
+          <option value="Cao">Ưu tiên Cao</option>
+          <option value="Trung bình">Ưu tiên Trung bình</option>
+          <option value="Thấp">Ưu tiên Thấp</option>
+        </select>
+
+        <select class="select-control" id="filter-status" onchange="handleFilterChange()">
+          <option value="">-- Tất cả trạng thái --</option>
+          <option value="Đang thực hiện">Đang thực hiện</option>
+          <option value="Hoàn thành">Hoàn thành</option>
+          <option value="Quá hạn">Quá hạn</option>
+          <option value="Đã hủy">Đã hủy</option>
+        </select>
+        
+        <input type="date" class="date-control" id="filter-date-start" title="Từ ngày" onchange="handleFilterChange()">
+        <input type="date" class="date-control" id="filter-date-end" title="Đến ngày" onchange="handleFilterChange()">
+        
+        <button class="btn btn-secondary btn-sm" onclick="resetFilters()">
+          <i class="fa-solid fa-filter-circle-xmark"></i> Xóa lọc
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW 1: KANBAN BOARD -->
+    <section id="view-kanban" class="view-section">
+      <div class="kanban-board">
+        <!-- Col 1: Đang thực hiện -->
+        <div class="kanban-col col-doing">
+          <div class="col-header">
+            <div class="col-title"><i class="fa-solid fa-spinner fa-spin-pulse"></i> ĐANG THỰC HIỆN</div>
+            <span class="col-count" id="count-doing">0</span>
+          </div>
+          <div class="kanban-cards" id="cards-doing" data-status="Đang thực hiện"></div>
+        </div>
+        
+        <!-- Col 2: Hoàn thành -->
+        <div class="kanban-col col-done">
+          <div class="col-header">
+            <div class="col-title"><i class="fa-solid fa-circle-check"></i> HOÀN THÀNH</div>
+            <span class="col-count" id="count-done">0</span>
+          </div>
+          <div class="kanban-cards" id="cards-done" data-status="Hoàn thành"></div>
+        </div>
+        
+        <!-- Col 3: Quá hạn -->
+        <div class="kanban-col col-overdue">
+          <div class="col-header">
+            <div class="col-title"><i class="fa-solid fa-triangle-exclamation"></i> QUÁ HẠN</div>
+            <span class="col-count" id="count-overdue">0</span>
+          </div>
+          <div class="kanban-cards" id="cards-overdue" data-status="Quá hạn"></div>
+        </div>
+
+        <!-- Col 4: Đã hủy -->
+        <div class="kanban-col col-canceled">
+          <div class="col-header">
+            <div class="col-title"><i class="fa-solid fa-ban"></i> ĐÃ HỦY</div>
+            <span class="col-count" id="count-canceled">0</span>
+          </div>
+          <div class="kanban-cards" id="cards-canceled" data-status="Đã hủy"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: LIST VIEW (TABLE) -->
+    <section id="view-list" class="view-section" style="display: none;">
+      <div class="table-container">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th onclick="sortTable('ID')">ID <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortTable('Tiêu đề')">Tiêu Đề Công Việc <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortTable('Mức độ ưu tiên')">Ưu Tiên <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortTable('Trạng thái')">Trạng Thái <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortTable('Người thực hiện')">Người Thực Hiện <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortTable('Ngày kết thúc')">Hạn Kết Thúc <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortTable('Tiến độ (%)')">Tiến Độ <i class="fa-solid fa-sort"></i></th>
+              <th style="text-align: right;">Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="task-table-body">
+            <!-- Table rows rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW 3: GANTT CHART -->
+    <section id="view-gantt" class="view-section" style="display: none;">
+      <div class="gantt-wrapper" id="gantt-chart-container">
+        <!-- Dynamic Gantt Chart Timeline rendering -->
+      </div>
+    </section>
+
+    <!-- TAB: CÔNG VIỆC LƯU Ý -->
+    <section id="view-cvluuy" class="view-section" style="display: none;">
+      <div class="table-container">
+        <div style="padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color);">
+          <h3 style="font-size: 1.1rem; color: var(--primary-color);"><i class="fa-solid fa-note-sticky"></i> Danh Sách Công Việc Cần Lưu Ý</h3>
+          <button class="btn btn-primary btn-sm" onclick="openCvLuuYModal()">
+            <i class="fa-solid fa-plus"></i> Thêm Mục Lưu Ý
+          </button>
+        </div>
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Công Việc</th>
+              <th>Mô Tả</th>
+              <th>Tổ</th>
+              <th>Ngày Bắt Đầu</th>
+              <th>Ngày Kết Thúc</th>
+              <th>Ngày Làm Xong</th>
+              <th>Trạng Thái</th>
+              <th>Ghi Chú</th>
+              <th style="text-align: right;">Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="cvluuy-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB: HỒ SƠ TÀI LIỆU -->
+    <section id="view-documents" class="view-section" style="display: none;">
+      <div class="table-container">
+        <div style="padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color);">
+          <h3 style="font-size: 1.1rem; color: var(--primary-color);"><i class="fa-solid fa-file-invoice"></i> Quản Lý Hồ Sơ, Tài Liệu & Hợp Đồng</h3>
+          <button class="btn btn-primary btn-sm" onclick="openDocumentModal()">
+            <i class="fa-solid fa-plus"></i> Thêm Hồ Sơ Mới
+          </button>
+        </div>
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Số Hồ Sơ</th>
+              <th>Tên Hồ Sơ / Dự Án</th>
+              <th>Danh Mục</th>
+              <th>Phòng Ban</th>
+              <th>Nhà Cung Cấp</th>
+              <th>Tình Trạng</th>
+              <th>Giá Trị HĐ (VNĐ)</th>
+              <th>Thực Hiện (VNĐ)</th>
+              <th>Chênh Lệch</th>
+              <th>File Đính Kèm</th>
+              <th style="text-align: right;">Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="documents-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB: NHÂN SỰ -->
+    <section id="view-users" class="view-section" style="display: none;">
+      <div class="table-container" style="max-width: 800px; margin: 0 auto;">
+        <div style="padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color);">
+          <h3 style="font-size: 1.1rem; color: var(--primary-color);"><i class="fa-solid fa-id-card"></i> Danh Sách Cán Bộ Nhân Sự</h3>
+          <button class="btn btn-primary btn-sm" onclick="openUserModal()">
+            <i class="fa-solid fa-user-plus"></i> Thêm Người Dùng
+          </button>
+        </div>
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Mã ID</th>
+              <th>Họ Và Tên</th>
+              <th>Tổ / Phòng Ban</th>
+              <th style="text-align: right;">Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="users-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==============================================================================
+       MODALS
+       ============================================================================== -->
+
+  <!-- MODAL: CÔNG VIỆC CHÍNH (TASK MODAL) -->
+  <div class="modal-overlay" id="modal-task">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-task-title">Thêm / Chỉnh Sửa Công Việc</h3>
+        <button class="close-btn" onclick="closeModal('modal-task')">&times;</button>
+      </div>
+      <form id="form-task" onsubmit="handleTaskFormSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="task-id">
+          
+          <div class="form-group">
+            <label for="task-title-input">Tiêu đề công việc <span style="color:red;">*</span></label>
+            <input type="text" class="form-control" id="task-title-input" required placeholder="Nhập tiêu đề công việc...">
+          </div>
+
+          <div class="form-group">
+            <label for="task-desc-input">Mô tả chi tiết</label>
+            <textarea class="form-control" id="task-desc-input" rows="3" placeholder="Nhập chi tiết nội dung công việc..."></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="task-priority-input">Mức độ ưu tiên</label>
+              <select class="form-control" id="task-priority-input">
+                <option value="Cao">Cao</option>
+                <option value="Trung bình" selected>Trung bình</option>
+                <option value="Thấp">Thấp</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="task-status-input">Trạng thái</label>
+              <select class="form-control" id="task-status-input">
+                <option value="Đang thực hiện">Đang thực hiện</option>
+                <option value="Hoàn thành">Hoàn thành</option>
+                <option value="Quá hạn">Quá hạn</option>
+                <option value="Đã hủy">Đã hủy</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="task-start-input">Ngày bắt đầu</label>
+              <input type="date" class="form-control" id="task-start-input">
+            </div>
+            <div class="form-group">
+              <label for="task-end-input">Ngày kết thúc</label>
+              <input type="date" class="form-control" id="task-end-input">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="task-assignee-input">Người phụ trách</label>
+              <select class="form-control" id="task-assignee-input">
+                <option value="">-- Chọn người thực hiện --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="task-progress-input">Tiến độ (<span id="progress-val-display">0</span>%)</label>
+              <input type="range" class="form-control" id="task-progress-input" min="0" max="100" value="0" oninput="document.getElementById('progress-val-display').innerText = this.value">
+            </div>
+          </div>
+
+          <!-- Subtasks Builder Section -->
+          <div class="form-group">
+            <label><i class="fa-solid fa-list-check"></i> Danh sách công việc con (Subtasks)</label>
+            <div class="subtasks-builder">
+              <div id="subtasks-container"></div>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addSubtaskRow()" style="margin-top: 8px;">
+                <i class="fa-solid fa-plus"></i> Thêm việc con
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="task-attachment-input"><i class="fa-solid fa-link"></i> Link đính kèm tệp / Tài liệu Google Drive</label>
+            <input type="url" class="form-control" id="task-attachment-input" placeholder="https://drive.google.com/...">
+          </div>
+        </div>
+
+        <div style="padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; background: #f8fafc;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-task')">Hủy</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-task">Lưu Công Việc</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CÔNG VIỆC LƯU Ý -->
+  <div class="modal-overlay" id="modal-cvluuy">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Thêm / Chỉnh Sửa Công Việc Lưu Ý</h3>
+        <button class="close-btn" onclick="closeModal('modal-cvluuy')">&times;</button>
+      </div>
+      <form id="form-cvluuy" onsubmit="handleCvLuuYSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="ly-id">
+          <div class="form-group">
+            <label>Công việc</label>
+            <input type="text" class="form-control" id="ly-task" required placeholder="Tên công việc cần lưu ý...">
+          </div>
+          <div class="form-group">
+            <label>Mô tả</label>
+            <textarea class="form-control" id="ly-desc" rows="2"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tổ / Phòng ban</label>
+              <input type="text" class="form-control" id="ly-group">
+            </div>
+            <div class="form-group">
+              <label>Trạng thái</label>
+              <select class="form-control" id="ly-status">
+                <option value="Cần lưu ý">Cần lưu ý</option>
+                <option value="Đang xử lý">Đang xử lý</option>
+                <option value="Hoàn thành">Hoàn thành</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Ngày bắt đầu</label>
+              <input type="date" class="form-control" id="ly-start">
+            </div>
+            <div class="form-group">
+              <label>Ngày kết thúc</label>
+              <input type="date" class="form-control" id="ly-end">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Ghi chú</label>
+            <input type="text" class="form-control" id="ly-note">
+          </div>
+        </div>
+        <div style="padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cvluuy')">Hủy</button>
+          <button type="submit" class="btn btn-primary">Lưu Lưu Ý</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: HỒ SƠ TÀI LIỆU -->
+  <div class="modal-overlay" id="modal-doc">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Thêm / Chỉnh Sửa Hồ Sơ Tài Liệu</h3>
+        <button class="close-btn" onclick="closeModal('modal-doc')">&times;</button>
+      </div>
+      <form id="form-doc" onsubmit="handleDocSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="doc-id">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Số hồ sơ / Hợp đồng</label>
+              <input type="text" class="form-control" id="doc-code" required placeholder="HS-2026/01">
+            </div>
+            <div class="form-group">
+              <label>Tên hồ sơ</label>
+              <input type="text" class="form-control" id="doc-title" required placeholder="Tên hợp đồng hoặc hồ sơ...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Danh mục</label>
+              <input type="text" class="form-control" id="doc-category" placeholder="Hợp đồng kinh tế, Quyết định...">
+            </div>
+            <div class="form-group">
+              <label>Phòng ban</label>
+              <input type="text" class="form-control" id="doc-dept">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nhà cung cấp / Đối tác</label>
+              <input type="text" class="form-control" id="doc-vendor">
+            </div>
+            <div class="form-group">
+              <label>Tình trạng</label>
+              <select class="form-control" id="doc-status">
+                <option value="Đang hiệu lực">Đang hiệu lực</option>
+                <option value="Đã thanh lý">Đã thanh lý</option>
+                <option value="Hết hạn">Hết hạn</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Giá trị hợp đồng (VNĐ)</label>
+              <input type="number" class="form-control" id="doc-val-hd" value="0">
+            </div>
+            <div class="form-group">
+              <label>Giá trị thực hiện (VNĐ)</label>
+              <input type="number" class="form-control" id="doc-val-th" value="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Link File URL (Google Drive / Cloud)</label>
+            <input type="url" class="form-control" id="doc-file-url" placeholder="https://drive.google.com/...">
+          </div>
+        </div>
+        <div style="padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-doc')">Hủy</button>
+          <button type="submit" class="btn btn-primary">Lưu Hồ Sơ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NHÂN SỰ -->
+  <div class="modal-overlay" id="modal-user">
+    <div class="modal-card" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Thêm / Chỉnh Sửa Nhân Sự</h3>
+        <button class="close-btn" onclick="closeModal('modal-user')">&times;</button>
+      </div>
+      <form id="form-user" onsubmit="handleUserSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="usr-id">
+          <div class="form-group">
+            <label>Họ và Tên</label>
+            <input type="text" class="form-control" id="usr-name" required placeholder="Ví dụ: Nguyễn Văn A">
+          </div>
+          <div class="form-group">
+            <label>Tổ / Phong ban</label>
+            <input type="text" class="form-control" id="usr-group" required placeholder="Tổ Công Nghệ Thống Nhất">
+          </div>
+        </div>
+        <div style="padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-user')">Hủy</button>
+          <button type="submit" class="btn btn-primary">Lưu Nhân Sự</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SETTINGS (CẤU HÌNH API DRIFT CHO VERCEL / GAS) -->
+  <div class="modal-overlay" id="modal-settings">
+    <div class="modal-card" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-gear"></i> Cấu Hình Kết Nối API Google Apps Script</h3>
+        <button class="close-btn" onclick="closeModal('modal-settings')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 12px;">
+          Khi chạy ứng dụng trên <strong>Vercel</strong> hoặc môi trường Web ngoài, hãy dán đường dẫn Web App Google Apps Script bên dưới để kết nối API.
+        </p>
+        <div class="form-group">
+          <label>Google Apps Script Web App URL</label>
+          <input type="text" class="form-control" id="gas-api-url-input" placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+      </div>
+      <div style="padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-settings')">Đóng</button>
+        <button type="button" class="btn btn-primary" onclick="saveSettings()">Lưu Cấu Hình</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" style="position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px;"></div>
+
+  <!-- Local / Vercel JavaScript file -->
+  <script src="app.js"></script>
+  
+  <!-- GAS Template Include (Only evaluated when running inside Google Apps Script) -->
+  <?!= include('JavaScript'); ?>
+
+</body>
+</html>
