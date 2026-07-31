@@ -805,7 +805,7 @@ function renderTaskListTable() {
     return;
   }
   
-  filtered.forEach(t => {
+  filtered.forEach((t, index) => {
     const taskId = t.ID || t.id;
     const status = t['Trạng thái'] || 'Đang thực hiện';
     
@@ -832,7 +832,7 @@ function renderTaskListTable() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
+      <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index + 1}.</span><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
       <td class="col-desc-cell">${escapeHtml(t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
       <td>${formatNameList(chuTriName)}</td>
