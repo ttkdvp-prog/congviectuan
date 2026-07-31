@@ -61,6 +61,15 @@ document.addEventListener('DOMContentLoaded', () => {
   if (uInput) uInput.addEventListener('input', handleGlobalFilter);
   if (gSelect) gSelect.addEventListener('change', handleGlobalFilter);
 
+  // Restore local cache for zero-latency initial view on F5
+  const cachedLocal = localStorage.getItem('TTHT_TASKS_CACHE');
+  if (cachedLocal) {
+    try {
+      appState.tasks = JSON.parse(cachedLocal);
+      renderActiveTab();
+    } catch(e) {}
+  }
+
   appState.loadData();
   setupKanbanDragAndDrop();
 });
@@ -144,6 +153,8 @@ function onDataLoaded(response) {
         t['Trạng thái'] = 'Hoàn thành quá hạn';
       }
     });
+
+    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
 
     populateSelects();
     renderActiveTab();
@@ -499,6 +510,7 @@ function setupKanbanDragAndDrop() {
         if (task) {
           task['Trạng thái'] = newStatus;
           if (newStatus === 'Hoàn thành') task['Tiến độ (%)'] = 100;
+          try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
           renderKanbanBoard();
           callBackendSilent('updateTaskStatus', { id: taskId, status: newStatus });
           showToast(`Đã chuyển công việc sang "${newStatus}"`, 'success');
@@ -593,6 +605,7 @@ function handleInlineTaskChange(taskId, field, value, element) {
   if (field === 'ghiChu') {
     task['Ghi chú'] = value;
     payload.ghiChu = value;
+    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
 
     if (noteDebounceTimers[taskId]) clearTimeout(noteDebounceTimers[taskId]);
     noteDebounceTimers[taskId] = setTimeout(() => {
@@ -628,6 +641,8 @@ function handleInlineTaskChange(taskId, field, value, element) {
 
     payload.progress = task['Tiến độ (%)'];
     payload.status = task['Trạng thái'];
+
+    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
 
     if (element) {
       const tr = element.closest('tr');
@@ -673,6 +688,8 @@ function handleInlineTaskChange(taskId, field, value, element) {
       task['Tiến độ (%)'] = Math.min(100, pct);
       payload.progress = task['Tiến độ (%)'];
     }
+
+    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
 
     if (element) {
       const tr = element.closest('tr');

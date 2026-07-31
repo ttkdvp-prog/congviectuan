@@ -160,13 +160,12 @@ function saveTask(payload) {
     const data = sheet.getDataRange().getValues();
     const headers = data[0].map(h => String(h).trim());
     
-    const idColIdx = findHeaderIndex(headers, 'ID');
     const isEdit = payload.id !== undefined && payload.id !== null && payload.id !== '';
     let targetRow = -1;
-
-    if (isEdit && idColIdx !== -1) {
+    if (isEdit) {
+      const idIdx = findHeaderIndex(headers, 'ID');
       for (let i = 1; i < data.length; i++) {
-        if (String(data[i][idColIdx]) === String(payload.id)) {
+        if (String(data[i][idIdx]) === String(payload.id)) {
           targetRow = i + 1;
           break;
         }
@@ -178,15 +177,16 @@ function saveTask(payload) {
       payload.id = 'TSK-' + Math.floor(1000 + Math.random() * 9000);
     }
 
-    const subtasksJson = Array.isArray(payload.subtasks) ? JSON.stringify(payload.subtasks) : (payload['Danh sách công việc con'] || '[]');
+    const subtasksJson = payload.subtasks ? JSON.stringify(payload.subtasks) : '';
+    const assignee = payload['Người thực hiện'] || payload['Người phụ trách'] || '';
+
     const keHoach = payload['Kế hoạch'] !== undefined ? Number(payload['Kế hoạch']) : 1;
     const thucHien = payload['Thực hiện'] !== undefined ? Number(payload['Thực hiện']) : 0;
     const tyLe = keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%';
-    const assignee = payload['Người thực hiện'] || payload['Người phụ trách'] || '';
-
-    let status = payload['Trạng thái'] || 'Đang thực hiện';
     const doneDate = payload['Ngày làm xong'] || '';
     const endDate = payload['Ngày kết thúc'] || payload['Hạn hoàn thành'] || '';
+
+    let status = payload['Trạng thái'] || 'Đang thực hiện';
     if (doneDate && endDate && doneDate > endDate) {
       status = 'Hoàn thành quá hạn';
     }
@@ -213,6 +213,7 @@ function saveTask(payload) {
     });
 
     sheet.getRange(targetRow, 1, 1, headers.length).setValues([rowValues]);
+    SpreadsheetApp.flush();
     return { success: true, id: payload.id };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -271,6 +272,7 @@ function updateTaskInline(payload) {
       if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.ghiChu);
     }
     
+    SpreadsheetApp.flush();
     return { success: true };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -297,6 +299,7 @@ function deleteTask(payload) {
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][idColIdx]) === String(payload.id)) {
         sheet.deleteRow(i + 1);
+        SpreadsheetApp.flush();
         return { success: true };
       }
     }
@@ -334,6 +337,7 @@ function saveUser(payload) {
 
     const rowValues = [payload.id, payload['Tên'] || '', payload['Tổ'] || ''];
     sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+    SpreadsheetApp.flush();
     return { success: true, id: payload.id };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -376,6 +380,7 @@ function saveCvLuuY(payload) {
     });
 
     sheet.getRange(targetRow, 1, 1, headers.length).setValues([rowValues]);
+    SpreadsheetApp.flush();
     return { success: true, id: payload.id };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -418,6 +423,7 @@ function saveDocument(payload) {
     });
 
     sheet.getRange(targetRow, 1, 1, headers.length).setValues([rowValues]);
+    SpreadsheetApp.flush();
     return { success: true, id: payload.id };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -438,6 +444,7 @@ function deleteRowById(sheetName, id) {
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]) === String(id)) {
         sheet.deleteRow(i + 1);
+        SpreadsheetApp.flush();
         return { success: true };
       }
     }
