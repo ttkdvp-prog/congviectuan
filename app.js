@@ -24,6 +24,8 @@ const appState = {
   donutChart: null
 };
 
+const noteDebounceTimers = {};
+
 function getTaskAssignee(task) {
   if (!task) return 'Chưa gán';
   return task['Người thực hiện'] || task['Người phụ trách'] || task['NguoiThucHien'] || task['Assignee'] || 'Chưa gán';
@@ -55,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   appState.loadData();
   setupKanbanDragAndDrop();
-  setupTableScrollSync();
 });
 
 appState.loadData = function (forceRefresh = false) {
@@ -510,7 +511,6 @@ function renderTaskListTable() {
   tbody.innerHTML = '';
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
-    setupTableScrollSync();
     return;
   }
   
@@ -562,7 +562,7 @@ function renderTaskListTable() {
       </td>
       <td class="ty-le-col-cell"><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
       <td class="col-note-cell">
-        <input type="text" class="inline-note-input" value="${escapeHtml(ghiChu)}" placeholder="Nhập ghi chú..." onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)">
+        <textarea class="inline-note-textarea" rows="2" placeholder="Nhập ghi chú..." oninput="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)" onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)">${escapeHtml(ghiChu)}</textarea>
       </td>
       <td style="text-align:center;">
         <div style="display:flex; gap:4px; justify-content:center;">
@@ -573,148 +573,120 @@ function renderTaskListTable() {
     `;
     tbody.appendChild(tr);
   });
-
-  setTimeout(setupTableScrollSync, 100);
-}
-
-function setupTableScrollSync() {
-  const topScroll = document.getElementById('task-table-top-scrollbar');
-  const topContent = document.getElementById('task-table-top-scrollbar-content');
-  const tableContainer = document.getElementById('task-table-scroll-body') || document.querySelector('.dark-table-container');
-
-  if (!topScroll || !tableContainer) return;
-  const table = tableContainer.querySelector('table');
-  if (!table) return;
-
-  topContent.style.width = table.scrollWidth + 'px';
-
-  let isSyncingTop = false;
-  let isSyncingBottom = false;
-
-  topScroll.onscroll = function() {
-    if (!isSyncingTop) {
-      isSyncingBottom = true;
-      tableContainer.scrollLeft = topScroll.scrollLeft;
-    }
-    isSyncingTop = false;
-  };
-
-  tableContainer.onscroll = function() {
-    if (!isSyncingBottom) {
-      isSyncingTop = true;
-      topScroll.scrollLeft = tableContainer.scrollLeft;
-    }
-    isSyncingBottom = false;
-  };
 }
 
 function handleInlineTaskChange(taskId, field, value, element) {
   const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
-  if (task) {
-    const payload = { id: taskId };
+  if (!task) return;
+  const payload = { id: taskId };
 
-    if (field === 'ngayLamXong') {
-      task['Ngày làm xong'] = value;
-      payload.ngayLamXong = value;
+  if (field === 'ghiChu') {
+    task['Ghi chú'] = value;
+    payload.ghiChu = value;
 
-      if (value) {
-        task['Tiến độ (%)'] = 100;
-        const endDate = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
-        if (endDate && value > endDate) {
-          task['Trạng thái'] = 'Hoàn thành quá hạn';
-        } else {
-          task['Trạng thái'] = 'Hoàn thành';
-        }
-      } else {
-        const kh = Number(task['Kế hoạch'] || 1);
-        const th = Number(task['Thực hiện'] || 0);
-        task['Tiến độ (%)'] = kh > 0 ? Math.min(100, Math.round((th / kh) * 100)) : 0;
-        const endDate = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
-        const todayStr = new Date().toISOString().split('T')[0];
-        if (endDate && todayStr > endDate && task['Tiến độ (%)'] < 100) {
-          task['Trạng thái'] = 'Quá hạn';
-        } else {
-          task['Trạng thái'] = 'Đang thực hiện';
-        }
-      }
-
-      payload.progress = task['Tiến độ (%)'];
-      payload.status = task['Trạng thái'];
-
-      if (element) {
-        const tr = element.closest('tr');
-        if (tr) {
-          const progressCell = tr.querySelector('.progress-col-cell');
-          if (progressCell) {
-            progressCell.innerHTML = `
-              <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
-                <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
-                  <div style="width:${task['Tiến độ (%)']}%; height:100%; background:var(--emerald-primary);"></div>
-                </div>
-                <span style="font-size:0.75rem; color:#94a3b8;">${task['Tiến độ (%)']}%</span>
-              </div>
-            `;
-          }
-          const statusCell = tr.querySelector('.status-col-cell');
-          if (statusCell) {
-            const st = task['Trạng thái'];
-            if (st === 'Hoàn thành quá hạn') {
-              statusCell.innerHTML = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
-            } else if (st === 'Hoàn thành') {
-              statusCell.innerHTML = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
-            } else if (st === 'Quá hạn') {
-              statusCell.innerHTML = `<span class="tag-status-overdue">Quá hạn</span>`;
-            } else {
-              statusCell.innerHTML = `<span style="color:#38bdf8; font-weight:600;">${st}</span>`;
-            }
-          }
-        }
-      }
-    }
-
-    if (field === 'thucHien') {
-      const numVal = Number(value);
-      task['Thực hiện'] = numVal;
-      payload.thucHien = numVal;
-
-      const kh = task['Kế hoạch'] !== undefined && task['Kế hoạch'] !== '' ? Number(task['Kế hoạch']) : 1;
-      const pct = kh > 0 ? Math.round((numVal / kh) * 100) : 0;
-      task['Tỷ lệ'] = pct + '%';
-      
-      if (!task['Ngày làm xong']) {
-        task['Tiến độ (%)'] = Math.min(100, pct);
-        payload.progress = task['Tiến độ (%)'];
-      }
-
-      if (element) {
-        const tr = element.closest('tr');
-        if (tr) {
-          const tyLeTd = tr.querySelector('.ty-le-col-cell');
-          if (tyLeTd) {
-            tyLeTd.innerHTML = `<strong style="color:var(--emerald-primary);">${task['Tỷ lệ']}</strong>`;
-          }
-          const progressCell = tr.querySelector('.progress-col-cell');
-          if (progressCell) {
-            progressCell.innerHTML = `
-              <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
-                <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
-                  <div style="width:${task['Tiến độ (%)']}%; height:100%; background:var(--emerald-primary);"></div>
-                </div>
-                <span style="font-size:0.75rem; color:#94a3b8;">${task['Tiến độ (%)']}%</span>
-              </div>
-            `;
-          }
-        }
-      }
-    }
-
-    if (field === 'ghiChu') {
-      task['Ghi chú'] = value;
-      payload.ghiChu = value;
-    }
-    
-    callBackendSilent('updateTaskInline', payload);
+    if (noteDebounceTimers[taskId]) clearTimeout(noteDebounceTimers[taskId]);
+    noteDebounceTimers[taskId] = setTimeout(() => {
+      callBackendSilent('updateTaskInline', payload);
+    }, 500);
+    return;
   }
+
+  if (field === 'ngayLamXong') {
+    task['Ngày làm xong'] = value;
+    payload.ngayLamXong = value;
+
+    if (value) {
+      task['Tiến độ (%)'] = 100;
+      const endDate = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
+      if (endDate && value > endDate) {
+        task['Trạng thái'] = 'Hoàn thành quá hạn';
+      } else {
+        task['Trạng thái'] = 'Hoàn thành';
+      }
+    } else {
+      const kh = Number(task['Kế hoạch'] || 1);
+      const th = Number(task['Thực hiện'] || 0);
+      task['Tiến độ (%)'] = kh > 0 ? Math.min(100, Math.round((th / kh) * 100)) : 0;
+      const endDate = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (endDate && todayStr > endDate && task['Tiến độ (%)'] < 100) {
+        task['Trạng thái'] = 'Quá hạn';
+      } else {
+        task['Trạng thái'] = 'Đang thực hiện';
+      }
+    }
+
+    payload.progress = task['Tiến độ (%)'];
+    payload.status = task['Trạng thái'];
+
+    if (element) {
+      const tr = element.closest('tr');
+      if (tr) {
+        const progressCell = tr.querySelector('.progress-col-cell');
+        if (progressCell) {
+          progressCell.innerHTML = `
+            <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
+              <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+                <div style="width:${task['Tiến độ (%)']}%; height:100%; background:var(--emerald-primary);"></div>
+              </div>
+              <span style="font-size:0.75rem; color:#94a3b8;">${task['Tiến độ (%)']}%</span>
+            </div>
+          `;
+        }
+        const statusCell = tr.querySelector('.status-col-cell');
+        if (statusCell) {
+          const st = task['Trạng thái'];
+          if (st === 'Hoàn thành quá hạn') {
+            statusCell.innerHTML = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
+          } else if (st === 'Hoàn thành') {
+            statusCell.innerHTML = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
+          } else if (st === 'Quá hạn') {
+            statusCell.innerHTML = `<span class="tag-status-overdue">Quá hạn</span>`;
+          } else {
+            statusCell.innerHTML = `<span style="color:#38bdf8; font-weight:600;">${st}</span>`;
+          }
+        }
+      }
+    }
+  }
+
+  if (field === 'thucHien') {
+    const numVal = Number(value);
+    task['Thực hiện'] = numVal;
+    payload.thucHien = numVal;
+
+    const kh = task['Kế hoạch'] !== undefined && task['Kế hoạch'] !== '' ? Number(task['Kế hoạch']) : 1;
+    const pct = kh > 0 ? Math.round((numVal / kh) * 100) : 0;
+    task['Tỷ lệ'] = pct + '%';
+    
+    if (!task['Ngày làm xong']) {
+      task['Tiến độ (%)'] = Math.min(100, pct);
+      payload.progress = task['Tiến độ (%)'];
+    }
+
+    if (element) {
+      const tr = element.closest('tr');
+      if (tr) {
+        const tyLeTd = tr.querySelector('.ty-le-col-cell');
+        if (tyLeTd) {
+          tyLeTd.innerHTML = `<strong style="color:var(--emerald-primary);">${task['Tỷ lệ']}</strong>`;
+        }
+        const progressCell = tr.querySelector('.progress-col-cell');
+        if (progressCell) {
+          progressCell.innerHTML = `
+            <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
+              <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+                <div style="width:${task['Tiến độ (%)']}%; height:100%; background:var(--emerald-primary);"></div>
+              </div>
+              <span style="font-size:0.75rem; color:#94a3b8;">${task['Tiến độ (%)']}%</span>
+            </div>
+          `;
+        }
+      }
+    }
+  }
+
+  callBackendSilent('updateTaskInline', payload);
 }
 
 function sortTable(columnName) {
@@ -802,7 +774,9 @@ function renderCvLuuYTable() {
       <td>${formatDateVN(item['Ngày kết thúc'])}</td>
       <td><input type="date" class="inline-date-picker" value="${item['Ngày làm xong'] || ''}"></td>
       <td><span class="tag-priority tag-p-low">${item['Trạng thái'] || 'Cần lưu ý'}</span></td>
-      <td class="col-note-cell"><input type="text" class="inline-note-input" value="${escapeHtml(item['Ghi chú'] || '')}"></td>
+      <td class="col-note-cell">
+        <textarea class="inline-note-textarea" rows="2" placeholder="Nhập ghi chú..." oninput="handleInlineTaskChange('${item.ID || item.id}', 'cvluuy_ghiChu', this.value, this)" onchange="handleInlineTaskChange('${item.ID || item.id}', 'cvluuy_ghiChu', this.value, this)">${escapeHtml(item['Ghi chú'] || '')}</textarea>
+      </td>
       <td style="text-align:right;">
         <div style="display:flex; gap:6px; justify-content:flex-end;">
           <button class="btn-action-edit" onclick="openCvLuuYModal('${item.ID || item.id}')"><i class="fa-solid fa-pen"></i></button>
