@@ -312,10 +312,61 @@ function onDataError(error) {
   showToast('Không thể kết nối với Backend Google Apps Script.', 'error');
 }
 
+function getUserNameAndGroup(u) {
+  let name = '';
+  let group = '';
+  if (!u || typeof u !== 'object') return { name, group };
+
+  for (let k in u) {
+    const ck = cleanKey(k);
+    if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'tennguoidung' || ck === 'name' || ck === 'nguoithuchien') {
+      if (u[k] && String(u[k]).trim()) {
+        name = String(u[k]).trim();
+        break;
+      }
+    }
+  }
+  if (!name) {
+    for (let k in u) {
+      const ck = cleanKey(k);
+      if ((ck.includes('ten') || ck.includes('user')) && !ck.includes('to') && !ck.includes('file')) {
+        if (u[k] && String(u[k]).trim()) {
+          name = String(u[k]).trim();
+          break;
+        }
+      }
+    }
+  }
+
+  for (let k in u) {
+    const ck = cleanKey(k);
+    if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck === 'nhom' || ck === 'donvi') {
+      if (u[k] && String(u[k]).trim()) {
+        group = String(u[k]).trim();
+        break;
+      }
+    }
+  }
+  if (!group) {
+    for (let k in u) {
+      const ck = cleanKey(k);
+      if ((ck.includes('to') || ck.includes('group') || ck.includes('donvi')) && !ck.includes('tiendo') && !ck.includes('taptin') && !ck.includes('tep')) {
+        if (u[k] && String(u[k]).trim() && isNaN(u[k])) {
+          group = String(u[k]).trim();
+          break;
+        }
+      }
+    }
+  }
+
+  return { name, group };
+}
+
 function populateSelects() {
   const groupSelect = document.getElementById('global-group-select');
   const cvluuyGroupSelect = document.getElementById('cvluuy-group-select');
   const kanbanAssigneeSelect = document.getElementById('kanban-assignee-filter');
+  const taskToChuTriSelect = document.getElementById('task-tochutri-input');
   const taskChuTriSelect = document.getElementById('task-chutri-input');
   const taskPhoiHopSelect = document.getElementById('task-phoihop-input');
   
@@ -323,34 +374,48 @@ function populateSelects() {
   const allGroups = new Set();
   const assignees = new Set();
   
-  appState.users.forEach(u => {
-    const g = u['Tổ'] || u['TỔ'] || u['Tên tổ'] || u.group;
-    const n = u['Tên'] || u['Tên nhân viên'] || u.name;
-    if (g && String(g).trim()) {
-      hostGroups.add(String(g).trim());
-      allGroups.add(String(g).trim());
-    }
-    if (n && String(n).trim()) assignees.add(String(n).trim());
-  });
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { name, group } = getUserNameAndGroup(u);
+      if (group) {
+        hostGroups.add(group);
+        allGroups.add(group);
+      }
+      if (name) assignees.add(name);
+    });
+  }
 
-  appState.tasks.forEach(t => {
-    const a = getTaskAssignee(t);
-    const c = getTaskCollaborator(t);
-    const tg = getTaskGroup(t);
-    const tcg = getTaskCollaboratorGroup(t);
-    if (a && a !== 'Chưa gán') assignees.add(String(a).trim());
-    if (c && String(c).trim()) assignees.add(String(c).trim());
-    if (tg && String(tg).trim()) {
-      hostGroups.add(String(tg).trim());
-      allGroups.add(String(tg).trim());
-    }
-    if (tcg && String(tcg).trim()) allGroups.add(String(tcg).trim());
-  });
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const a = getTaskAssignee(t);
+      const c = getTaskCollaborator(t);
+      const tg = getTaskGroup(t);
+      const tcg = getTaskCollaboratorGroup(t);
+      
+      if (a && a !== 'Chưa gán') {
+        a.split(',').forEach(n => { if (n.trim()) assignees.add(n.trim()); });
+      }
+      if (c && String(c).trim()) {
+        c.split(',').forEach(n => { if (n.trim()) assignees.add(n.trim()); });
+      }
+      if (tg && String(tg).trim()) {
+        hostGroups.add(tg);
+        allGroups.add(tg);
+      }
+      if (tcg && String(tcg).trim()) allGroups.add(tcg);
+    });
+  }
 
-  appState.cvluuy.forEach(item => {
-    const g = item['Tổ'] || item['TỔ'] || item['Tên tổ'];
-    if (g && String(g).trim()) allGroups.add(String(g).trim());
-  });
+  if (appState.cvluuy && Array.isArray(appState.cvluuy)) {
+    appState.cvluuy.forEach(item => {
+      for (let k in item) {
+        const ck = cleanKey(k);
+        if (ck.includes('to') && item[k] && typeof item[k] === 'string' && item[k].trim()) {
+          allGroups.add(item[k].trim());
+        }
+      }
+    });
+  }
 
   if (groupSelect) {
     const curVal = groupSelect.value;
@@ -418,49 +483,49 @@ function handleModalGroupChange(selectedGroup) {
   const selGrpClean = cleanKey(selectedGroup);
 
   if (selGrpClean) {
-    appState.users.forEach(u => {
-      let group = '';
-      let name = '';
-      for (let k in u) {
-        const ck = cleanKey(k);
-        if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck.includes('to')) {
-          if (u[k] && String(u[k]).trim()) group = String(u[k]).trim();
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        const { name, group } = getUserNameAndGroup(u);
+        const ckG = cleanKey(group);
+        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
+          filteredUsers.add(name);
         }
-        if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name' || ck.includes('ten')) {
-          if (u[k] && String(u[k]).trim()) name = String(u[k]).trim();
-        }
-      }
-      const ckG = cleanKey(group);
-      if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
-        filteredUsers.add(name);
-      }
-    });
+      });
+    }
 
-    appState.tasks.forEach(t => {
-      const tg = getTaskGroup(t);
-      const ckTg = cleanKey(tg);
-      const a = getTaskAssignee(t);
-      if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
-        filteredUsers.add(a);
-      }
-    });
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        if (!t || typeof t !== 'object') return;
+        const tg = getTaskGroup(t);
+        const ckTg = cleanKey(tg);
+        const a = getTaskAssignee(t);
+        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
+          a.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+        }
+      });
+    }
   }
 
   if (!selGrpClean || filteredUsers.size === 0) {
-    appState.users.forEach(u => {
-      for (let k in u) {
-        const ck = cleanKey(k);
-        if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name') {
-          if (u[k] && String(u[k]).trim()) filteredUsers.add(String(u[k]).trim());
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        const { name } = getUserNameAndGroup(u);
+        if (name) filteredUsers.add(name);
+      });
+    }
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        if (!t || typeof t !== 'object') return;
+        const a = getTaskAssignee(t);
+        const c = getTaskCollaborator(t);
+        if (a && a !== 'Chưa gán') {
+          a.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
         }
-      }
-    });
-    appState.tasks.forEach(t => {
-      const a = getTaskAssignee(t);
-      const c = getTaskCollaborator(t);
-      if (a && a !== 'Chưa gán') filteredUsers.add(a);
-      if (c && String(c).trim()) filteredUsers.add(String(c).trim());
-    });
+        if (c && String(c).trim()) {
+          c.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+        }
+      });
+    }
   }
 
   chuTriSelect.innerHTML = '<option value="">-- Chọn người chủ trì --</option>';

@@ -311,10 +311,61 @@ function onDataError(error) {
   showToast('Không thể kết nối với Backend Google Apps Script.', 'error');
 }
 
+function getUserNameAndGroup(u) {
+  let name = '';
+  let group = '';
+  if (!u || typeof u !== 'object') return { name, group };
+
+  for (let k in u) {
+    const ck = cleanKey(k);
+    if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'tennguoidung' || ck === 'name' || ck === 'nguoithuchien') {
+      if (u[k] && String(u[k]).trim()) {
+        name = String(u[k]).trim();
+        break;
+      }
+    }
+  }
+  if (!name) {
+    for (let k in u) {
+      const ck = cleanKey(k);
+      if ((ck.includes('ten') || ck.includes('user')) && !ck.includes('to') && !ck.includes('file')) {
+        if (u[k] && String(u[k]).trim()) {
+          name = String(u[k]).trim();
+          break;
+        }
+      }
+    }
+  }
+
+  for (let k in u) {
+    const ck = cleanKey(k);
+    if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck === 'nhom' || ck === 'donvi') {
+      if (u[k] && String(u[k]).trim()) {
+        group = String(u[k]).trim();
+        break;
+      }
+    }
+  }
+  if (!group) {
+    for (let k in u) {
+      const ck = cleanKey(k);
+      if ((ck.includes('to') || ck.includes('group') || ck.includes('donvi')) && !ck.includes('tiendo') && !ck.includes('taptin') && !ck.includes('tep')) {
+        if (u[k] && String(u[k]).trim() && isNaN(u[k])) {
+          group = String(u[k]).trim();
+          break;
+        }
+      }
+    }
+  }
+
+  return { name, group };
+}
+
 function populateSelects() {
   const groupSelect = document.getElementById('global-group-select');
   const cvluuyGroupSelect = document.getElementById('cvluuy-group-select');
   const kanbanAssigneeSelect = document.getElementById('kanban-assignee-filter');
+  const taskToChuTriSelect = document.getElementById('task-tochutri-input');
   const taskChuTriSelect = document.getElementById('task-chutri-input');
   const taskPhoiHopSelect = document.getElementById('task-phoihop-input');
   
@@ -322,59 +373,48 @@ function populateSelects() {
   const allGroups = new Set();
   const assignees = new Set();
   
-  appState.users.forEach(u => {
-    let name = '';
-    let group = '';
-    for (let k in u) {
-      const ck = cleanKey(k);
-      if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group') {
-        if (u[k] && String(u[k]).trim()) group = String(u[k]).trim();
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { name, group } = getUserNameAndGroup(u);
+      if (group) {
+        hostGroups.add(group);
+        allGroups.add(group);
       }
-      if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name') {
-        if (u[k] && String(u[k]).trim()) name = String(u[k]).trim();
+      if (name) assignees.add(name);
+    });
+  }
+
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const a = getTaskAssignee(t);
+      const c = getTaskCollaborator(t);
+      const tg = getTaskGroup(t);
+      const tcg = getTaskCollaboratorGroup(t);
+      
+      if (a && a !== 'Chưa gán') {
+        a.split(',').forEach(n => { if (n.trim()) assignees.add(n.trim()); });
       }
-    }
-    if (group) {
-      hostGroups.add(group);
-      allGroups.add(group);
-    }
-    if (name) assignees.add(name);
-  });
+      if (c && String(c).trim()) {
+        c.split(',').forEach(n => { if (n.trim()) assignees.add(n.trim()); });
+      }
+      if (tg && String(tg).trim()) {
+        hostGroups.add(tg);
+        allGroups.add(tg);
+      }
+      if (tcg && String(tcg).trim()) allGroups.add(tcg);
+    });
+  }
 
-  appState.tasks.forEach(t => {
-    const a = getTaskAssignee(t);
-    const c = getTaskCollaborator(t);
-    const tg = getTaskGroup(t);
-    const tcg = getTaskCollaboratorGroup(t);
-    
-    if (a && a !== 'Chưa gán') assignees.add(a);
-    if (c && String(c).trim()) assignees.add(c);
-    if (tg && String(tg).trim()) {
-      hostGroups.add(tg);
-      allGroups.add(tg);
-    }
-    if (tcg && String(tcg).trim()) allGroups.add(tcg);
-
-    for (let k in t) {
-      const ck = cleanKey(k);
-      if (ck.includes('to') && t[k] && typeof t[k] === 'string' && t[k].trim()) {
-        const val = t[k].trim();
-        if (val.toLowerCase().includes('tổ') || val.toLowerCase().includes('to ')) {
-          hostGroups.add(val);
-          allGroups.add(val);
+  if (appState.cvluuy && Array.isArray(appState.cvluuy)) {
+    appState.cvluuy.forEach(item => {
+      for (let k in item) {
+        const ck = cleanKey(k);
+        if (ck.includes('to') && item[k] && typeof item[k] === 'string' && item[k].trim()) {
+          allGroups.add(item[k].trim());
         }
       }
-    }
-  });
-
-  appState.cvluuy.forEach(item => {
-    for (let k in item) {
-      const ck = cleanKey(k);
-      if (ck.includes('to') && item[k] && typeof item[k] === 'string' && item[k].trim()) {
-        allGroups.add(item[k].trim());
-      }
-    }
-  });
+    });
+  }
 
   if (groupSelect) {
     const curVal = groupSelect.value;
@@ -444,18 +484,7 @@ function handleModalGroupChange(selectedGroup) {
   if (selGrpClean) {
     if (appState.users && Array.isArray(appState.users)) {
       appState.users.forEach(u => {
-        if (!u || typeof u !== 'object') return;
-        let group = '';
-        let name = '';
-        for (let k in u) {
-          const ck = cleanKey(k);
-          if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck.includes('to')) {
-            if (u[k] && String(u[k]).trim()) group = String(u[k]).trim();
-          }
-          if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name' || ck.includes('ten')) {
-            if (u[k] && String(u[k]).trim()) name = String(u[k]).trim();
-          }
-        }
+        const { name, group } = getUserNameAndGroup(u);
         const ckG = cleanKey(group);
         if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
           filteredUsers.add(name);
@@ -470,7 +499,7 @@ function handleModalGroupChange(selectedGroup) {
         const ckTg = cleanKey(tg);
         const a = getTaskAssignee(t);
         if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
-          filteredUsers.add(a);
+          a.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
         }
       });
     }
@@ -479,13 +508,8 @@ function handleModalGroupChange(selectedGroup) {
   if (!selGrpClean || filteredUsers.size === 0) {
     if (appState.users && Array.isArray(appState.users)) {
       appState.users.forEach(u => {
-        if (!u || typeof u !== 'object') return;
-        for (let k in u) {
-          const ck = cleanKey(k);
-          if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name') {
-            if (u[k] && String(u[k]).trim()) filteredUsers.add(String(u[k]).trim());
-          }
-        }
+        const { name } = getUserNameAndGroup(u);
+        if (name) filteredUsers.add(name);
       });
     }
     if (appState.tasks && Array.isArray(appState.tasks)) {
@@ -493,8 +517,12 @@ function handleModalGroupChange(selectedGroup) {
         if (!t || typeof t !== 'object') return;
         const a = getTaskAssignee(t);
         const c = getTaskCollaborator(t);
-        if (a && a !== 'Chưa gán') filteredUsers.add(a);
-        if (c && String(c).trim()) filteredUsers.add(String(c).trim());
+        if (a && a !== 'Chưa gán') {
+          a.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+        }
+        if (c && String(c).trim()) {
+          c.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+        }
       });
     }
   }
