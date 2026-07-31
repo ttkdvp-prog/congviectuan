@@ -177,11 +177,19 @@ function saveTask(payload) {
     const tyLe = keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%';
     const assignee = payload['Người thực hiện'] || payload['Người phụ trách'] || '';
 
+    // Check status logic: Hoàn thành quá hạn vs Hoàn thành
+    let status = payload['Trạng thái'] || 'Đang thực hiện';
+    const doneDate = payload['Ngày làm xong'] || '';
+    const endDate = payload['Ngày kết thúc'] || payload['Hạn hoàn thành'] || '';
+    if (doneDate && endDate && doneDate > endDate) {
+      status = 'Hoàn thành quá hạn';
+    }
+
     const rowValues = headers.map(h => {
       if (h === 'ID') return payload.id;
       if (h === 'Tiêu đề') return payload['Tiêu đề'] || '';
       if (h === 'Mô tả') return payload['Mô tả'] || '';
-      if (h === 'Trạng thái') return payload['Trạng thái'] || 'Đang thực hiện';
+      if (h === 'Trạng thái') return status;
       if (h === 'Mức độ ưu tiên') return payload['Mức độ ưu tiên'] || 'Trung bình';
       if (h === 'Ngày bắt đầu') return payload['Ngày bắt đầu'] || '';
       if (h === 'Ngày kết thúc') return payload['Ngày kết thúc'] || '';
@@ -189,7 +197,7 @@ function saveTask(payload) {
       if (h === 'Người thực hiện' || h === 'Người phụ trách') return assignee;
       if (h === 'Danh sách công việc con') return subtasksJson;
       if (h === 'Tệp đính kèm') return payload['Tệp đính kèm'] || '';
-      if (h === 'Ngày làm xong') return payload['Ngày làm xong'] || '';
+      if (h === 'Ngày làm xong') return doneDate;
       if (h === 'Kế hoạch') return keHoach;
       if (h === 'Thực hiện') return thucHien;
       if (h === 'Tỷ lệ') return tyLe;
@@ -265,7 +273,7 @@ function updateTaskStatus(payload) {
   return updateTaskInline({
     id: payload.id,
     status: payload.status,
-    progress: payload.status === 'Hoàn thành' ? 100 : undefined
+    progress: payload.status === 'Hoàn thành' || payload.status === 'Hoàn thành quá hạn' ? 100 : undefined
   });
 }
 

@@ -129,6 +129,13 @@ function onDataLoaded(response) {
       } else {
         t.subtasks = t.subtasks || [];
       }
+
+      // Check status: Hoàn thành quá hạn
+      const doneDate = t['Ngày làm xong'] || '';
+      const endDate = t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '';
+      if (doneDate && endDate && doneDate > endDate) {
+        t['Trạng thái'] = 'Hoàn thành quá hạn';
+      }
     });
 
     populateSelects();
@@ -282,13 +289,14 @@ function renderActiveTab() {
   else if (tab === 'cvluuy') renderCvLuuYTable();
 }
 
+/* 1. DASHBOARD */
 function renderDashboard() {
   const filtered = getFilteredTasks();
   let countDoing = 0, countDone = 0, countOverdue = 0, countCanceled = 0;
   filtered.forEach(t => {
     const st = t['Trạng thái'] || 'Đang thực hiện';
     if (st === 'Đang thực hiện') countDoing++;
-    else if (st === 'Hoàn thành') countDone++;
+    else if (st === 'Hoàn thành' || st === 'Hoàn thành quá hạn') countDone++;
     else if (st === 'Quá hạn') countOverdue++;
     else if (st === 'Đã hủy') countCanceled++;
   });
@@ -378,7 +386,13 @@ function renderRecentTasks(tasks) {
     const priority = t['Mức độ ưu tiên'] || 'Trung bình';
     const tagPClass = priority === 'Cao' ? 'tag-p-high' : priority === 'Trung bình' ? 'tag-p-med' : 'tag-p-low';
     const status = t['Trạng thái'] || '';
-    const statusHtml = status === 'Quá hạn' ? `<span class="tag-status-overdue">Quá hạn</span>` : `<span style="font-size:0.75rem; color:#94a3b8;">${status}</span>`;
+    
+    let statusHtml = `<span style="font-size:0.75rem; color:#94a3b8;">${status}</span>`;
+    if (status === 'Hoàn thành quá hạn') {
+      statusHtml = `<span style="color:#f59e0b; font-weight:600; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
+    } else if (status === 'Quá hạn') {
+      statusHtml = `<span class="tag-status-overdue">Quá hạn</span>`;
+    }
 
     html += `
       <div class="recent-row-item" onclick="openTaskModal('${t.ID || t.id}')" style="cursor:pointer;">
@@ -397,6 +411,7 @@ function renderRecentTasks(tasks) {
   container.innerHTML = html;
 }
 
+/* 2. KANBAN BOARD */
 function renderKanbanBoard() {
   const filtered = getFilteredTasks();
   const cols = {
@@ -409,7 +424,8 @@ function renderKanbanBoard() {
   Object.values(cols).forEach(c => { if (c) c.innerHTML = ''; });
   
   filtered.forEach(t => {
-    const st = t['Trạng thái'] || 'Đang thực hiện';
+    let st = t['Trạng thái'] || 'Đang thực hiện';
+    if (st === 'Hoàn thành quá hạn') st = 'Hoàn thành';
     if (cols[st]) {
       counts[st]++;
       cols[st].appendChild(createDarkTaskCard(t));
@@ -485,6 +501,7 @@ function setupKanbanDragAndDrop() {
   });
 }
 
+/* 3. DANH SÁCH (TABLE) */
 function renderTaskListTable() {
   const filtered = getFilteredTasks();
   const tbody = document.getElementById('task-list-tbody');
@@ -499,11 +516,17 @@ function renderTaskListTable() {
   filtered.forEach(t => {
     const taskId = t.ID || t.id;
     const status = t['Trạng thái'] || 'Đang thực hiện';
-    const statusBadge = status === 'Quá hạn' 
-      ? `<span class="tag-status-overdue">Quá hạn</span>`
-      : status === 'Hoàn thành'
-      ? `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`
-      : `<span style="color:#38bdf8; font-weight:600;">${status}</span>`;
+    
+    let statusBadge = '';
+    if (status === 'Hoàn thành quá hạn') {
+      statusBadge = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
+    } else if (status === 'Quá hạn') {
+      statusBadge = `<span class="tag-status-overdue">Quá hạn</span>`;
+    } else if (status === 'Hoàn thành') {
+      statusBadge = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
+    } else {
+      statusBadge = `<span style="color:#38bdf8; font-weight:600;">${status}</span>`;
+    }
 
     const progress = Number(t['Tiến độ (%)'] || 0);
     const keHoach = t['Kế hoạch'] !== undefined && t['Kế hoạch'] !== '' ? t['Kế hoạch'] : 1;
@@ -562,12 +585,23 @@ function handleInlineTaskChange(taskId, field, value, element) {
 
       if (value) {
         task['Tiến độ (%)'] = 100;
-        task['Trạng thái'] = 'Hoàn thành';
+        const endDate = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
+        if (endDate && value > endDate) {
+          task['Trạng thái'] = 'Hoàn thành quá hạn';
+        } else {
+          task['Trạng thái'] = 'Hoàn thành';
+        }
       } else {
         const kh = Number(task['Kế hoạch'] || 1);
         const th = Number(task['Thực hiện'] || 0);
         task['Tiến độ (%)'] = kh > 0 ? Math.min(100, Math.round((th / kh) * 100)) : 0;
-        if (task['Tiến độ (%)'] < 100) task['Trạng thái'] = 'Đang thực hiện';
+        const endDate = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (endDate && todayStr > endDate && task['Tiến độ (%)'] < 100) {
+          task['Trạng thái'] = 'Quá hạn';
+        } else {
+          task['Trạng thái'] = 'Đang thực hiện';
+        }
       }
 
       payload.progress = task['Tiến độ (%)'];
@@ -590,9 +624,15 @@ function handleInlineTaskChange(taskId, field, value, element) {
           const statusCell = tr.querySelector('.status-col-cell');
           if (statusCell) {
             const st = task['Trạng thái'];
-            statusCell.innerHTML = st === 'Hoàn thành' 
-              ? `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>` 
-              : `<span style="color:#38bdf8; font-weight:600;">${st}</span>`;
+            if (st === 'Hoàn thành quá hạn') {
+              statusCell.innerHTML = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
+            } else if (st === 'Hoàn thành') {
+              statusCell.innerHTML = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
+            } else if (st === 'Quá hạn') {
+              statusCell.innerHTML = `<span class="tag-status-overdue">Quá hạn</span>`;
+            } else {
+              statusCell.innerHTML = `<span style="color:#38bdf8; font-weight:600;">${st}</span>`;
+            }
           }
         }
       }
@@ -812,7 +852,8 @@ function renderOrgStatistics() {
     const org = usr ? (usr['Tổ'] || 'Khác') : 'Khác';
     if (!orgMap[org]) orgMap[org] = { total: 0, done: 0 };
     orgMap[org].total++;
-    if (t['Trạng thái'] === 'Hoàn thành') orgMap[org].done++;
+    const st = t['Trạng thái'];
+    if (st === 'Hoàn thành' || st === 'Hoàn thành quá hạn') orgMap[org].done++;
   });
 
   let html = `<div style="display:flex; flex-direction:column; gap:16px;">`;
