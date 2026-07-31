@@ -34,7 +34,12 @@ function autoResizeTextarea(el) {
 
 function getTaskAssignee(task) {
   if (!task) return 'Chưa gán';
-  return task['Người thực hiện'] || task['Người phụ trách'] || task['NguoiThucHien'] || task['Assignee'] || 'Chưa gán';
+  return task['Người chủ trì'] || task['Người phụ trách'] || task['Người thực hiện'] || task['NguoiThucHien'] || task['Assignee'] || 'Chưa gán';
+}
+
+function getTaskCollaborator(task) {
+  if (!task) return '';
+  return task['Người phối hợp'] || task['NguoiPhoiHop'] || '';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -173,7 +178,8 @@ function populateSelects() {
   const groupSelect = document.getElementById('global-group-select');
   const cvluuyGroupSelect = document.getElementById('cvluuy-group-select');
   const kanbanAssigneeSelect = document.getElementById('kanban-assignee-filter');
-  const taskAssigneeSelect = document.getElementById('task-assignee-input');
+  const taskChuTriSelect = document.getElementById('task-chutri-input');
+  const taskPhoiHopSelect = document.getElementById('task-phoihop-input');
   
   const groups = new Set();
   const assignees = new Set();
@@ -187,7 +193,9 @@ function populateSelects() {
 
   appState.tasks.forEach(t => {
     const a = getTaskAssignee(t);
+    const c = getTaskCollaborator(t);
     if (a && a !== 'Chưa gán') assignees.add(a);
+    if (c) assignees.add(c);
     if (t['Tổ']) groups.add(t['Tổ']);
   });
 
@@ -211,11 +219,17 @@ function populateSelects() {
     assignees.forEach(a => kanbanAssigneeSelect.innerHTML += `<option value="${a}">${a}</option>`);
     if (curVal) kanbanAssigneeSelect.value = curVal;
   }
-  if (taskAssigneeSelect) {
-    const curVal = taskAssigneeSelect.value;
-    taskAssigneeSelect.innerHTML = '<option value="">-- Chọn người thực hiện --</option>';
-    assignees.forEach(a => taskAssigneeSelect.innerHTML += `<option value="${a}">${a}</option>`);
-    if (curVal) taskAssigneeSelect.value = curVal;
+  if (taskChuTriSelect) {
+    const curVal = taskChuTriSelect.value;
+    taskChuTriSelect.innerHTML = '<option value="">-- Chọn người chủ trì --</option>';
+    assignees.forEach(a => taskChuTriSelect.innerHTML += `<option value="${a}">${a}</option>`);
+    if (curVal) taskChuTriSelect.value = curVal;
+  }
+  if (taskPhoiHopSelect) {
+    const curVal = taskPhoiHopSelect.value;
+    taskPhoiHopSelect.innerHTML = '<option value="">-- Chọn người phối hợp --</option>';
+    assignees.forEach(a => taskPhoiHopSelect.innerHTML += `<option value="${a}">${a}</option>`);
+    if (curVal) taskPhoiHopSelect.value = curVal;
   }
 }
 
@@ -274,11 +288,12 @@ function getFilteredTasks() {
     const title = (t['Tiêu đề'] || '').toLowerCase();
     const desc = (t['Mô tả'] || '').toLowerCase();
     const assignee = getTaskAssignee(t).toLowerCase();
+    const collaborator = getTaskCollaborator(t).toLowerCase();
     
-    if (search && !title.includes(search) && !desc.includes(search) && !assignee.includes(search)) return false;
+    if (search && !title.includes(search) && !desc.includes(search) && !assignee.includes(search) && !collaborator.includes(search)) return false;
     
     const userSearch = appState.filters.user.toLowerCase();
-    if (userSearch && !assignee.includes(userSearch)) return false;
+    if (userSearch && !assignee.includes(userSearch) && !collaborator.includes(userSearch)) return false;
 
     const groupFilter = appState.filters.group;
     if (groupFilter) {
@@ -528,7 +543,7 @@ function renderTaskListTable() {
   
   tbody.innerHTML = '';
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
     return;
   }
   
@@ -553,14 +568,16 @@ function renderTaskListTable() {
     const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
     const ghiChu = t['Ghi chú'] || '';
     const ngayLamXong = t['Ngày làm xong'] || '';
-    const assigneeName = getTaskAssignee(t);
+    const chuTriName = getTaskAssignee(t);
+    const phoiHopName = getTaskCollaborator(t);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
       <td class="col-desc-cell">${escapeHtml(t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
-      <td>${escapeHtml(assigneeName)}</td>
+      <td>${escapeHtml(chuTriName)}</td>
+      <td>${escapeHtml(phoiHopName)}</td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(t['Ngày kết thúc'])}</td>
       <td>
@@ -933,7 +950,8 @@ function openTaskModal(taskId = null) {
       document.getElementById('task-end-input').value = task['Ngày kết thúc'] || '';
       document.getElementById('task-kehoach-input').value = task['Kế hoạch'] !== undefined ? task['Kế hoạch'] : 1;
       document.getElementById('task-thuchien-input').value = task['Thực hiện'] !== undefined ? task['Thực hiện'] : 0;
-      document.getElementById('task-assignee-input').value = getTaskAssignee(task);
+      document.getElementById('task-chutri-input').value = getTaskAssignee(task);
+      document.getElementById('task-phoihop-input').value = getTaskCollaborator(task);
       document.getElementById('task-progress-input').value = task['Tiến độ (%)'] || 0;
       document.getElementById('progress-val-display').innerText = task['Tiến độ (%)'] || 0;
       document.getElementById('task-ghichu-input').value = task['Ghi chú'] || '';
@@ -995,8 +1013,10 @@ function handleTaskFormSubmit(e) {
     'Ngày kết thúc': document.getElementById('task-end-input').value,
     'Kế hoạch': Number(document.getElementById('task-kehoach-input').value),
     'Thực hiện': Number(document.getElementById('task-thuchien-input').value),
-    'Người thực hiện': document.getElementById('task-assignee-input').value,
-    'Người phụ trách': document.getElementById('task-assignee-input').value,
+    'Người chủ trì': document.getElementById('task-chutri-input').value,
+    'Người phối hợp': document.getElementById('task-phoihop-input').value,
+    'Người thực hiện': document.getElementById('task-chutri-input').value,
+    'Người phụ trách': document.getElementById('task-chutri-input').value,
     'Tiến độ (%)': Number(document.getElementById('task-progress-input').value),
     'Ghi chú': document.getElementById('task-ghichu-input').value,
     'Tệp đính kèm': document.getElementById('task-attachment-input').value,

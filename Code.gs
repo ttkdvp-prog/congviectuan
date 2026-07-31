@@ -178,7 +178,8 @@ function saveTask(payload) {
     }
 
     const subtasksJson = payload.subtasks ? JSON.stringify(payload.subtasks) : '';
-    const assignee = payload['Người thực hiện'] || payload['Người phụ trách'] || '';
+    const chuTri = payload['Người chủ trì'] || payload['Người thực hiện'] || payload['Người phụ trách'] || '';
+    const phoiHop = payload['Người phối hợp'] || '';
 
     const keHoach = payload['Kế hoạch'] !== undefined ? Number(payload['Kế hoạch']) : 1;
     const thucHien = payload['Thực hiện'] !== undefined ? Number(payload['Thực hiện']) : 0;
@@ -201,7 +202,8 @@ function saveTask(payload) {
       if (cleanH === 'ngày bắt đầu') return payload['Ngày bắt đầu'] || '';
       if (cleanH === 'ngày kết thúc' || cleanH === 'hạn hoàn thành') return payload['Ngày kết thúc'] || '';
       if (cleanH.includes('tiến độ')) return payload['Tiến độ (%)'] || 0;
-      if (cleanH.includes('người thực hiện') || cleanH.includes('người phụ trách')) return assignee;
+      if (cleanH.includes('chủ trì') || cleanH.includes('phụ trách') || cleanH.includes('thực hiện')) return chuTri;
+      if (cleanH.includes('phối hợp')) return phoiHop;
       if (cleanH.includes('việc con')) return subtasksJson;
       if (cleanH.includes('đính kèm')) return payload['Tệp đính kèm'] || '';
       if (cleanH.includes('ngày làm xong')) return doneDate;

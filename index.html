@@ -245,7 +245,8 @@
                   <th class="col-title-header" onclick="sortTable('Tiêu đề')">TIÊU ĐỀ <i class="fa-solid fa-sort"></i></th>
                   <th onclick="sortTable('Mô tả')">MÔ TẢ</th>
                   <th onclick="sortTable('Trạng thái')">TRẠNG THÁI</th>
-                  <th onclick="sortTable('Người thực hiện')">NGƯỜI PHỤ TRÁCH</th>
+                  <th onclick="sortTable('Người chủ trì')">NGƯỜI CHỦ TRÌ</th>
+                  <th onclick="sortTable('Người phối hợp')">NGƯỜI PHỐI HỢP</th>
                   <th onclick="sortTable('Ngày bắt đầu')">BẮT ĐẦU</th>
                   <th onclick="sortTable('Ngày kết thúc')">HẠN HOÀN THÀNH</th>
                   <th>NGÀY LÀM XONG</th>
@@ -429,15 +430,22 @@
 
           <div class="dark-form-row">
             <div class="dark-form-group">
-              <label>Người phụ trách</label>
-              <select class="dark-form-control" id="task-assignee-input">
-                <option value="">-- Chọn người thực hiện --</option>
+              <label>Người chủ trì</label>
+              <select class="dark-form-control" id="task-chutri-input">
+                <option value="">-- Chọn người chủ trì --</option>
               </select>
             </div>
             <div class="dark-form-group">
-              <label>Tiến độ (<span id="progress-val-display">0</span>%)</label>
-              <input type="range" class="dark-form-control" id="task-progress-input" min="0" max="100" value="0" oninput="document.getElementById('progress-val-display').innerText = this.value">
+              <label>Người phối hợp</label>
+              <select class="dark-form-control" id="task-phoihop-input">
+                <option value="">-- Chọn người phối hợp --</option>
+              </select>
             </div>
+          </div>
+
+          <div class="dark-form-group">
+            <label>Tiến độ (<span id="progress-val-display">0</span>%)</label>
+            <input type="range" class="dark-form-control" id="task-progress-input" min="0" max="100" value="0" oninput="document.getElementById('progress-val-display').innerText = this.value">
           </div>
 
           <div class="dark-form-group">
