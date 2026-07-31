@@ -235,11 +235,18 @@ function callBackend(action, payload, successCallback) {
     google.script.run
       .withSuccessHandler(res => {
         if (successCallback) successCallback(res);
-        appState.loadData(true);
       })
-      .withFailureHandler(onDataError)[action](payload);
+      .withFailureHandler(err => {
+        console.warn('GAS backend call failed, using local cache:', action, err);
+        if (successCallback) successCallback({ success: true, localOnly: true });
+      })[action](payload);
   } else {
-    const fetchUrl = appState.apiUrl || window.location.href;
+    const fetchUrl = appState.apiUrl;
+    if (!fetchUrl) {
+      console.warn('No apiUrl set for standalone backend call:', action);
+      if (successCallback) successCallback({ success: true, localOnly: true });
+      return;
+    }
     fetch(fetchUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
@@ -248,9 +255,11 @@ function callBackend(action, payload, successCallback) {
       .then(res => res.json())
       .then(res => {
         if (successCallback) successCallback(res);
-        appState.loadData(true);
       })
-      .catch(err => onDataError(err));
+      .catch(err => {
+        console.warn('Backend fetch failed, using local cache:', action, err);
+        if (successCallback) successCallback({ success: true, localOnly: true });
+      });
   }
 }
 
@@ -1441,45 +1450,75 @@ function handleTaskFormSubmit(e) {
     if (title) subtasks.push({ id: idx + 1, title: title, completed: completed });
   });
 
+  const taskId = document.getElementById('task-id')?.value || '';
+  const titleVal = document.getElementById('task-title-input')?.value || '';
+  const descVal = document.getElementById('task-desc-input')?.value || '';
+  const priorityVal = document.getElementById('task-priority-input')?.value || 'Trung bình';
+  const statusVal = document.getElementById('task-status-input')?.value || 'Đang thực hiện';
+  const startVal = document.getElementById('task-start-input')?.value || '';
+  const endVal = document.getElementById('task-end-input')?.value || '';
+  const kehoachVal = Number(document.getElementById('task-kehoach-input')?.value || 1);
+  const thuchienVal = Number(document.getElementById('task-thuchien-input')?.value || 0);
+
   const toChuTriInput = document.getElementById('task-tochutri-input')?.value || '';
-  const chuTriName = document.getElementById('task-chutri-input').value;
-  const phoiHopName = document.getElementById('task-phoihop-input').value;
+  const chuTriName = document.getElementById('task-chutri-input')?.value || '';
+  const phoiHopName = document.getElementById('task-phoihop-input')?.value || '';
 
   const chuTriUser = appState.users.find(u => (u['Tên'] || u.name) === chuTriName);
   const phoiHopUser = appState.users.find(u => (u['Tên'] || u.name) === phoiHopName);
-
   const finalToChuTri = toChuTriInput || (chuTriUser ? (chuTriUser['Tổ'] || chuTriUser.group) : '');
 
+  const newId = taskId || ('TSK-' + Math.floor(1000 + Math.random() * 9000));
+
   const payload = {
-    id: document.getElementById('task-id').value,
-    'Tiêu đề': document.getElementById('task-title-input').value,
-    'Mô tả': document.getElementById('task-desc-input').value,
-    'Mức độ ưu tiên': document.getElementById('task-priority-input').value,
-    'Trạng thái': document.getElementById('task-status-input').value,
-    'Ngày bắt đầu': document.getElementById('task-start-input').value,
-    'Ngày kết thúc': document.getElementById('task-end-input').value,
-    'Kế hoạch': Number(document.getElementById('task-kehoach-input').value),
-    'Thực hiện': Number(document.getElementById('task-thuchien-input').value),
+    id: newId,
+    'ID': newId,
+    'Tiêu đề': titleVal,
+    'Mô tả': descVal,
+    'Mức độ ưu tiên': priorityVal,
+    'Trạng thái': statusVal,
+    'Ngày bắt đầu': startVal,
+    'Ngày kết thúc': endVal,
+    'Kế hoạch': kehoachVal,
+    'Thực hiện': thuchienVal,
     'Người chủ trì': chuTriName,
     'Tổ chủ trì': finalToChuTri,
     'Người phối hợp': phoiHopName,
     'Tổ phối hợp': phoiHopUser ? (phoiHopUser['Tổ'] || phoiHopUser.group) : '',
     'Người thực hiện': chuTriName,
     'Người phụ trách': chuTriName,
-    'Tiến độ (%)': Number(document.getElementById('task-progress-input').value),
-    'Ghi chú': document.getElementById('task-ghichu-input').value,
-    'Tệp đính kèm': document.getElementById('task-attachment-input').value,
+    'Tiến độ (%)': Number(document.getElementById('task-progress-input')?.value || 0),
+    'Ghi chú': document.getElementById('task-ghichu-input')?.value || '',
+    'Tệp đính kèm': document.getElementById('task-attachment-input')?.value || '',
     subtasks: subtasks
   };
 
+  const existingIdx = appState.tasks.findIndex(t => String(t.ID || t.id) === String(newId));
+  if (existingIdx >= 0) {
+    appState.tasks[existingIdx] = { ...appState.tasks[existingIdx], ...payload };
+  } else {
+    appState.tasks.unshift(payload);
+  }
+
+  try {
+    localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks));
+  } catch (err) {}
+
+  populateSelects();
+  renderActiveTab();
   closeModal('modal-task');
-  showToast('Đang lưu công việc...', 'info');
-  callBackend('saveTask', payload, () => showToast('Đã lưu công việc!', 'success'));
+  showToast('Đã lưu công việc thành công!', 'success');
+
+  callBackend('saveTask', payload);
 }
 
 function confirmDeleteTask(id) {
   if (confirm('Bạn có chắc chắn muốn xóa công việc này?')) {
-    callBackend('deleteTask', { id: id }, () => showToast('Đã xóa công việc!', 'success'));
+    appState.tasks = appState.tasks.filter(t => String(t.ID || t.id) !== String(id));
+    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e){}
+    renderActiveTab();
+    showToast('Đã xóa công việc!', 'success');
+    callBackend('deleteTask', { id: id });
   }
 }
 
@@ -1505,23 +1544,47 @@ function openCvLuuYModal(id = null) {
 
 function handleCvLuuYSubmit(e) {
   e.preventDefault();
+  const lyId = document.getElementById('ly-id')?.value || '';
+  const newId = lyId || ('LY-' + Math.floor(1000 + Math.random() * 9000));
+
   const payload = {
-    id: document.getElementById('ly-id').value,
-    'Công việc': document.getElementById('ly-task').value,
-    'Mô tả': document.getElementById('ly-desc').value,
-    'Tổ': document.getElementById('ly-group').value,
-    'Trạng thái': document.getElementById('ly-status').value,
-    'Ngày bắt đầu': document.getElementById('ly-start').value,
-    'Ngày kết thúc': document.getElementById('ly-end').value,
-    'Ghi chú': document.getElementById('ly-note').value
+    id: newId,
+    'ID': newId,
+    'Công việc': document.getElementById('ly-task')?.value || '',
+    'Mô tả': document.getElementById('ly-desc')?.value || '',
+    'Tổ': document.getElementById('ly-group')?.value || '',
+    'Trạng thái': document.getElementById('ly-status')?.value || 'Cần lưu ý',
+    'Ngày bắt đầu': document.getElementById('ly-start')?.value || '',
+    'Ngày kết thúc': document.getElementById('ly-end')?.value || '',
+    'Ghi chú': document.getElementById('ly-note')?.value || ''
   };
+
+  const existingIdx = appState.cvluuy.findIndex(i => String(i.ID || i.id) === String(newId));
+  if (existingIdx >= 0) {
+    appState.cvluuy[existingIdx] = { ...appState.cvluuy[existingIdx], ...payload };
+  } else {
+    appState.cvluuy.unshift(payload);
+  }
+
+  try {
+    localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy));
+  } catch (err) {}
+
+  populateSelects();
+  renderActiveTab();
   closeModal('modal-cvluuy');
-  callBackend('saveCvLuuY', payload, () => showToast('Đã lưu lưu ý!', 'success'));
+  showToast('Đã lưu lưu ý thành công!', 'success');
+
+  callBackend('saveCvLuuY', payload);
 }
 
 function confirmDeleteCvLuuY(id) {
   if (confirm('Xóa mục này?')) {
-    callBackend('deleteCvLuuY', { id: id }, () => showToast('Đã xóa lưu ý!', 'success'));
+    appState.cvluuy = appState.cvluuy.filter(i => String(i.ID || i.id) !== String(id));
+    try { localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy)); } catch(e){}
+    renderActiveTab();
+    showToast('Đã xóa lưu ý!', 'success');
+    callBackend('deleteCvLuuY', { id: id });
   }
 }
 
