@@ -660,7 +660,6 @@ function switchSidebarTab(tabName) {
     tongquan: 'Tổng quan',
     kanban: 'Bảng Kanban',
     danhsach: 'Danh sách',
-    gantt: 'Biểu đồ Gantt',
     tailieu: 'Quản lý tài liệu',
     nguoidung: 'Quản lý người dùng',
     thongke: 'Thống kê theo tổ',
@@ -736,7 +735,6 @@ function renderActiveTab() {
   if (tab === 'tongquan') renderDashboard();
   else if (tab === 'kanban') renderKanbanBoard();
   else if (tab === 'danhsach') renderTaskListTable();
-  else if (tab === 'gantt') renderGanttChart();
   else if (tab === 'tailieu') renderDocumentsTable();
   else if (tab === 'nguoidung') renderUsersTable();
   else if (tab === 'thongke') renderOrgStatistics();
