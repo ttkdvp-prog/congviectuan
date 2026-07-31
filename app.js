@@ -441,45 +441,49 @@ function handleModalGroupChange(selectedGroup) {
   const filteredUsers = new Set();
   const selGrpClean = cleanKey(selectedGroup);
 
-  if (!selGrpClean) {
-    appState.users.forEach(u => {
-      let name = '';
-      for (let k in u) {
-        const ck = cleanKey(k);
-        if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name') {
-          if (u[k] && String(u[k]).trim()) name = String(u[k]).trim();
-        }
-      }
-      if (name) filteredUsers.add(name);
-    });
-    appState.tasks.forEach(t => {
-      const a = getTaskAssignee(t);
-      if (a && a !== 'Chưa gán') filteredUsers.add(a);
-    });
-  } else {
+  if (selGrpClean) {
     appState.users.forEach(u => {
       let group = '';
       let name = '';
       for (let k in u) {
         const ck = cleanKey(k);
-        if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group') {
+        if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck.includes('to')) {
           if (u[k] && String(u[k]).trim()) group = String(u[k]).trim();
         }
-        if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name') {
+        if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name' || ck.includes('ten')) {
           if (u[k] && String(u[k]).trim()) name = String(u[k]).trim();
         }
       }
-      if (cleanKey(group) === selGrpClean && name) {
+      const ckG = cleanKey(group);
+      if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
         filteredUsers.add(name);
       }
     });
 
     appState.tasks.forEach(t => {
       const tg = getTaskGroup(t);
+      const ckTg = cleanKey(tg);
       const a = getTaskAssignee(t);
-      if (cleanKey(tg) === selGrpClean && a && a !== 'Chưa gán') {
+      if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
         filteredUsers.add(a);
       }
+    });
+  }
+
+  if (!selGrpClean || filteredUsers.size === 0) {
+    appState.users.forEach(u => {
+      for (let k in u) {
+        const ck = cleanKey(k);
+        if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name') {
+          if (u[k] && String(u[k]).trim()) filteredUsers.add(String(u[k]).trim());
+        }
+      }
+    });
+    appState.tasks.forEach(t => {
+      const a = getTaskAssignee(t);
+      const c = getTaskCollaborator(t);
+      if (a && a !== 'Chưa gán') filteredUsers.add(a);
+      if (c && String(c).trim()) filteredUsers.add(String(c).trim());
     });
   }
 
@@ -487,6 +491,7 @@ function handleModalGroupChange(selectedGroup) {
   Array.from(filteredUsers).sort().forEach(u => {
     chuTriSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
   });
+
   if (currentVal && Array.from(filteredUsers).includes(currentVal)) {
     chuTriSelect.value = currentVal;
   }
