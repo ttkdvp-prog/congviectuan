@@ -385,25 +385,18 @@
             <textarea class="dark-form-control" id="task-desc-input" rows="3" placeholder="Nhập chi tiết nội dung công việc..."></textarea>
           </div>
 
-          <div class="dark-form-row">
-            <div class="dark-form-group">
-              <label>Mức độ ưu tiên</label>
-              <select class="dark-form-control" id="task-priority-input">
-                <option value="Cao">Cao</option>
-                <option value="Trung bình" selected>Trung bình</option>
-                <option value="Thấp">Thấp</option>
-              </select>
-            </div>
-            
-            <div class="dark-form-group">
-              <label>Trạng thái</label>
-              <select class="dark-form-control" id="task-status-input">
-                <option value="Đang thực hiện">Đang thực hiện</option>
-                <option value="Hoàn thành">Hoàn thành</option>
-                <option value="Quá hạn">Quá hạn</option>
-                <option value="Đã hủy">Đã hủy</option>
-              </select>
-            </div>
+          <input type="hidden" id="task-status-input" value="Đang thực hiện">
+          <input type="hidden" id="task-progress-input" value="0">
+          <input type="hidden" id="task-ghichu-input" value="">
+          <span id="progress-val-display" style="display:none;">0</span>
+
+          <div class="dark-form-group">
+            <label>Mức độ ưu tiên</label>
+            <select class="dark-form-control" id="task-priority-input">
+              <option value="Cao">Cao</option>
+              <option value="Trung bình" selected>Trung bình</option>
+              <option value="Thấp">Thấp</option>
+            </select>
           </div>
 
           <div class="dark-form-row">
@@ -441,16 +434,6 @@
                 <option value="">-- Chọn người phối hợp --</option>
               </select>
             </div>
-          </div>
-
-          <div class="dark-form-group">
-            <label>Tiến độ (<span id="progress-val-display">0</span>%)</label>
-            <input type="range" class="dark-form-control" id="task-progress-input" min="0" max="100" value="0" oninput="document.getElementById('progress-val-display').innerText = this.value">
-          </div>
-
-          <div class="dark-form-group">
-            <label>Ghi chú</label>
-            <input type="text" class="dark-form-control" id="task-ghichu-input" placeholder="Nhập ghi chú...">
           </div>
 
           <div class="dark-form-group">
