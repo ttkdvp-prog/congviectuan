@@ -207,13 +207,17 @@ function populateSelects() {
   const taskChuTriSelect = document.getElementById('task-chutri-input');
   const taskPhoiHopSelect = document.getElementById('task-phoihop-input');
   
-  const groups = new Set();
+  const hostGroups = new Set();
+  const allGroups = new Set();
   const assignees = new Set();
   
   appState.users.forEach(u => {
     const g = u['Tổ'] || u['TỔ'] || u['Tên tổ'] || u.group;
     const n = u['Tên'] || u['Tên nhân viên'] || u.name;
-    if (g) groups.add(String(g).trim());
+    if (g) {
+      hostGroups.add(String(g).trim());
+      allGroups.add(String(g).trim());
+    }
     if (n) assignees.add(String(n).trim());
   });
 
@@ -224,19 +228,22 @@ function populateSelects() {
     const tcg = getTaskCollaboratorGroup(t);
     if (a && a !== 'Chưa gán') assignees.add(String(a).trim());
     if (c) assignees.add(String(c).trim());
-    if (tg) groups.add(String(tg).trim());
-    if (tcg) groups.add(String(tcg).trim());
+    if (tg) {
+      hostGroups.add(String(tg).trim());
+      allGroups.add(String(tg).trim());
+    }
+    if (tcg) allGroups.add(String(tcg).trim());
   });
 
   appState.cvluuy.forEach(item => {
     const g = item['Tổ'] || item['TỔ'] || item['Tên tổ'];
-    if (g) groups.add(String(g).trim());
+    if (g) allGroups.add(String(g).trim());
   });
 
   if (groupSelect) {
     const curVal = groupSelect.value;
     groupSelect.innerHTML = '<option value="">Tất cả tổ chủ trì</option>';
-    Array.from(groups).sort().forEach(g => {
+    Array.from(hostGroups).sort().forEach(g => {
       if (g) groupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
     });
     if (curVal) groupSelect.value = curVal;
@@ -245,7 +252,7 @@ function populateSelects() {
   if (cvluuyGroupSelect) {
     const curVal = cvluuyGroupSelect.value;
     cvluuyGroupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
-    Array.from(groups).sort().forEach(g => {
+    Array.from(allGroups).sort().forEach(g => {
       if (g) cvluuyGroupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
     });
     if (curVal) cvluuyGroupSelect.value = curVal;
