@@ -762,6 +762,13 @@ function setupKanbanDragAndDrop() {
   });
 }
 
+function formatNameList(nameStr) {
+  if (!nameStr) return '';
+  const names = String(nameStr).split(',').map(n => n.trim()).filter(Boolean);
+  if (names.length === 0) return '';
+  return names.map(n => `<div style="line-height:1.35; margin:3px 0; word-break:break-word;">${escapeHtml(n)}</div>`).join('');
+}
+
 /* 3. DANH SÁCH (TABLE) */
 function renderTaskListTable() {
   const filtered = getFilteredTasks();
@@ -804,9 +811,9 @@ function renderTaskListTable() {
       <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
       <td class="col-desc-cell">${escapeHtml(t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
-      <td>${escapeHtml(chuTriName)}</td>
+      <td>${formatNameList(chuTriName)}</td>
       <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
-      <td>${escapeHtml(phoiHopName)}</td>
+      <td>${formatNameList(phoiHopName)}</td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(t['Ngày kết thúc'])}</td>
       <td>
