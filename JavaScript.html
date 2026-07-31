@@ -1759,11 +1759,11 @@ function renderUserStatistics() {
       if (u.total === 0) {
         gradeBadge = `<span style="color:#94a3b8; font-size:0.78rem;">Chưa giao việc</span>`;
       } else if (pct >= 90 && u.overdue === 0) {
-        gradeBadge = `<span class="badge-grade grade-a"><i class="fa-solid fa-trophy" style="margin-right:4px;"></i>Xuất sắc (A)</span>`;
+        gradeBadge = `<span class="badge-grade grade-a"><i class="fa-solid fa-trophy" style="margin-right:4px;"></i>Xuất sắc (A+)</span>`;
       } else if (pct >= 75 && u.overdue <= 1) {
-        gradeBadge = `<span class="badge-grade grade-b"><i class="fa-solid fa-star" style="margin-right:4px;"></i>Tốt (B)</span>`;
+        gradeBadge = `<span class="badge-grade grade-b"><i class="fa-solid fa-star" style="margin-right:4px;"></i>Tốt (A)</span>`;
       } else if (pct >= 50) {
-        gradeBadge = `<span class="badge-grade grade-c">Hoàn thành (C)</span>`;
+        gradeBadge = `<span class="badge-grade grade-c">Hoàn thành (B)</span>`;
       } else {
         gradeBadge = `<span class="badge-grade grade-d"><i class="fa-solid fa-circle-exclamation" style="margin-right:4px;"></i>Chưa đạt (D)</span>`;
       }
