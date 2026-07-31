@@ -659,6 +659,7 @@ function switchSidebarTab(tabName) {
     tongquan: 'Tổng quan',
     kanban: 'Bảng Kanban',
     danhsach: 'Danh sách',
+    totruonggiaoviec: 'Tổ trưởng giao việc',
     tailieu: 'Quản lý tài liệu',
     nguoidung: 'Quản lý người dùng',
     thongke: 'Thống kê theo tổ',
@@ -698,23 +699,28 @@ function getFilteredTasks() {
 
   return appState.tasks.filter(t => {
     const chuTri = getTaskAssignee(t);
-    const toChuTri = getTaskGroup(t);
     const phoiHop = getTaskCollaborator(t);
+    const toChuTri = getTaskGroup(t);
     const toPhoiHop = getTaskCollaboratorGroup(t);
 
-    // 1. Text search box filter
+    // 1. Search filter
     if (search) {
-      const allTextValues = Object.values(t).join(' ').toLowerCase();
-      const combinedText = `${allTextValues} ${chuTri.toLowerCase()} ${toChuTri.toLowerCase()} ${phoiHop.toLowerCase()} ${toPhoiHop.toLowerCase()}`;
-      if (!combinedText.includes(search)) return false;
-    }
-    
-    // 2. Group filter (Tổ chủ trì)
-    if (groupFilter) {
-      if (toChuTri.toLowerCase() !== groupFilter) return false;
+      const titleMatch = (t['Tiêu đề công việc'] || '').toLowerCase().includes(search);
+      const descMatch = (t['Mô tả công việc'] || '').toLowerCase().includes(search);
+      const chuTriMatch = chuTri.toLowerCase().includes(search);
+      const phoiHopMatch = phoiHop.toLowerCase().includes(search);
+      const toChuTriMatch = toChuTri.toLowerCase().includes(search);
+      if (!titleMatch && !descMatch && !chuTriMatch && !phoiHopMatch && !toChuTriMatch) return false;
     }
 
-    // 3. User / Person in charge filter (Chủ trì hoặc Phối hợp)
+    // 2. Group filter
+    if (groupFilter) {
+      const matchHostGroup = toChuTri.toLowerCase().includes(groupFilter);
+      const matchCollabGroup = toPhoiHop.toLowerCase().includes(groupFilter);
+      if (!matchHostGroup && !matchCollabGroup) return false;
+    }
+
+    // 3. User filter
     if (userFilter) {
       const matchChuTri = chuTri.toLowerCase() === userFilter;
       const matchPhoiHop = phoiHop.toLowerCase() === userFilter;
@@ -734,6 +740,7 @@ function renderActiveTab() {
   if (tab === 'tongquan') renderDashboard();
   else if (tab === 'kanban') renderKanbanBoard();
   else if (tab === 'danhsach') renderTaskListTable();
+  else if (tab === 'totruonggiaoviec') { populateToTruongFilters(); renderToTruongTaskList(); }
   else if (tab === 'tailieu') renderDocumentsTable();
   else if (tab === 'nguoidung') renderUsersTable();
   else if (tab === 'thongke') renderOrgStatistics();
@@ -2247,4 +2254,193 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+/* ==============================================================================
+ * TỔ TRƯỞNG GIAO VIỆC ENGINE
+ * ============================================================================== */
+function populateToTruongFilters() {
+  const gSelect = document.getElementById('totruong-group-select');
+  if (!gSelect) return;
+
+  const currentGrp = gSelect.value;
+  const groups = new Set();
+
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { group } = getUserNameAndGroup(u);
+      if (group) groups.add(group);
+    });
+  }
+
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const tg = getTaskGroup(t);
+      if (tg) groups.add(tg);
+    });
+  }
+
+  gSelect.innerHTML = '<option value="">Tất cả tổ giao việc</option>';
+  Array.from(groups).sort().forEach(g => {
+    gSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+  });
+
+  if (currentGrp && Array.from(groups).includes(currentGrp)) {
+    gSelect.value = currentGrp;
+  }
+
+  onToTruongGroupChange();
+}
+
+function onToTruongGroupChange() {
+  const gSelect = document.getElementById('totruong-group-select');
+  const uSelect = document.getElementById('totruong-user-select');
+  if (!gSelect || !uSelect) return;
+
+  const selGroup = gSelect.value;
+  const selGrpClean = cleanKey(selGroup);
+  const currentUsr = uSelect.value;
+  const teamUsers = new Set();
+
+  if (selGrpClean) {
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        const { name, group } = getUserNameAndGroup(u);
+        const ckG = cleanKey(group);
+        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
+          teamUsers.add(name);
+        }
+      });
+    }
+
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        const tg = getTaskGroup(t);
+        const ckTg = cleanKey(tg);
+        const a = getTaskAssignee(t);
+        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
+          a.split(',').forEach(n => { if (n.trim()) teamUsers.add(n.trim()); });
+        }
+      });
+    }
+  } else {
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        const { name } = getUserNameAndGroup(u);
+        if (name) teamUsers.add(name);
+      });
+    }
+  }
+
+  uSelect.innerHTML = '<option value="">Tất cả nhân viên trong tổ</option>';
+  Array.from(teamUsers).sort().forEach(u => {
+    uSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
+  });
+
+  if (currentUsr && Array.from(teamUsers).includes(currentUsr)) {
+    uSelect.value = currentUsr;
+  }
+
+  renderToTruongTaskList();
+}
+
+function renderToTruongTaskList() {
+  const tbody = document.getElementById('totruong-task-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const selGroup = document.getElementById('totruong-group-select')?.value || '';
+  const selUser = document.getElementById('totruong-user-select')?.value || '';
+  const searchQuery = (document.getElementById('totruong-search-input')?.value || '').trim().toLowerCase();
+
+  const grpClean = cleanKey(selGroup);
+  const usrClean = cleanKey(selUser);
+
+  let filtered = appState.tasks.filter(t => {
+    const chuTri = getTaskAssignee(t);
+    const phoiHop = getTaskCollaborator(t);
+    const toChuTri = getTaskGroup(t);
+    const toPhoiHop = getTaskCollaboratorGroup(t);
+
+    if (searchQuery) {
+      const titleMatch = (t['Tiêu đề công việc'] || '').toLowerCase().includes(searchQuery);
+      const descMatch = (t['Mô tả công việc'] || '').toLowerCase().includes(searchQuery);
+      const chuTriMatch = chuTri.toLowerCase().includes(searchQuery);
+      const phoiHopMatch = phoiHop.toLowerCase().includes(searchQuery);
+      if (!titleMatch && !descMatch && !chuTriMatch && !phoiHopMatch) return false;
+    }
+
+    if (grpClean) {
+      const matchHostGroup = cleanKey(toChuTri).includes(grpClean) || grpClean.includes(cleanKey(toChuTri));
+      const matchCollabGroup = cleanKey(toPhoiHop).includes(grpClean) || grpClean.includes(cleanKey(toPhoiHop));
+      if (!matchHostGroup && !matchCollabGroup) return false;
+    }
+
+    if (usrClean) {
+      const matchChuTri = cleanKey(chuTri).includes(usrClean) || usrClean.includes(cleanKey(chuTri));
+      const matchPhoiHop = cleanKey(phoiHop).includes(usrClean) || usrClean.includes(cleanKey(phoiHop));
+      if (!matchChuTri && !matchPhoiHop) return false;
+    }
+
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="11" style="text-align:center; padding:24px; color:#94a3b8;">Không tìm thấy công việc nào phù hợp với bộ lọc Tổ trưởng.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  filtered.forEach((t, idx) => {
+    const tr = document.createElement('tr');
+    const st = t['Trạng thái'] || 'Đang thực hiện';
+    let statusBadgeClass = 'tag-priority tag-p-medium';
+    if (st === 'Hoàn thành') statusBadgeClass = 'tag-priority tag-p-low';
+    else if (st === 'Hoàn thành quá hạn' || st === 'Quá hạn') statusBadgeClass = 'tag-priority tag-p-high';
+
+    const chuTri = getTaskAssignee(t);
+    const phoiHop = getTaskCollaborator(t);
+    const toChuTri = getTaskGroup(t);
+
+    tr.innerHTML = `
+      <td style="text-align:center; font-weight:700; color:#38bdf8;">${idx + 1}</td>
+      <td class="col-title-cell"><strong>${escapeHtml(t['Tiêu đề công việc'] || '')}</strong></td>
+      <td style="color:#94a3b8; font-size:0.82rem;">${escapeHtml(t['Mô tả công việc'] || '')}</td>
+      <td><span style="color:#38bdf8; font-weight:600;">${escapeHtml(chuTri)}</span></td>
+      <td>${escapeHtml(toChuTri)}</td>
+      <td style="color:#a78bfa;">${escapeHtml(phoiHop)}</td>
+      <td>${escapeHtml(t['Ngày bắt đầu'] || '')}</td>
+      <td>${escapeHtml(t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '')}</td>
+      <td>${escapeHtml(t['Ngày làm xong'] || '--')}</td>
+      <td><span class="${statusBadgeClass}">${escapeHtml(st)}</span></td>
+      <td style="text-align:center;">
+        <div style="display:flex; gap:6px; justify-content:center;">
+          <button class="btn-action-edit" onclick="openTaskModal('${t.ID || t.id}')" title="Sửa công việc"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn-action-delete" onclick="confirmDeleteTask('${t.ID || t.id}')" title="Xóa công việc"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function openTaskModalForTeamLeader() {
+  const selGroup = document.getElementById('totruong-group-select')?.value || '';
+  const selUser = document.getElementById('totruong-user-select')?.value || '';
+
+  openTaskModal();
+
+  if (selGroup) {
+    const toInput = document.getElementById('task-tochutri-input');
+    if (toInput) toInput.value = selGroup;
+    onTaskGroupInputChange();
+  }
+
+  if (selUser) {
+    const userInput = document.getElementById('task-chutri-input');
+    if (userInput) userInput.value = selUser;
+  }
 }

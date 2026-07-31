@@ -45,6 +45,9 @@
         <button class="nav-item" data-tab="danhsach" onclick="switchSidebarTab('danhsach')">
           <i class="fa-solid fa-list-check"></i> <span>Danh sách</span>
         </button>
+        <button class="nav-item" data-tab="totruonggiaoviec" onclick="switchSidebarTab('totruonggiaoviec')">
+          <i class="fa-solid fa-clipboard-user"></i> <span>Tổ trưởng giao việc</span>
+        </button>
         <button class="nav-item" data-tab="tailieu" onclick="switchSidebarTab('tailieu')">
           <i class="fa-solid fa-folder-open"></i> <span>Quản lý tài liệu</span>
         </button>
@@ -259,6 +262,51 @@
                 </tr>
               </thead>
               <tbody id="task-list-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- TAB: TỔ TRƯỞNG GIAO VIỆC -->
+        <section id="section-totruonggiaoviec" class="page-section">
+          <div class="cvluuy-filter-bar" style="margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; flex: 1;">
+              <select class="select-dark" id="totruong-group-select" onchange="onToTruongGroupChange()" style="min-width: 180px;">
+                <option value="">Tất cả tổ giao việc</option>
+              </select>
+
+              <select class="select-dark" id="totruong-user-select" onchange="renderToTruongTaskList()" style="min-width: 200px;">
+                <option value="">Tất cả nhân viên trong tổ</option>
+              </select>
+
+              <div class="cvluuy-search-box" style="flex: 1; min-width: 220px;">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="totruong-search-input" placeholder="Tìm kiếm tên việc, người làm..." oninput="renderToTruongTaskList()">
+              </div>
+            </div>
+
+            <button class="btn-add-primary" onclick="openTaskModalForTeamLeader()">
+              <i class="fa-solid fa-plus"></i> Giao việc mới
+            </button>
+          </div>
+
+          <div class="dark-table-container">
+            <table class="dark-table list-view-table">
+              <thead>
+                <tr>
+                  <th style="width: 50px; text-align: center;">STT</th>
+                  <th class="col-title-header">TIÊU ĐỀ CÔNG VIỆC</th>
+                  <th>MÔ TẢ</th>
+                  <th>NGƯỜI CHỦ TRÌ</th>
+                  <th>TỔ CHỦ TRÌ</th>
+                  <th>NGƯỜI PHỐI HỢP</th>
+                  <th>BẮT ĐẦU</th>
+                  <th>KẾT THÚC</th>
+                  <th>NGÀY LÀM XONG</th>
+                  <th>TRẠNG THÁI</th>
+                  <th style="text-align: center;">THAO TÁC</th>
+                </tr>
+              </thead>
+              <tbody id="totruong-task-tbody"></tbody>
             </table>
           </div>
         </section>
