@@ -34,9 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setupKanbanDragAndDrop();
 });
 
-/**
- * Data Loader Wrapper
- */
 appState.loadData = function (forceRefresh = false) {
   showToast('Đang đồng bộ dữ liệu với Google Sheets...', 'info');
   
@@ -85,7 +82,6 @@ function onDataLoaded(response) {
     appState.cvluuy = response.cvluuy || [];
     appState.documents = response.documents || [];
     
-    // Parse subtasks
     appState.tasks.forEach(t => {
       if (typeof t['Danh sách công việc con'] === 'string' && t['Danh sách công việc con']) {
         try { t.subtasks = JSON.parse(t['Danh sách công việc con']); } catch (e) { t.subtasks = []; }
@@ -107,9 +103,6 @@ function onDataError(error) {
   showToast('Không thể kết nối với Backend Google Apps Script.', 'error');
 }
 
-/**
- * Populate Dropdowns (Users, Groups)
- */
 function populateSelects() {
   const groupSelect = document.getElementById('global-group-select');
   const cvluuyGroupSelect = document.getElementById('cvluuy-group-select');
@@ -143,27 +136,21 @@ function populateSelects() {
   }
 }
 
-/**
- * Sidebar Navigation Router
- */
 function switchSidebarTab(tabName) {
   appState.currentTab = tabName;
   
-  // Highlight Active Item in Sidebar
   document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
     item.classList.toggle('active', item.dataset.tab === tabName);
   });
 
-  // Toggle Page Sections
   document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
   const activeSec = document.getElementById('section-' + tabName);
   if (activeSec) activeSec.classList.add('active');
 
-  // Update Top Title
   const titles = {
     tongquan: 'Tổng quan',
     kanban: 'Bảng Kanban',
-    danhsach: 'Danh sách công việc',
+    danhsach: 'Danh sách',
     gantt: 'Biểu đồ Gantt',
     tailieu: 'Quản lý tài liệu',
     nguoidung: 'Quản lý người dùng',
@@ -207,9 +194,6 @@ function getFilteredTasks() {
   });
 }
 
-/**
- * Render Router
- */
 function renderActiveTab() {
   const tab = appState.currentTab;
   if (tab === 'tongquan') renderDashboard();
@@ -222,12 +206,9 @@ function renderActiveTab() {
   else if (tab === 'cvluuy') renderCvLuuYTable();
 }
 
-/* ==============================================================================
-   1. DASHBOARD TỔNG QUAN RENDER
-   ============================================================================== */
+/* 1. DASHBOARD */
 function renderDashboard() {
   const filtered = getFilteredTasks();
-  
   let countDoing = 0, countDone = 0, countOverdue = 0, countCanceled = 0;
   filtered.forEach(t => {
     const st = t['Trạng thái'] || 'Đang thực hiện';
@@ -243,7 +224,6 @@ function renderDashboard() {
   document.getElementById('kpi-done-val').innerText = countDone;
   document.getElementById('kpi-overdue-val').innerText = countOverdue;
 
-  // Donut Chart Legend & Percent
   const pctDone = total > 0 ? Math.round((countDone / total) * 100) : 0;
   document.getElementById('donut-percent').innerText = pctDone + '%';
   document.getElementById('lg-doing').innerText = countDoing;
@@ -259,10 +239,7 @@ function renderDashboard() {
 function renderDonutChart(doing, done, overdue, canceled) {
   const ctx = document.getElementById('statusDonutChart');
   if (!ctx) return;
-  
-  if (appState.donutChart) {
-    appState.donutChart.destroy();
-  }
+  if (appState.donutChart) appState.donutChart.destroy();
   
   appState.donutChart = new Chart(ctx, {
     type: 'doughnut',
@@ -277,10 +254,7 @@ function renderDonutChart(doing, done, overdue, canceled) {
     },
     options: {
       cutout: '78%',
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: true }
-      },
+      plugins: { legend: { display: false }, tooltip: { enabled: true } },
       responsive: true,
       maintainAspectRatio: false
     }
@@ -290,13 +264,11 @@ function renderDonutChart(doing, done, overdue, canceled) {
 function renderHighPriorityTasks(tasks) {
   const container = document.getElementById('high-priority-container');
   if (!container) return;
-  
   const highPriority = tasks.filter(t => t['Mức độ ưu tiên'] === 'Cao');
   if (highPriority.length === 0) {
     container.innerHTML = `<div class="empty-widget-state"><i class="fa-solid fa-angles-down"></i> Không có công việc ưu tiên cao</div>`;
     return;
   }
-  
   let html = '';
   highPriority.slice(0, 5).forEach(t => {
     html += `
@@ -307,7 +279,7 @@ function renderHighPriorityTasks(tasks) {
         </div>
         <div class="recent-meta-group">
           <span class="tag-priority tag-p-high">Cao</span>
-          <span style="font-size:0.75rem; color:#94a3b8;">${t['Ngày kết thúc'] || ''}</span>
+          <span style="font-size:0.75rem; color:#94a3b8;">${formatDateVN(t['Ngày kết thúc'])}</span>
         </div>
       </div>
     `;
@@ -318,12 +290,10 @@ function renderHighPriorityTasks(tasks) {
 function renderRecentTasks(tasks) {
   const container = document.getElementById('recent-tasks-container');
   if (!container) return;
-  
   if (tasks.length === 0) {
     container.innerHTML = `<div class="empty-widget-state">Chưa có dữ liệu công việc</div>`;
     return;
   }
-  
   let html = '';
   tasks.slice(0, 8).forEach(t => {
     const priority = t['Mức độ ưu tiên'] || 'Trung bình';
@@ -340,7 +310,7 @@ function renderRecentTasks(tasks) {
         <div class="recent-meta-group">
           <span class="tag-priority ${tagPClass}">${priority}</span>
           ${statusHtml}
-          <span style="font-size:0.75rem; color:#64748b;">${t['Ngày kết thúc'] || ''}</span>
+          <span style="font-size:0.75rem; color:#64748b;">${formatDateVN(t['Ngày kết thúc'])}</span>
         </div>
       </div>
     `;
@@ -348,9 +318,7 @@ function renderRecentTasks(tasks) {
   container.innerHTML = html;
 }
 
-/* ==============================================================================
-   2. BẢNG KANBAN DARK RENDER
-   ============================================================================== */
+/* 2. KANBAN BOARD */
 function renderKanbanBoard() {
   const filtered = getFilteredTasks();
   const cols = {
@@ -359,7 +327,6 @@ function renderKanbanBoard() {
     'Quá hạn': document.getElementById('cards-overdue'),
     'Đã hủy': document.getElementById('cards-canceled')
   };
-  
   const counts = { 'Đang thực hiện': 0, 'Hoàn thành': 0, 'Quá hạn': 0, 'Đã hủy': 0 };
   Object.values(cols).forEach(c => { if (c) c.innerHTML = ''; });
   
@@ -385,7 +352,6 @@ function createDarkTaskCard(task) {
   
   const priority = task['Mức độ ưu tiên'] || 'Trung bình';
   const tagPClass = priority === 'Cao' ? 'tag-p-high' : priority === 'Trung bình' ? 'tag-p-med' : 'tag-p-low';
-  
   const assignee = task['Người thực hiện'] || 'Chưa gán';
   const avatarLetter = assignee.charAt(0).toUpperCase();
 
@@ -397,7 +363,7 @@ function createDarkTaskCard(task) {
     <div class="dark-card-title">${escapeHtml(task['Tiêu đề'] || '')}</div>
     ${task['Mô tả'] ? `<div class="dark-card-sub">${escapeHtml(task['Mô tả'])}</div>` : ''}
     <div class="dark-card-footer">
-      <div><i class="fa-regular fa-calendar"></i> ${task['Ngày kết thúc'] || 'N/A'}</div>
+      <div><i class="fa-regular fa-calendar"></i> ${formatDateVN(task['Ngày kết thúc'])}</div>
       <div style="display:flex; align-items:center; gap:6px;">
         <div style="width:22px; height:22px; border-radius:50%; background:var(--emerald-primary); color:#0b0f19; font-weight:700; font-size:0.7rem; display:flex; align-items:center; justify-content:center;">${avatarLetter}</div>
         <button class="btn-dark-sec btn-sm" style="padding:2px 6px;" onclick="openTaskModal('${task.ID || task.id}'); event.stopPropagation();"><i class="fa-solid fa-pen"></i></button>
@@ -409,10 +375,7 @@ function createDarkTaskCard(task) {
     card.classList.add('dragging');
     e.dataTransfer.setData('text/plain', task.ID || task.id);
   });
-  
-  card.addEventListener('dragend', () => {
-    card.classList.remove('dragging');
-  });
+  card.addEventListener('dragend', () => card.classList.remove('dragging'));
   
   return card;
 }
@@ -423,11 +386,7 @@ function setupKanbanDragAndDrop() {
       e.preventDefault();
       container.style.background = 'rgba(0, 200, 151, 0.08)';
     });
-    
-    container.addEventListener('dragleave', () => {
-      container.style.background = 'transparent';
-    });
-    
+    container.addEventListener('dragleave', () => container.style.background = 'transparent');
     container.addEventListener('drop', (e) => {
       e.preventDefault();
       container.style.background = 'transparent';
@@ -449,7 +408,7 @@ function setupKanbanDragAndDrop() {
 }
 
 /* ==============================================================================
-   3. DANH SÁCH (TABLE RENDER)
+   3. DANH SÁCH (TABLE - EXACT MATCH TO USER SCREENSHOT)
    ============================================================================== */
 function renderTaskListTable() {
   const filtered = getFilteredTasks();
@@ -458,11 +417,12 @@ function renderTaskListTable() {
   
   tbody.innerHTML = '';
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
     return;
   }
   
   filtered.forEach(t => {
+    const taskId = t.ID || t.id;
     const status = t['Trạng thái'] || 'Đang thực hiện';
     const statusBadge = status === 'Quá hạn' 
       ? `<span class="tag-status-overdue">Quá hạn</span>`
@@ -471,25 +431,67 @@ function renderTaskListTable() {
       : `<span style="color:#38bdf8; font-weight:600;">${status}</span>`;
 
     const progress = Number(t['Tiến độ (%)'] || 0);
+    const keHoach = t['Kế hoạch'] !== undefined && t['Kế hoạch'] !== '' ? t['Kế hoạch'] : 1;
+    const thucHien = t['Thực hiện'] !== undefined && t['Thực hiện'] !== '' ? t['Thực hiện'] : 0;
+    const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
+    const ghiChu = t['Ghi chú'] || '';
+    const ngayLamXong = t['Ngày làm xong'] || '';
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
-      <td style="max-width:220px; font-size:0.78rem; color:#94a3b8;">${escapeHtml(t['Mô tả'] || '').substring(0, 60)}</td>
+      <td><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
+      <td style="max-width:240px; font-size:0.78rem; color:#94a3b8; white-space:normal;">${escapeHtml(t['Mô tả'] || '')}</td>
       <td>${statusBadge}</td>
       <td>${escapeHtml(t['Người thực hiện'] || 'Chưa gán')}</td>
-      <td>${t['Ngày bắt đầu'] || ''}</td>
-      <td>${t['Ngày kết thúc'] || ''}</td>
-      <td><input type="date" class="dark-form-control" style="padding:4px 8px; font-size:0.75rem;" value="${t['Ngày làm xong'] || ''}"></td>
-      <td>${progress}%</td>
-      <td>1</td>
-      <td style="text-align:right;">
-        <button class="btn-dark-sec btn-sm" onclick="openTaskModal('${t.ID || t.id}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn-dark-sec btn-sm" style="color:#ef4444;" onclick="confirmDeleteTask('${t.ID || t.id}')"><i class="fa-solid fa-trash"></i></button>
+      <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
+      <td>${formatDateVN(t['Ngày kết thúc'])}</td>
+      <td>
+        <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleInlineTaskChange('${taskId}', 'ngayLamXong', this.value)">
+      </td>
+      <td>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:50px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+            <div style="width:${progress}%; height:100%; background:var(--emerald-primary);"></div>
+          </div>
+          <span style="font-size:0.75rem; color:#94a3b8;">${progress}%</span>
+        </div>
+      </td>
+      <td><span class="number-pill">${keHoach}</span></td>
+      <td>
+        <input type="number" class="inline-note-input" style="width:50px; text-align:center;" value="${thucHien}" onchange="handleInlineTaskChange('${taskId}', 'thucHien', this.value)">
+      </td>
+      <td><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
+      <td>
+        <input type="text" class="inline-note-input" value="${escapeHtml(ghiChu)}" placeholder="Nhập ghi chú..." onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value)">
+      </td>
+      <td style="text-align:center;">
+        <div style="display:flex; gap:6px; justify-content:center;">
+          <button class="btn-action-edit" title="Sửa công việc" onclick="openTaskModal('${taskId}')"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn-action-delete" title="Xóa công việc" onclick="confirmDeleteTask('${taskId}')"><i class="fa-solid fa-trash"></i></button>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
   });
+}
+
+function handleInlineTaskChange(taskId, field, value) {
+  const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
+  if (task) {
+    if (field === 'ngayLamXong') task['Ngày làm xong'] = value;
+    if (field === 'thucHien') {
+      task['Thực hiện'] = Number(value);
+      const kh = task['Kế hoạch'] || 1;
+      task['Tỷ lệ'] = Math.round((Number(value) / kh) * 100) + '%';
+    }
+    if (field === 'ghiChu') task['Ghi chú'] = value;
+    
+    renderTaskListTable();
+    
+    const payload = { id: taskId };
+    payload[field] = value;
+    callBackend('updateTaskInline', payload);
+  }
 }
 
 function sortTable(columnName) {
@@ -511,9 +513,7 @@ function sortTable(columnName) {
   renderTaskListTable();
 }
 
-/* ==============================================================================
-   4. GANTT CHART RENDER
-   ============================================================================== */
+/* 4. GANTT CHART */
 function renderGanttChart() {
   const container = document.getElementById('gantt-chart-container');
   if (!container) return;
@@ -556,9 +556,7 @@ function renderGanttChart() {
   container.innerHTML = html;
 }
 
-/* ==============================================================================
-   5. CÔNG VIỆC LƯU Ý TABLE RENDER
-   ============================================================================== */
+/* 5. CÔNG VIỆC LƯU Ý */
 function renderCvLuuYTable() {
   const tbody = document.getElementById('cvluuy-tbody');
   if (!tbody) return;
@@ -579,25 +577,25 @@ function renderCvLuuYTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${escapeHtml(item['Công việc'] || '')}</strong></td>
-      <td style="max-width:250px; font-size:0.78rem; color:#94a3b8;">${escapeHtml(item['Mô tả'] || '')}</td>
+      <td style="max-width:250px; font-size:0.78rem; color:#94a3b8; white-space:normal;">${escapeHtml(item['Mô tả'] || '')}</td>
       <td><span class="tag-org">${escapeHtml(item['Tổ'] || 'Chung')}</span></td>
-      <td>${item['Ngày bắt đầu'] || ''}</td>
-      <td>${item['Ngày kết thúc'] || ''}</td>
-      <td><input type="date" class="dark-form-control" style="padding:4px 8px; font-size:0.75rem;" value="${item['Ngày làm xong'] || ''}"></td>
+      <td>${formatDateVN(item['Ngày bắt đầu'])}</td>
+      <td>${formatDateVN(item['Ngày kết thúc'])}</td>
+      <td><input type="date" class="inline-date-picker" value="${item['Ngày làm xong'] || ''}"></td>
       <td><span class="tag-priority tag-p-low">${item['Trạng thái'] || 'Cần lưu ý'}</span></td>
-      <td><input type="text" class="dark-form-control" style="padding:4px 8px; font-size:0.75rem;" value="${escapeHtml(item['Ghi chú'] || '')}"></td>
+      <td><input type="text" class="inline-note-input" value="${escapeHtml(item['Ghi chú'] || '')}"></td>
       <td style="text-align:right;">
-        <button class="btn-dark-sec btn-sm" onclick="openCvLuuYModal('${item.ID || item.id}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn-dark-sec btn-sm" style="color:#ef4444;" onclick="confirmDeleteCvLuuY('${item.ID || item.id}')"><i class="fa-solid fa-trash"></i></button>
+        <div style="display:flex; gap:6px; justify-content:flex-end;">
+          <button class="btn-action-edit" onclick="openCvLuuYModal('${item.ID || item.id}')"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn-action-delete" onclick="confirmDeleteCvLuuY('${item.ID || item.id}')"><i class="fa-solid fa-trash"></i></button>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-/* ==============================================================================
-   6. DOCUMENTS & USERS & STATS TABLES RENDER
-   ============================================================================== */
+/* 6. DOCUMENTS & USERS & STATS */
 function renderDocumentsTable() {
   const tbody = document.getElementById('documents-tbody');
   if (!tbody) return;
@@ -623,8 +621,10 @@ function renderDocumentsTable() {
       <td>${diffVal} đ</td>
       <td>${fileBtn}</td>
       <td style="text-align:right;">
-        <button class="btn-dark-sec btn-sm" onclick="openDocumentModal('${doc.ID || doc.id}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn-dark-sec btn-sm" style="color:#ef4444;" onclick="confirmDeleteDoc('${doc.ID || doc.id}')"><i class="fa-solid fa-trash"></i></button>
+        <div style="display:flex; gap:6px; justify-content:flex-end;">
+          <button class="btn-action-edit" onclick="openDocumentModal('${doc.ID || doc.id}')"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn-action-delete" onclick="confirmDeleteDoc('${doc.ID || doc.id}')"><i class="fa-solid fa-trash"></i></button>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
@@ -643,8 +643,10 @@ function renderUsersTable() {
       <td><strong>${escapeHtml(usr['Tên'] || '')}</strong></td>
       <td>${escapeHtml(usr['Tổ'] || '')}</td>
       <td style="text-align:right;">
-        <button class="btn-dark-sec btn-sm" onclick="openUserModal('${usr.ID || usr.id}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn-dark-sec btn-sm" style="color:#ef4444;" onclick="confirmDeleteUser('${usr.ID || usr.id}')"><i class="fa-solid fa-trash"></i></button>
+        <div style="display:flex; gap:6px; justify-content:flex-end;">
+          <button class="btn-action-edit" onclick="openUserModal('${usr.ID || usr.id}')"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn-action-delete" onclick="confirmDeleteUser('${usr.ID || usr.id}')"><i class="fa-solid fa-trash"></i></button>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
@@ -690,9 +692,7 @@ function renderOrgStatistics() {
   container.innerHTML = html;
 }
 
-/* ==============================================================================
-   7. MODAL ACTIONS & SUBTASKS
-   ============================================================================== */
+/* 7. MODALS HANDLERS */
 function openTaskModal(taskId = null) {
   const form = document.getElementById('form-task');
   form.reset();
@@ -709,9 +709,12 @@ function openTaskModal(taskId = null) {
       document.getElementById('task-status-input').value = task['Trạng thái'] || 'Đang thực hiện';
       document.getElementById('task-start-input').value = task['Ngày bắt đầu'] || '';
       document.getElementById('task-end-input').value = task['Ngày kết thúc'] || '';
+      document.getElementById('task-kehoach-input').value = task['Kế hoạch'] !== undefined ? task['Kế hoạch'] : 1;
+      document.getElementById('task-thuchien-input').value = task['Thực hiện'] !== undefined ? task['Thực hiện'] : 0;
       document.getElementById('task-assignee-input').value = task['Người thực hiện'] || '';
       document.getElementById('task-progress-input').value = task['Tiến độ (%)'] || 0;
       document.getElementById('progress-val-display').innerText = task['Tiến độ (%)'] || 0;
+      document.getElementById('task-ghichu-input').value = task['Ghi chú'] || '';
       document.getElementById('task-attachment-input').value = task['Tệp đính kèm'] || '';
 
       if (task.subtasks && Array.isArray(task.subtasks)) {
@@ -768,8 +771,11 @@ function handleTaskFormSubmit(e) {
     'Trạng thái': document.getElementById('task-status-input').value,
     'Ngày bắt đầu': document.getElementById('task-start-input').value,
     'Ngày kết thúc': document.getElementById('task-end-input').value,
+    'Kế hoạch': Number(document.getElementById('task-kehoach-input').value),
+    'Thực hiện': Number(document.getElementById('task-thuchien-input').value),
     'Người thực hiện': document.getElementById('task-assignee-input').value,
     'Tiến độ (%)': Number(document.getElementById('task-progress-input').value),
+    'Ghi chú': document.getElementById('task-ghichu-input').value,
     'Tệp đính kèm': document.getElementById('task-attachment-input').value,
     subtasks: subtasks
   };
@@ -905,17 +911,9 @@ function confirmDeleteUser(id) {
   }
 }
 
-function openModal(id) {
-  document.getElementById(id).classList.add('active');
-}
-
-function closeModal(id) {
-  document.getElementById(id).classList.remove('active');
-}
-
-function openSettingsModal() {
-  openModal('modal-settings');
-}
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function openSettingsModal() { openModal('modal-settings'); }
 
 function saveSettings() {
   const url = document.getElementById('gas-api-url-input').value.trim();
@@ -924,6 +922,16 @@ function saveSettings() {
   closeModal('modal-settings');
   showToast('Đã lưu cấu hình API thành công!', 'success');
   appState.loadData(true);
+}
+
+function formatDateVN(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 function showToast(message, type = 'info') {

@@ -6,7 +6,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Color Tokens */
   --bg-dark: #0b0f19;
   --sidebar-bg: #111726;
   --header-bg: #161c2a;
@@ -16,18 +15,15 @@
   --text-sub: #94a3b8;
   --text-muted: #64748b;
   
-  /* Primary Accent Colors */
   --emerald-primary: #00c897;
   --emerald-hover: #00b386;
   --emerald-glow: rgba(0, 200, 151, 0.2);
   
-  /* Status Colors */
   --status-doing: #38bdf8;
   --status-done: #10b981;
   --status-overdue: #ef4444;
   --status-canceled: #64748b;
 
-  /* Priority & Org Tag Badges */
   --priority-high: #f43f5e;
   --priority-med: #d97706;
   --priority-low: #0284c7;
@@ -53,15 +49,12 @@ body.dark-theme {
   overflow-x: hidden;
 }
 
-/* App Layout Grid */
 .app-layout {
   display: flex;
   min-height: 100vh;
 }
 
-/* ==============================================================================
-   LEFT SIDEBAR
-   ============================================================================== */
+/* SIDEBAR */
 .sidebar {
   width: 250px;
   min-width: 250px;
@@ -108,7 +101,6 @@ body.dark-theme {
   color: var(--text-muted);
 }
 
-/* Sidebar Navigation Items */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -159,9 +151,7 @@ body.dark-theme {
   gap: 8px;
 }
 
-/* ==============================================================================
-   MAIN WRAPPER & TOP NAVBAR
-   ============================================================================== */
+/* MAIN CONTENT */
 .main-wrapper {
   flex: 1;
   display: flex;
@@ -188,9 +178,7 @@ body.dark-theme {
   gap: 14px;
 }
 
-.sidebar-toggle {
-  display: none;
-}
+.sidebar-toggle { display: none; }
 
 .page-title {
   font-size: 1.25rem;
@@ -306,25 +294,15 @@ body.dark-theme {
   background: rgba(255, 255, 255, 0.12);
 }
 
-/* ==============================================================================
-   CONTENT BODY & PAGE SECTIONS
-   ============================================================================== */
 .content-body {
   padding: 24px 28px;
   flex: 1;
 }
 
-.page-section {
-  display: none;
-}
+.page-section { display: none; }
+.page-section.active { display: block; }
 
-.page-section.active {
-  display: block;
-}
-
-/* ==============================================================================
-   TAB 1: TỔNG QUAN (DASHBOARD)
-   ============================================================================== */
+/* KPI CARDS */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -371,7 +349,6 @@ body.dark-theme {
   margin-top: 2px;
 }
 
-/* Widgets Row */
 .dashboard-widgets-row {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
@@ -397,9 +374,7 @@ body.dark-theme {
   gap: 8px;
 }
 
-.icon-green {
-  color: var(--emerald-primary);
-}
+.icon-green { color: var(--emerald-primary); }
 
 .chart-container-box {
   display: flex;
@@ -467,7 +442,6 @@ body.dark-theme {
   font-size: 0.85rem;
 }
 
-/* Recent Tasks List Widget */
 .recent-list-rows {
   display: flex;
   flex-direction: column;
@@ -532,9 +506,7 @@ body.dark-theme {
   font-weight: 600;
 }
 
-/* ==============================================================================
-   TAB 2: KANBAN BOARD DARK
-   ============================================================================== */
+/* KANBAN BOARD */
 .kanban-filter-header {
   display: flex;
   gap: 12px;
@@ -597,7 +569,6 @@ body.dark-theme {
   flex: 1;
 }
 
-/* Dark Card Item */
 .dark-card {
   background: #1a2338;
   border: 1px solid var(--card-border);
@@ -645,9 +616,7 @@ body.dark-theme {
   color: var(--text-muted);
 }
 
-/* ==============================================================================
-   TABLES (DANH SÁCH & CÔNG VIỆC LƯU Ý)
-   ============================================================================== */
+/* TABLES (DANH SÁCH MATCHING SCREENSHOT) */
 .dark-table-container {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -668,27 +637,98 @@ body.dark-theme {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
 }
 
 .dark-table th {
-  background: #141b2d;
-  padding: 12px 16px;
-  font-weight: 600;
-  color: var(--text-sub);
+  background: #251652; /* Purple/Navy header matching user screenshot */
+  padding: 12px 14px;
+  font-weight: 700;
+  color: #ffffff;
   border-bottom: 1px solid var(--card-border);
   white-space: nowrap;
+  font-size: 0.78rem;
+  letter-spacing: 0.5px;
 }
 
 .dark-table td {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--card-border);
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   color: var(--text-white);
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .dark-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Action Icon Buttons for List View Table */
+.btn-action-edit {
+  background: #0284c7;
+  color: #ffffff;
+  border: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  transition: var(--transition);
+}
+
+.btn-action-edit:hover {
+  background: #0369a1;
+}
+
+.btn-action-delete {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  transition: var(--transition);
+}
+
+.btn-action-delete:hover {
+  background: #dc2626;
+}
+
+.inline-date-picker {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text-sub);
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.inline-note-input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text-white);
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  outline: none;
+  width: 140px;
+}
+
+.number-pill {
+  background: rgba(255, 255, 255, 0.07);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.8rem;
 }
 
 .cvluuy-filter-bar {
@@ -722,9 +762,7 @@ body.dark-theme {
   color: var(--text-muted);
 }
 
-/* ==============================================================================
-   MODALS DARK
-   ============================================================================== */
+/* MODALS DARK */
 .dark-modal-overlay {
   position: fixed;
   top: 0;
@@ -775,13 +813,9 @@ body.dark-theme {
   cursor: pointer;
 }
 
-.dark-modal-body {
-  padding: 24px;
-}
+.dark-modal-body { padding: 24px; }
 
-.dark-form-group {
-  margin-bottom: 16px;
-}
+.dark-form-group { margin-bottom: 16px; }
 
 .dark-form-group label {
   display: block;
@@ -802,9 +836,7 @@ body.dark-theme {
   outline: none;
 }
 
-.dark-form-control:focus {
-  border-color: var(--emerald-primary);
-}
+.dark-form-control:focus { border-color: var(--emerald-primary); }
 
 .dark-form-row {
   display: grid;
@@ -828,7 +860,6 @@ body.dark-theme {
   padding: 12px;
 }
 
-/* Responsive Media Queries */
 @media (max-width: 1024px) {
   .sidebar { width: 70px; min-width: 70px; padding: 16px 8px; }
   .brand-name, .brand-sub, .sidebar-footer, .nav-item span { display: none; }
