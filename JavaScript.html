@@ -128,6 +128,13 @@ function getTaskCollaboratorGroup(task) {
   return '';
 }
 
+function ensureSelectsPopulated() {
+  const gSelect = document.getElementById('global-group-select');
+  if (!gSelect || gSelect.options.length <= 1) {
+    populateSelects();
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const urlInput = document.getElementById('gas-api-url-input');
   if (urlInput && appState.apiUrl) {
@@ -153,12 +160,18 @@ document.addEventListener('DOMContentLoaded', () => {
   if (gSelect) gSelect.addEventListener('change', onGlobalGroupChange);
 
   // Restore local cache for zero-latency initial view on F5
-  const cachedLocal = localStorage.getItem('TTHT_TASKS_CACHE');
-  if (cachedLocal) {
-    try {
-      appState.tasks = JSON.parse(cachedLocal);
-      renderActiveTab();
-    } catch(e) {}
+  const cachedTasks = localStorage.getItem('TTHT_TASKS_CACHE');
+  const cachedUsers = localStorage.getItem('TTHT_USERS_CACHE');
+  if (cachedTasks) {
+    try { appState.tasks = JSON.parse(cachedTasks); } catch(e) {}
+  }
+  if (cachedUsers) {
+    try { appState.users = JSON.parse(cachedUsers); } catch(e) {}
+  }
+
+  if (appState.tasks.length > 0 || appState.users.length > 0) {
+    populateSelects();
+    renderActiveTab();
   }
 
   appState.loadData();
@@ -245,7 +258,10 @@ function onDataLoaded(response) {
       }
     });
 
-    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
+    try {
+      localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks));
+      localStorage.setItem('TTHT_USERS_CACHE', JSON.stringify(appState.users));
+    } catch(e) {}
 
     populateSelects();
     renderActiveTab();
@@ -274,11 +290,11 @@ function populateSelects() {
   appState.users.forEach(u => {
     const g = u['Tổ'] || u['TỔ'] || u['Tên tổ'] || u.group;
     const n = u['Tên'] || u['Tên nhân viên'] || u.name;
-    if (g) {
+    if (g && String(g).trim()) {
       hostGroups.add(String(g).trim());
       allGroups.add(String(g).trim());
     }
-    if (n) assignees.add(String(n).trim());
+    if (n && String(n).trim()) assignees.add(String(n).trim());
   });
 
   appState.tasks.forEach(t => {
@@ -287,17 +303,17 @@ function populateSelects() {
     const tg = getTaskGroup(t);
     const tcg = getTaskCollaboratorGroup(t);
     if (a && a !== 'Chưa gán') assignees.add(String(a).trim());
-    if (c) assignees.add(String(c).trim());
-    if (tg) {
+    if (c && String(c).trim()) assignees.add(String(c).trim());
+    if (tg && String(tg).trim()) {
       hostGroups.add(String(tg).trim());
       allGroups.add(String(tg).trim());
     }
-    if (tcg) allGroups.add(String(tcg).trim());
+    if (tcg && String(tcg).trim()) allGroups.add(String(tcg).trim());
   });
 
   appState.cvluuy.forEach(item => {
     const g = item['Tổ'] || item['TỔ'] || item['Tên tổ'];
-    if (g) allGroups.add(String(g).trim());
+    if (g && String(g).trim()) allGroups.add(String(g).trim());
   });
 
   if (groupSelect) {
@@ -358,23 +374,23 @@ function updateGlobalUserSelectOptions() {
   const groupSelect = document.getElementById('global-group-select');
   if (!userSelect || !groupSelect) return;
 
-  const selectedGroup = groupSelect.value;
+  const selectedGroup = String(groupSelect.value || '').trim().toLowerCase();
   const currentSelectedUser = userSelect.value;
 
   const usersInGroup = new Set();
 
   appState.users.forEach(u => {
     const g = String(u['Tổ'] || u['TỔ'] || u['Tên tổ'] || u.group || '').trim();
-    const name = String(u['Tên'] || u['Tên nhân viên'] || u.name || '').trim();
+    const name = String(u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u.name || '').trim();
     if (name) {
-      if (!selectedGroup || g === selectedGroup) {
+      if (!selectedGroup || g.toLowerCase() === selectedGroup) {
         usersInGroup.add(name);
       }
     }
   });
 
   appState.tasks.forEach(t => {
-    const tg = getTaskGroup(t);
+    const tg = getTaskGroup(t).trim().toLowerCase();
     if (!selectedGroup || tg === selectedGroup) {
       const chuTri = getTaskAssignee(t);
       const phoiHop = getTaskCollaborator(t);
@@ -388,7 +404,7 @@ function updateGlobalUserSelectOptions() {
     userSelect.innerHTML += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
   });
 
-  if (usersInGroup.has(currentSelectedUser)) {
+  if (currentSelectedUser && Array.from(usersInGroup).some(u => u.toLowerCase() === currentSelectedUser.toLowerCase())) {
     userSelect.value = currentSelectedUser;
   } else {
     userSelect.value = '';
