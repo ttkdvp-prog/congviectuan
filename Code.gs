@@ -63,24 +63,31 @@ function createJsonResponse(data) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+function findHeaderIndex(headers, targetName) {
+  const cleanTarget = String(targetName).toLowerCase().replace(/[^a-z0-9àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệđìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]/g, '');
+  for (let i = 0; i < headers.length; i++) {
+    const cleanH = String(headers[i]).toLowerCase().replace(/[^a-z0-9àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệđìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]/g, '');
+    if (cleanH === cleanTarget) return i;
+  }
+  return -1;
+}
+
 function ensureTaskHeaders(sheet) {
   const data = sheet.getDataRange().getValues();
+  const standardHeaders = [
+    'ID', 'Tiêu đề', 'Mô tả', 'Trạng thái', 'Mức độ ưu tiên',
+    'Ngày bắt đầu', 'Ngày kết thúc', 'Tiến độ (%)', 'Người thực hiện',
+    'Danh sách công việc con', 'Tệp đính kèm', 'Ngày làm xong',
+    'Kế hoạch', 'Thực hiện', 'Tỷ lệ', 'Ghi chú'
+  ];
+
   if (data.length === 0 || !data[0][0]) {
-    const headers = [
-      'ID', 'Tiêu đề', 'Mô tả', 'Trạng thái', 'Mức độ ưu tiên',
-      'Ngày bắt đầu', 'Ngày kết thúc', 'Tiến độ (%)', 'Người thực hiện',
-      'Danh sách công việc con', 'Tệp đính kèm', 'Ngày làm xong',
-      'Kế hoạch', 'Thực hiện', 'Tỷ lệ', 'Ghi chú'
-    ];
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, standardHeaders.length).setValues([standardHeaders]);
   } else {
     const currentHeaders = data[0].map(h => String(h).trim());
-    const required = [
-      'Ngày làm xong', 'Kế hoạch', 'Thực hiện', 'Tỷ lệ', 'Ghi chú'
-    ];
     let updated = false;
-    required.forEach(req => {
-      if (currentHeaders.indexOf(req) === -1) {
+    standardHeaders.forEach(req => {
+      if (findHeaderIndex(currentHeaders, req) === -1) {
         currentHeaders.push(req);
         updated = true;
       }
@@ -153,11 +160,11 @@ function saveTask(payload) {
     const data = sheet.getDataRange().getValues();
     const headers = data[0].map(h => String(h).trim());
     
-    const idColIdx = headers.indexOf('ID');
+    const idColIdx = findHeaderIndex(headers, 'ID');
     const isEdit = payload.id !== undefined && payload.id !== null && payload.id !== '';
     let targetRow = -1;
 
-    if (isEdit) {
+    if (isEdit && idColIdx !== -1) {
       for (let i = 1; i < data.length; i++) {
         if (String(data[i][idColIdx]) === String(payload.id)) {
           targetRow = i + 1;
@@ -177,7 +184,6 @@ function saveTask(payload) {
     const tyLe = keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%';
     const assignee = payload['Người thực hiện'] || payload['Người phụ trách'] || '';
 
-    // Check status logic: Hoàn thành quá hạn vs Hoàn thành
     let status = payload['Trạng thái'] || 'Đang thực hiện';
     const doneDate = payload['Ngày làm xong'] || '';
     const endDate = payload['Ngày kết thúc'] || payload['Hạn hoàn thành'] || '';
@@ -186,22 +192,23 @@ function saveTask(payload) {
     }
 
     const rowValues = headers.map(h => {
-      if (h === 'ID') return payload.id;
-      if (h === 'Tiêu đề') return payload['Tiêu đề'] || '';
-      if (h === 'Mô tả') return payload['Mô tả'] || '';
-      if (h === 'Trạng thái') return status;
-      if (h === 'Mức độ ưu tiên') return payload['Mức độ ưu tiên'] || 'Trung bình';
-      if (h === 'Ngày bắt đầu') return payload['Ngày bắt đầu'] || '';
-      if (h === 'Ngày kết thúc') return payload['Ngày kết thúc'] || '';
-      if (h === 'Tiến độ (%)') return payload['Tiến độ (%)'] || 0;
-      if (h === 'Người thực hiện' || h === 'Người phụ trách') return assignee;
-      if (h === 'Danh sách công việc con') return subtasksJson;
-      if (h === 'Tệp đính kèm') return payload['Tệp đính kèm'] || '';
-      if (h === 'Ngày làm xong') return doneDate;
-      if (h === 'Kế hoạch') return keHoach;
-      if (h === 'Thực hiện') return thucHien;
-      if (h === 'Tỷ lệ') return tyLe;
-      if (h === 'Ghi chú') return payload['Ghi chú'] || '';
+      const cleanH = String(h).trim().toLowerCase();
+      if (cleanH === 'id') return payload.id;
+      if (cleanH === 'tiêu đề') return payload['Tiêu đề'] || '';
+      if (cleanH === 'mô tả') return payload['Mô tả'] || '';
+      if (cleanH === 'trạng thái') return status;
+      if (cleanH === 'mức độ ưu tiên') return payload['Mức độ ưu tiên'] || 'Trung bình';
+      if (cleanH === 'ngày bắt đầu') return payload['Ngày bắt đầu'] || '';
+      if (cleanH === 'ngày kết thúc' || cleanH === 'hạn hoàn thành') return payload['Ngày kết thúc'] || '';
+      if (cleanH.includes('tiến độ')) return payload['Tiến độ (%)'] || 0;
+      if (cleanH.includes('người thực hiện') || cleanH.includes('người phụ trách')) return assignee;
+      if (cleanH.includes('việc con')) return subtasksJson;
+      if (cleanH.includes('đính kèm')) return payload['Tệp đính kèm'] || '';
+      if (cleanH.includes('ngày làm xong')) return doneDate;
+      if (cleanH === 'kế hoạch') return keHoach;
+      if (cleanH === 'thực hiện') return thucHien;
+      if (cleanH === 'tỷ lệ') return tyLe;
+      if (cleanH === 'ghi chú') return payload['Ghi chú'] || '';
       return payload[h] || '';
     });
 
@@ -222,7 +229,7 @@ function updateTaskInline(payload) {
 
     const data = sheet.getDataRange().getValues();
     const headers = data[0].map(h => String(h).trim());
-    const idColIdx = headers.indexOf('ID');
+    const idColIdx = findHeaderIndex(headers, 'ID');
     
     let targetRow = -1;
     for (let i = 1; i < data.length; i++) {
@@ -235,15 +242,15 @@ function updateTaskInline(payload) {
     if (targetRow === -1) return { success: false, message: 'Task ID not found' };
     
     if (payload.ngayLamXong !== undefined) {
-      let colIdx = headers.indexOf('Ngày làm xong');
+      let colIdx = findHeaderIndex(headers, 'Ngày làm xong');
       if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.ngayLamXong);
     }
     if (payload.thucHien !== undefined) {
-      let colIdx = headers.indexOf('Thực hiện');
+      let colIdx = findHeaderIndex(headers, 'Thực hiện');
       if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.thucHien);
       
-      let khCol = headers.indexOf('Kế hoạch');
-      let tyLeCol = headers.indexOf('Tỷ lệ');
+      let khCol = findHeaderIndex(headers, 'Kế hoạch');
+      let tyLeCol = findHeaderIndex(headers, 'Tỷ lệ');
       if (khCol !== -1 && tyLeCol !== -1) {
         let kh = Number(sheet.getRange(targetRow, khCol + 1).getValue() || 1);
         let pct = kh > 0 ? Math.round((Number(payload.thucHien) / kh) * 100) : 0;
@@ -251,15 +258,16 @@ function updateTaskInline(payload) {
       }
     }
     if (payload.progress !== undefined) {
-      let colIdx = headers.indexOf('Tiến độ (%)');
+      let colIdx = findHeaderIndex(headers, 'Tiến độ (%)');
+      if (colIdx === -1) colIdx = findHeaderIndex(headers, 'Tiến độ');
       if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.progress);
     }
     if (payload.status !== undefined) {
-      let colIdx = headers.indexOf('Trạng thái');
+      let colIdx = findHeaderIndex(headers, 'Trạng thái');
       if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.status);
     }
     if (payload.ghiChu !== undefined) {
-      let colIdx = headers.indexOf('Ghi chú');
+      let colIdx = findHeaderIndex(headers, 'Ghi chú');
       if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.ghiChu);
     }
     
@@ -284,7 +292,7 @@ function deleteTask(payload) {
     if (!sheet) return { success: false, message: 'Sheet not found' };
     
     const data = sheet.getDataRange().getValues();
-    const idColIdx = data[0].indexOf('ID');
+    const idColIdx = findHeaderIndex(data[0], 'ID');
     
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][idColIdx]) === String(payload.id)) {

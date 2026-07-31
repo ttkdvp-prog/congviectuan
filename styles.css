@@ -627,7 +627,7 @@ body.dark-theme {
   color: var(--text-muted);
 }
 
-/* TABLES (DANH SÁCH MATCHING SCREENSHOT) */
+/* TABLES (DANH SÁCH MATCHING SCREENSHOT & FITTING ON SCREEN) */
 .dark-table-container {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -637,7 +637,7 @@ body.dark-theme {
 }
 
 .section-action-header {
-  padding: 16px 20px;
+  padding: 14px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -648,46 +648,69 @@ body.dark-theme {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
 }
 
 .dark-table th {
   background: #251652;
-  padding: 12px 14px;
+  padding: 10px 8px;
   font-weight: 700;
   color: #ffffff;
   border-bottom: 1px solid var(--card-border);
   white-space: nowrap;
-  font-size: 0.78rem;
-  letter-spacing: 0.5px;
+  font-size: 0.76rem;
+  letter-spacing: 0.3px;
+  text-align: center;
+}
+
+.dark-table th:first-child,
+.dark-table th:nth-child(2) {
+  text-align: left;
 }
 
 .dark-table td {
-  padding: 12px 14px;
+  padding: 10px 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   color: var(--text-white);
   vertical-align: middle;
   white-space: nowrap;
+  text-align: center;
+}
+
+.dark-table td:first-child,
+.dark-table td:nth-child(2) {
+  text-align: left;
 }
 
 /* Balanced Title Column Styling */
 .dark-table td.col-title-cell,
 .dark-table th.col-title-header {
-  min-width: 180px !important;
-  width: 220px !important;
-  max-width: 260px !important;
+  min-width: 150px !important;
+  width: 180px !important;
+  max-width: 220px !important;
   white-space: normal !important;
   word-break: normal !important;
   overflow-wrap: break-word !important;
-  line-height: 1.45 !important;
+  line-height: 1.35 !important;
   font-weight: 600;
 }
 
-/* Wide Note Column Styling */
+/* Balanced Description Column */
+.dark-table td.col-desc-cell,
+.dark-table th.col-desc-header {
+  min-width: 160px !important;
+  width: 200px !important;
+  max-width: 240px !important;
+  white-space: normal !important;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+/* Note Column Styling */
 .dark-table td.col-note-cell,
 .dark-table th.col-note-header {
-  min-width: 200px !important;
-  width: 240px !important;
+  min-width: 150px !important;
+  width: 180px !important;
   white-space: normal !important;
 }
 
@@ -699,14 +722,14 @@ body.dark-theme {
   background: #0284c7;
   color: #ffffff;
   border: none;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   transition: var(--transition);
 }
 
@@ -716,14 +739,14 @@ body.dark-theme {
   background: #ef4444;
   color: #ffffff;
   border: none;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   transition: var(--transition);
 }
 
@@ -734,8 +757,8 @@ body.dark-theme {
   border: 1px solid var(--card-border);
   border-radius: 6px;
   color: var(--text-sub);
-  padding: 4px 8px;
-  font-size: 0.78rem;
+  padding: 3px 6px;
+  font-size: 0.75rem;
   outline: none;
 }
 
@@ -744,12 +767,12 @@ body.dark-theme {
   border: 1px solid var(--card-border);
   border-radius: 6px;
   color: #94a3b8;
-  padding: 6px 10px;
+  padding: 4px 8px;
   font-size: 0.78rem;
   font-family: inherit;
   outline: none;
   width: 100%;
-  min-width: 180px;
+  min-width: 130px;
   transition: var(--transition);
 }
 
@@ -761,10 +784,10 @@ body.dark-theme {
 
 .number-pill {
   background: rgba(255, 255, 255, 0.07);
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 
 .cvluuy-filter-bar {

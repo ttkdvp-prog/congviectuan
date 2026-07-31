@@ -539,7 +539,7 @@ function renderTaskListTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
-      <td style="max-width:240px; font-size:0.78rem; color:#94a3b8; white-space:normal;">${escapeHtml(t['Mô tả'] || '')}</td>
+      <td class="col-desc-cell">${escapeHtml(t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
       <td>${escapeHtml(assigneeName)}</td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
@@ -548,8 +548,8 @@ function renderTaskListTable() {
         <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleInlineTaskChange('${taskId}', 'ngayLamXong', this.value, this)">
       </td>
       <td class="progress-col-cell">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <div style="width:50px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
+          <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
             <div style="width:${progress}%; height:100%; background:var(--emerald-primary);"></div>
           </div>
           <span style="font-size:0.75rem; color:#94a3b8;">${progress}%</span>
@@ -557,14 +557,14 @@ function renderTaskListTable() {
       </td>
       <td><span class="number-pill">${keHoach}</span></td>
       <td>
-        <input type="number" class="inline-note-input" style="width:55px; text-align:center;" value="${thucHien}" onchange="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)" oninput="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)">
+        <input type="number" class="inline-note-input" style="width:50px; text-align:center; padding:3px;" value="${thucHien}" onchange="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)" oninput="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)">
       </td>
       <td class="ty-le-col-cell"><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
       <td class="col-note-cell">
         <input type="text" class="inline-note-input" value="${escapeHtml(ghiChu)}" placeholder="Nhập ghi chú..." onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)">
       </td>
       <td style="text-align:center;">
-        <div style="display:flex; gap:6px; justify-content:center;">
+        <div style="display:flex; gap:4px; justify-content:center;">
           <button class="btn-action-edit" title="Sửa công việc" onclick="openTaskModal('${taskId}')"><i class="fa-solid fa-pen"></i></button>
           <button class="btn-action-delete" title="Xóa công việc" onclick="confirmDeleteTask('${taskId}')"><i class="fa-solid fa-trash"></i></button>
         </div>
@@ -613,8 +613,8 @@ function handleInlineTaskChange(taskId, field, value, element) {
           const progressCell = tr.querySelector('.progress-col-cell');
           if (progressCell) {
             progressCell.innerHTML = `
-              <div style="display:flex; align-items:center; gap:6px;">
-                <div style="width:50px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
+                <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
                   <div style="width:${task['Tiến độ (%)']}%; height:100%; background:var(--emerald-primary);"></div>
                 </div>
                 <span style="font-size:0.75rem; color:#94a3b8;">${task['Tiến độ (%)']}%</span>
@@ -662,8 +662,8 @@ function handleInlineTaskChange(taskId, field, value, element) {
           const progressCell = tr.querySelector('.progress-col-cell');
           if (progressCell) {
             progressCell.innerHTML = `
-              <div style="display:flex; align-items:center; gap:6px;">
-                <div style="width:50px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
+                <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
                   <div style="width:${task['Tiến độ (%)']}%; height:100%; background:var(--emerald-primary);"></div>
                 </div>
                 <span style="font-size:0.75rem; color:#94a3b8;">${task['Tiến độ (%)']}%</span>
@@ -762,7 +762,7 @@ function renderCvLuuYTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-title-cell"><strong>${escapeHtml(item['Công việc'] || '')}</strong></td>
-      <td style="max-width:250px; font-size:0.78rem; color:#94a3b8; white-space:normal;">${escapeHtml(item['Mô tả'] || '')}</td>
+      <td class="col-desc-cell">${escapeHtml(item['Mô tả'] || '')}</td>
       <td><span class="tag-org">${escapeHtml(item['Tổ'] || 'Chung')}</span></td>
       <td>${formatDateVN(item['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(item['Ngày kết thúc'])}</td>
@@ -1166,4 +1166,3 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
-</script>
