@@ -442,49 +442,61 @@ function handleModalGroupChange(selectedGroup) {
   const selGrpClean = cleanKey(selectedGroup);
 
   if (selGrpClean) {
-    appState.users.forEach(u => {
-      let group = '';
-      let name = '';
-      for (let k in u) {
-        const ck = cleanKey(k);
-        if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck.includes('to')) {
-          if (u[k] && String(u[k]).trim()) group = String(u[k]).trim();
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        if (!u || typeof u !== 'object') return;
+        let group = '';
+        let name = '';
+        for (let k in u) {
+          const ck = cleanKey(k);
+          if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck.includes('to')) {
+            if (u[k] && String(u[k]).trim()) group = String(u[k]).trim();
+          }
+          if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name' || ck.includes('ten')) {
+            if (u[k] && String(u[k]).trim()) name = String(u[k]).trim();
+          }
         }
-        if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name' || ck.includes('ten')) {
-          if (u[k] && String(u[k]).trim()) name = String(u[k]).trim();
+        const ckG = cleanKey(group);
+        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
+          filteredUsers.add(name);
         }
-      }
-      const ckG = cleanKey(group);
-      if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
-        filteredUsers.add(name);
-      }
-    });
+      });
+    }
 
-    appState.tasks.forEach(t => {
-      const tg = getTaskGroup(t);
-      const ckTg = cleanKey(tg);
-      const a = getTaskAssignee(t);
-      if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
-        filteredUsers.add(a);
-      }
-    });
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        if (!t || typeof t !== 'object') return;
+        const tg = getTaskGroup(t);
+        const ckTg = cleanKey(tg);
+        const a = getTaskAssignee(t);
+        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
+          filteredUsers.add(a);
+        }
+      });
+    }
   }
 
   if (!selGrpClean || filteredUsers.size === 0) {
-    appState.users.forEach(u => {
-      for (let k in u) {
-        const ck = cleanKey(k);
-        if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name') {
-          if (u[k] && String(u[k]).trim()) filteredUsers.add(String(u[k]).trim());
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        if (!u || typeof u !== 'object') return;
+        for (let k in u) {
+          const ck = cleanKey(k);
+          if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name') {
+            if (u[k] && String(u[k]).trim()) filteredUsers.add(String(u[k]).trim());
+          }
         }
-      }
-    });
-    appState.tasks.forEach(t => {
-      const a = getTaskAssignee(t);
-      const c = getTaskCollaborator(t);
-      if (a && a !== 'Chưa gán') filteredUsers.add(a);
-      if (c && String(c).trim()) filteredUsers.add(String(c).trim());
-    });
+      });
+    }
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        if (!t || typeof t !== 'object') return;
+        const a = getTaskAssignee(t);
+        const c = getTaskCollaborator(t);
+        if (a && a !== 'Chưa gán') filteredUsers.add(a);
+        if (c && String(c).trim()) filteredUsers.add(String(c).trim());
+      });
+    }
   }
 
   chuTriSelect.innerHTML = '<option value="">-- Chọn người chủ trì --</option>';
@@ -1257,50 +1269,72 @@ function renderOrgStatistics() {
 }
 
 function openTaskModal(taskId = null) {
-  const form = document.getElementById('form-task');
-  form.reset();
-  document.getElementById('subtasks-container').innerHTML = '';
-  populateSelects();
-  
-  if (taskId) {
-    const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
-    if (task) {
-      document.getElementById('modal-task-title').innerText = 'Chỉnh Sửa Công Việc #' + taskId;
-      document.getElementById('task-id').value = task.ID || task.id;
-      document.getElementById('task-title-input').value = task['Tiêu đề'] || '';
-      document.getElementById('task-desc-input').value = task['Mô tả'] || '';
-      document.getElementById('task-priority-input').value = task['Mức độ ưu tiên'] || 'Trung bình';
-      document.getElementById('task-status-input').value = task['Trạng thái'] || 'Đang thực hiện';
-      document.getElementById('task-start-input').value = task['Ngày bắt đầu'] || '';
-      document.getElementById('task-end-input').value = task['Ngày kết thúc'] || '';
-      document.getElementById('task-kehoach-input').value = task['Kế hoạch'] !== undefined ? task['Kế hoạch'] : 1;
-      document.getElementById('task-thuchien-input').value = task['Thực hiện'] !== undefined ? task['Thực hiện'] : 0;
-      
-      const grp = getTaskGroup(task);
-      const toSelect = document.getElementById('task-tochutri-input');
-      if (toSelect) toSelect.value = grp;
-      handleModalGroupChange(grp);
+  try {
+    const form = document.getElementById('form-task');
+    if (form) form.reset();
+    const subContainer = document.getElementById('subtasks-container');
+    if (subContainer) subContainer.innerHTML = '';
+    
+    populateSelects();
+    
+    if (taskId) {
+      const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
+      if (task) {
+        if (document.getElementById('modal-task-title')) document.getElementById('modal-task-title').innerText = 'Chỉnh Sửa Công Việc #' + taskId;
+        if (document.getElementById('task-id')) document.getElementById('task-id').value = task.ID || task.id;
+        if (document.getElementById('task-title-input')) document.getElementById('task-title-input').value = task['Tiêu đề'] || '';
+        if (document.getElementById('task-desc-input')) document.getElementById('task-desc-input').value = task['Mô tả'] || '';
+        if (document.getElementById('task-priority-input')) document.getElementById('task-priority-input').value = task['Mức độ ưu tiên'] || 'Trung bình';
+        if (document.getElementById('task-status-input')) document.getElementById('task-status-input').value = task['Trạng thái'] || 'Đang thực hiện';
+        if (document.getElementById('task-start-input')) document.getElementById('task-start-input').value = task['Ngày bắt đầu'] || '';
+        if (document.getElementById('task-end-input')) document.getElementById('task-end-input').value = task['Ngày kết thúc'] || '';
+        if (document.getElementById('task-kehoach-input')) document.getElementById('task-kehoach-input').value = task['Kế hoạch'] !== undefined ? task['Kế hoạch'] : 1;
+        if (document.getElementById('task-thuchien-input')) document.getElementById('task-thuchien-input').value = task['Thực hiện'] !== undefined ? task['Thực hiện'] : 0;
+        
+        const grp = getTaskGroup(task);
+        const toSelect = document.getElementById('task-tochutri-input');
+        if (toSelect) toSelect.value = grp;
+        handleModalGroupChange(grp);
 
-      document.getElementById('task-chutri-input').value = getTaskAssignee(task);
-      document.getElementById('task-phoihop-input').value = getTaskCollaborator(task);
-      document.getElementById('task-progress-input').value = task['Tiến độ (%)'] || 0;
-      document.getElementById('progress-val-display').innerText = task['Tiến độ (%)'] || 0;
-      document.getElementById('task-ghichu-input').value = task['Ghi chú'] || '';
-      document.getElementById('task-attachment-input').value = task['Tệp đính kèm'] || '';
+        const chuTriSelect = document.getElementById('task-chutri-input');
+        const assigneeName = getTaskAssignee(task);
+        if (chuTriSelect) {
+          if (assigneeName && !Array.from(chuTriSelect.options).some(o => o.value === assigneeName)) {
+            chuTriSelect.innerHTML += `<option value="${escapeHtml(assigneeName)}">${escapeHtml(assigneeName)}</option>`;
+          }
+          chuTriSelect.value = assigneeName;
+        }
 
-      if (task.subtasks && Array.isArray(task.subtasks)) {
-        task.subtasks.forEach(st => addSubtaskRow(st.title, st.completed));
+        const phoiHopSelect = document.getElementById('task-phoihop-input');
+        const collabName = getTaskCollaborator(task);
+        if (phoiHopSelect) {
+          if (collabName && !Array.from(phoiHopSelect.options).some(o => o.value === collabName)) {
+            phoiHopSelect.innerHTML += `<option value="${escapeHtml(collabName)}">${escapeHtml(collabName)}</option>`;
+          }
+          phoiHopSelect.value = collabName;
+        }
+
+        if (document.getElementById('task-progress-input')) document.getElementById('task-progress-input').value = task['Tiến độ (%)'] || 0;
+        if (document.getElementById('progress-val-display')) document.getElementById('progress-val-display').innerText = task['Tiến độ (%)'] || 0;
+        if (document.getElementById('task-ghichu-input')) document.getElementById('task-ghichu-input').value = task['Ghi chú'] || '';
+        if (document.getElementById('task-attachment-input')) document.getElementById('task-attachment-input').value = task['Tệp đính kèm'] || '';
+
+        if (task.subtasks && Array.isArray(task.subtasks)) {
+          task.subtasks.forEach(st => addSubtaskRow(st.title, st.completed));
+        }
       }
+    } else {
+      if (document.getElementById('modal-task-title')) document.getElementById('modal-task-title').innerText = 'Tạo Công Việc Mới';
+      if (document.getElementById('task-id')) document.getElementById('task-id').value = '';
+      const toSelect = document.getElementById('task-tochutri-input');
+      if (toSelect) toSelect.value = '';
+      handleModalGroupChange('');
     }
-  } else {
-    document.getElementById('modal-task-title').innerText = 'Tạo Công Việc Mới';
-    document.getElementById('task-id').value = '';
-    const toSelect = document.getElementById('task-tochutri-input');
-    if (toSelect) toSelect.value = '';
-    handleModalGroupChange('');
+  } catch (err) {
+    console.error('Error in openTaskModal:', err);
+  } finally {
+    openModal('modal-task');
   }
-  
-  openModal('modal-task');
 }
 
 function addSubtaskRow(title = '', completed = false) {
