@@ -45,7 +45,7 @@ function getTaskCollaborator(task) {
 
 function getTaskGroup(task) {
   if (!task) return '';
-  let g = task['Tổ'] || task['TỔ'] || task['Tên tổ'] || task['To'];
+  let g = task['Tổ chủ trì'] || task['Tổ'] || task['TỔ'] || task['Tên tổ'] || task['To'];
   if (g) return String(g).trim();
 
   const assignee = getTaskAssignee(task);
@@ -60,6 +60,12 @@ function getTaskGroup(task) {
     }
   }
   return '';
+}
+
+function getTaskCollaboratorGroup(task) {
+  if (!task) return '';
+  let g = task['Tổ phối hợp'] || '';
+  return String(g).trim();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -215,9 +221,11 @@ function populateSelects() {
     const a = getTaskAssignee(t);
     const c = getTaskCollaborator(t);
     const tg = getTaskGroup(t);
+    const tcg = getTaskCollaboratorGroup(t);
     if (a && a !== 'Chưa gán') assignees.add(String(a).trim());
     if (c) assignees.add(String(c).trim());
     if (tg) groups.add(String(tg).trim());
+    if (tcg) groups.add(String(tcg).trim());
   });
 
   appState.cvluuy.forEach(item => {
@@ -227,7 +235,7 @@ function populateSelects() {
 
   if (groupSelect) {
     const curVal = groupSelect.value;
-    groupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
+    groupSelect.innerHTML = '<option value="">Tất cả tổ chủ trì</option>';
     Array.from(groups).sort().forEach(g => {
       if (g) groupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
     });
@@ -381,7 +389,7 @@ function getFilteredTasks() {
     
     if (search && !title.includes(search) && !desc.includes(search) && !note.includes(search) && !assignee.includes(search) && !collaborator.includes(search)) return false;
     
-    // Group filter
+    // Group filter (Tổ chủ trì)
     const groupFilter = appState.filters.group;
     if (groupFilter) {
       const taskGroup = getTaskGroup(t);
@@ -636,7 +644,7 @@ function renderTaskListTable() {
   
   tbody.innerHTML = '';
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="16" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
     return;
   }
   
@@ -662,7 +670,9 @@ function renderTaskListTable() {
     const ghiChu = t['Ghi chú'] || '';
     const ngayLamXong = t['Ngày làm xong'] || '';
     const chuTriName = getTaskAssignee(t);
+    const toChuTriName = getTaskGroup(t);
     const phoiHopName = getTaskCollaborator(t);
+    const toPhoiHopName = getTaskCollaboratorGroup(t);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -670,7 +680,9 @@ function renderTaskListTable() {
       <td class="col-desc-cell">${escapeHtml(t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
       <td>${escapeHtml(chuTriName)}</td>
+      <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
       <td>${escapeHtml(phoiHopName)}</td>
+      <td><span class="tag-org" style="background:rgba(56, 189, 248, 0.15); color:#38bdf8;">${escapeHtml(toPhoiHopName || '')}</span></td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(t['Ngày kết thúc'])}</td>
       <td>
@@ -1096,6 +1108,12 @@ function handleTaskFormSubmit(e) {
     if (title) subtasks.push({ id: idx + 1, title: title, completed: completed });
   });
 
+  const chuTriName = document.getElementById('task-chutri-input').value;
+  const phoiHopName = document.getElementById('task-phoihop-input').value;
+
+  const chuTriUser = appState.users.find(u => (u['Tên'] || u.name) === chuTriName);
+  const phoiHopUser = appState.users.find(u => (u['Tên'] || u.name) === phoiHopName);
+
   const payload = {
     id: document.getElementById('task-id').value,
     'Tiêu đề': document.getElementById('task-title-input').value,
@@ -1106,10 +1124,12 @@ function handleTaskFormSubmit(e) {
     'Ngày kết thúc': document.getElementById('task-end-input').value,
     'Kế hoạch': Number(document.getElementById('task-kehoach-input').value),
     'Thực hiện': Number(document.getElementById('task-thuchien-input').value),
-    'Người chủ trì': document.getElementById('task-chutri-input').value,
-    'Người phối hợp': document.getElementById('task-phoihop-input').value,
-    'Người thực hiện': document.getElementById('task-chutri-input').value,
-    'Người phụ trách': document.getElementById('task-chutri-input').value,
+    'Người chủ trì': chuTriName,
+    'Tổ chủ trì': chuTriUser ? (chuTriUser['Tổ'] || chuTriUser.group) : '',
+    'Người phối hợp': phoiHopName,
+    'Tổ phối hợp': phoiHopUser ? (phoiHopUser['Tổ'] || phoiHopUser.group) : '',
+    'Người thực hiện': chuTriName,
+    'Người phụ trách': chuTriName,
     'Tiến độ (%)': Number(document.getElementById('task-progress-input').value),
     'Ghi chú': document.getElementById('task-ghichu-input').value,
     'Tệp đính kèm': document.getElementById('task-attachment-input').value,

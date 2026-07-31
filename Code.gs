@@ -75,8 +75,8 @@ function findHeaderIndex(headers, targetName) {
 function ensureTaskHeaders(sheet) {
   const data = sheet.getDataRange().getValues();
   const standardHeaders = [
-    'ID', 'Mã nhân viên', 'Tiêu đề', 'Mô tả', 'Trạng thái', 'Mức độ ưu tiên',
-    'Người chủ trì', 'Tổ', 'Người phối hợp',
+    'ID', 'Mã nhân viên', 'Tiêu đề', 'Mô tả', 'Người chủ trì', 'Tổ chủ trì',
+    'Người phối hợp', 'Tổ phối hợp', 'Trạng thái', 'Mức độ ưu tiên',
     'Ngày bắt đầu', 'Ngày kết thúc', 'Tiến độ (%)', 'Tệp đính kèm', 'Ngày làm xong',
     'Kế hoạch', 'Thực hiện', 'Tỷ lệ', 'Ghi chú', 'Danh sách công việc con'
   ];
@@ -179,7 +179,9 @@ function saveTask(payload) {
 
     const subtasksJson = payload.subtasks ? JSON.stringify(payload.subtasks) : '';
     const chuTri = payload['Người chủ trì'] || payload['Người thực hiện'] || payload['Người phụ trách'] || '';
+    const toChuTri = payload['Tổ chủ trì'] || payload['Tổ'] || '';
     const phoiHop = payload['Người phối hợp'] || '';
+    const toPhoiHop = payload['Tổ phối hợp'] || '';
 
     const keHoach = payload['Kế hoạch'] !== undefined ? Number(payload['Kế hoạch']) : 1;
     const thucHien = payload['Thực hiện'] !== undefined ? Number(payload['Thực hiện']) : 0;
@@ -202,8 +204,11 @@ function saveTask(payload) {
       if (cleanH === 'ngày bắt đầu') return payload['Ngày bắt đầu'] || '';
       if (cleanH === 'ngày kết thúc' || cleanH === 'hạn hoàn thành') return payload['Ngày kết thúc'] || '';
       if (cleanH.includes('tiến độ')) return payload['Tiến độ (%)'] || 0;
+      if (cleanH.includes('chủ trì') && cleanH.includes('tổ')) return toChuTri;
+      if (cleanH.includes('phối hợp') && cleanH.includes('tổ')) return toPhoiHop;
       if (cleanH.includes('chủ trì') || cleanH.includes('phụ trách') || cleanH.includes('thực hiện')) return chuTri;
       if (cleanH.includes('phối hợp')) return phoiHop;
+      if (cleanH === 'tổ') return toChuTri;
       if (cleanH.includes('việc con')) return subtasksJson;
       if (cleanH.includes('đính kèm')) return payload['Tệp đính kèm'] || '';
       if (cleanH.includes('ngày làm xong')) return doneDate;
