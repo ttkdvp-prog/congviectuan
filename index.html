@@ -83,13 +83,12 @@
             <input type="text" id="global-search-input" placeholder="Tìm kiếm công việc..." oninput="handleGlobalFilter()">
           </div>
 
-          <div class="header-search">
-            <i class="fa-solid fa-user"></i>
-            <input type="text" id="global-user-search" placeholder="Tìm người phụ trách..." oninput="handleGlobalFilter()">
-          </div>
-
-          <select class="header-select" id="global-group-select" onchange="handleGlobalFilter()">
+          <select class="header-select" id="global-group-select" onchange="onGlobalGroupChange()">
             <option value="">Tất cả tổ</option>
+          </select>
+
+          <select class="header-select" id="global-user-select" onchange="handleGlobalFilter()">
+            <option value="">Tất cả người phụ trách</option>
           </select>
 
           <button class="btn-icon-btn" onclick="appState.loadData(true)" title="Làm mới dữ liệu">

@@ -42,6 +42,25 @@ function getTaskCollaborator(task) {
   return task['Người phối hợp'] || task['NguoiPhoiHop'] || '';
 }
 
+function getTaskGroup(task) {
+  if (!task) return '';
+  let g = task['Tổ'] || task['TỔ'] || task['Tên tổ'] || task['To'];
+  if (g) return String(g).trim();
+
+  const assignee = getTaskAssignee(task);
+  if (assignee && assignee !== 'Chưa gán') {
+    const usr = appState.users.find(u => {
+      const name = u['Tên'] || u['Tên nhân viên'] || u.name;
+      return String(name).trim() === String(assignee).trim();
+    });
+    if (usr) {
+      let ug = usr['Tổ'] || usr['TỔ'] || usr['Tên tổ'] || usr.group;
+      if (ug) return String(ug).trim();
+    }
+  }
+  return '';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const urlInput = document.getElementById('gas-api-url-input');
   if (urlInput && appState.apiUrl) {
@@ -59,12 +78,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Attach search & group filter event listeners
   const sInput = document.getElementById('global-search-input');
-  const uInput = document.getElementById('global-user-search');
+  const uSelect = document.getElementById('global-user-select');
   const gSelect = document.getElementById('global-group-select');
 
   if (sInput) sInput.addEventListener('input', handleGlobalFilter);
-  if (uInput) uInput.addEventListener('input', handleGlobalFilter);
-  if (gSelect) gSelect.addEventListener('change', handleGlobalFilter);
+  if (uSelect) uSelect.addEventListener('change', handleGlobalFilter);
+  if (gSelect) gSelect.addEventListener('change', onGlobalGroupChange);
 
   // Restore local cache for zero-latency initial view on F5
   const cachedLocal = localStorage.getItem('TTHT_TASKS_CACHE');
@@ -185,51 +204,119 @@ function populateSelects() {
   const assignees = new Set();
   
   appState.users.forEach(u => {
-    const g = u['Tổ'] || u.group;
-    const n = u['Tên'] || u.name;
-    if (g) groups.add(g);
-    if (n) assignees.add(n);
+    const g = u['Tổ'] || u['TỔ'] || u['Tên tổ'] || u.group;
+    const n = u['Tên'] || u['Tên nhân viên'] || u.name;
+    if (g) groups.add(String(g).trim());
+    if (n) assignees.add(String(n).trim());
   });
 
   appState.tasks.forEach(t => {
     const a = getTaskAssignee(t);
     const c = getTaskCollaborator(t);
-    if (a && a !== 'Chưa gán') assignees.add(a);
-    if (c) assignees.add(c);
-    if (t['Tổ']) groups.add(t['Tổ']);
+    const tg = getTaskGroup(t);
+    if (a && a !== 'Chưa gán') assignees.add(String(a).trim());
+    if (c) assignees.add(String(c).trim());
+    if (tg) groups.add(String(tg).trim());
   });
 
-  appState.cvluuy.forEach(item => { if (item['Tổ']) groups.add(item['Tổ']); });
+  appState.cvluuy.forEach(item => {
+    const g = item['Tổ'] || item['TỔ'] || item['Tên tổ'];
+    if (g) groups.add(String(g).trim());
+  });
 
   if (groupSelect) {
     const curVal = groupSelect.value;
     groupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
-    groups.forEach(g => groupSelect.innerHTML += `<option value="${g}">${g}</option>`);
+    Array.from(groups).sort().forEach(g => {
+      if (g) groupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+    });
     if (curVal) groupSelect.value = curVal;
   }
+
   if (cvluuyGroupSelect) {
     const curVal = cvluuyGroupSelect.value;
     cvluuyGroupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
-    groups.forEach(g => cvluuyGroupSelect.innerHTML += `<option value="${g}">${g}</option>`);
+    Array.from(groups).sort().forEach(g => {
+      if (g) cvluuyGroupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+    });
     if (curVal) cvluuyGroupSelect.value = curVal;
   }
+
   if (kanbanAssigneeSelect) {
     const curVal = kanbanAssigneeSelect.value;
     kanbanAssigneeSelect.innerHTML = '<option value="">Tất cả người phụ trách</option>';
-    assignees.forEach(a => kanbanAssigneeSelect.innerHTML += `<option value="${a}">${a}</option>`);
+    Array.from(assignees).sort().forEach(a => {
+      if (a) kanbanAssigneeSelect.innerHTML += `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`;
+    });
     if (curVal) kanbanAssigneeSelect.value = curVal;
   }
+
   if (taskChuTriSelect) {
     const curVal = taskChuTriSelect.value;
     taskChuTriSelect.innerHTML = '<option value="">-- Chọn người chủ trì --</option>';
-    assignees.forEach(a => taskChuTriSelect.innerHTML += `<option value="${a}">${a}</option>`);
+    Array.from(assignees).sort().forEach(a => {
+      if (a) taskChuTriSelect.innerHTML += `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`;
+    });
     if (curVal) taskChuTriSelect.value = curVal;
   }
+
   if (taskPhoiHopSelect) {
     const curVal = taskPhoiHopSelect.value;
     taskPhoiHopSelect.innerHTML = '<option value="">-- Chọn người phối hợp --</option>';
-    assignees.forEach(a => taskPhoiHopSelect.innerHTML += `<option value="${a}">${a}</option>`);
+    Array.from(assignees).sort().forEach(a => {
+      if (a) taskPhoiHopSelect.innerHTML += `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`;
+    });
     if (curVal) taskPhoiHopSelect.value = curVal;
+  }
+
+  updateGlobalUserSelectOptions();
+}
+
+function onGlobalGroupChange() {
+  updateGlobalUserSelectOptions();
+  handleGlobalFilter();
+}
+
+function updateGlobalUserSelectOptions() {
+  const userSelect = document.getElementById('global-user-select');
+  const groupSelect = document.getElementById('global-group-select');
+  if (!userSelect || !groupSelect) return;
+
+  const selectedGroup = groupSelect.value;
+  const currentSelectedUser = userSelect.value;
+
+  const usersInGroup = new Set();
+
+  appState.users.forEach(u => {
+    const g = String(u['Tổ'] || u['TỔ'] || u['Tên tổ'] || u.group || '').trim();
+    const name = String(u['Tên'] || u['Tên nhân viên'] || u.name || '').trim();
+    if (name) {
+      if (!selectedGroup || g === selectedGroup) {
+        usersInGroup.add(name);
+      }
+    }
+  });
+
+  appState.tasks.forEach(t => {
+    const tg = getTaskGroup(t);
+    if (!selectedGroup || tg === selectedGroup) {
+      const chuTri = getTaskAssignee(t);
+      const phoiHop = getTaskCollaborator(t);
+      if (chuTri && chuTri !== 'Chưa gán') usersInGroup.add(chuTri);
+      if (phoiHop) usersInGroup.add(phoiHop);
+    }
+  });
+
+  userSelect.innerHTML = '<option value="">Tất cả người phụ trách</option>';
+  Array.from(usersInGroup).sort().forEach(name => {
+    userSelect.innerHTML += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+  });
+
+  if (usersInGroup.has(currentSelectedUser)) {
+    userSelect.value = currentSelectedUser;
+  } else {
+    userSelect.value = '';
+    appState.filters.user = '';
   }
 }
 
@@ -266,11 +353,11 @@ function switchSidebarTab(tabName) {
 
 function handleGlobalFilter() {
   const sEl = document.getElementById('global-search-input');
-  const uEl = document.getElementById('global-user-search');
+  const uEl = document.getElementById('global-user-select');
   const gEl = document.getElementById('global-group-select');
 
   appState.filters.search = sEl ? sEl.value.trim() : '';
-  appState.filters.user = uEl ? uEl.value.trim() : '';
+  appState.filters.user = uEl ? uEl.value : '';
   appState.filters.group = gEl ? gEl.value : '';
   
   renderActiveTab();
@@ -287,20 +374,25 @@ function getFilteredTasks() {
     const search = appState.filters.search.toLowerCase();
     const title = (t['Tiêu đề'] || '').toLowerCase();
     const desc = (t['Mô tả'] || '').toLowerCase();
+    const note = (t['Ghi chú'] || '').toLowerCase();
     const assignee = getTaskAssignee(t).toLowerCase();
     const collaborator = getTaskCollaborator(t).toLowerCase();
     
-    if (search && !title.includes(search) && !desc.includes(search) && !assignee.includes(search) && !collaborator.includes(search)) return false;
+    if (search && !title.includes(search) && !desc.includes(search) && !note.includes(search) && !assignee.includes(search) && !collaborator.includes(search)) return false;
     
-    const userSearch = appState.filters.user.toLowerCase();
-    if (userSearch && !assignee.includes(userSearch) && !collaborator.includes(userSearch)) return false;
-
+    // Group filter
     const groupFilter = appState.filters.group;
     if (groupFilter) {
-      const taskAssignee = getTaskAssignee(t);
-      const userObj = appState.users.find(u => (u['Tên'] || u.name) === taskAssignee);
-      const taskGroup = userObj ? (userObj['Tổ'] || userObj.group) : (t['Tổ'] || '');
+      const taskGroup = getTaskGroup(t);
       if (taskGroup !== groupFilter) return false;
+    }
+
+    // User / Person in charge filter
+    const userFilter = appState.filters.user;
+    if (userFilter) {
+      const chuTri = getTaskAssignee(t);
+      const phoiHop = getTaskCollaborator(t);
+      if (chuTri !== userFilter && phoiHop !== userFilter) return false;
     }
 
     if (appState.filters.kanbanAssignee && getTaskAssignee(t) !== appState.filters.kanbanAssignee) return false;
@@ -1207,7 +1299,7 @@ function showToast(message, type = 'info') {
   `;
   
   const icon = type === 'success' ? 'circle-check' : type === 'error' ? 'circle-exclamation' : 'circle-info';
-  toast.innerHTML = `<i class="fa-solid fa-${icon}"></i> ${escapeHtml(message)}`;
+  toast.innerHTML = `<i class="fa-solid fa-circle-${icon}"></i> ${escapeHtml(message)}`;
   
   container.appendChild(toast);
   setTimeout(() => {

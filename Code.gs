@@ -75,10 +75,10 @@ function findHeaderIndex(headers, targetName) {
 function ensureTaskHeaders(sheet) {
   const data = sheet.getDataRange().getValues();
   const standardHeaders = [
-    'ID', 'Tiêu đề', 'Mô tả', 'Trạng thái', 'Mức độ ưu tiên',
-    'Ngày bắt đầu', 'Ngày kết thúc', 'Tiến độ (%)', 'Người thực hiện',
-    'Danh sách công việc con', 'Tệp đính kèm', 'Ngày làm xong',
-    'Kế hoạch', 'Thực hiện', 'Tỷ lệ', 'Ghi chú'
+    'ID', 'Mã nhân viên', 'Tiêu đề', 'Mô tả', 'Trạng thái', 'Mức độ ưu tiên',
+    'Người chủ trì', 'Tổ', 'Người phối hợp',
+    'Ngày bắt đầu', 'Ngày kết thúc', 'Tiến độ (%)', 'Tệp đính kèm', 'Ngày làm xong',
+    'Kế hoạch', 'Thực hiện', 'Tỷ lệ', 'Ghi chú', 'Danh sách công việc con'
   ];
 
   if (data.length === 0 || !data[0][0]) {
