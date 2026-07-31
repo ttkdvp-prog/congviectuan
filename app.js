@@ -32,19 +32,30 @@ function autoResizeTextarea(el) {
   el.style.height = Math.max(38, el.scrollHeight) + 'px';
 }
 
+function cleanKey(str) {
+  if (!str) return '';
+  return String(str)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
+
 function getTaskAssignee(task) {
   if (!task) return 'Chưa gán';
   for (let k in task) {
-    const cleanK = String(k).toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-    if (cleanK === 'nguoichutri' || cleanK === 'nguoiphutrach' || cleanK === 'nguoithuchien' || cleanK === 'assignee') {
+    const ck = cleanKey(k);
+    if (ck === 'nguoichutri' || ck === 'nguoiphutrach' || ck === 'nguoithuchien' || ck === 'assignee') {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
         return String(task[k]).trim();
       }
     }
   }
   for (let k in task) {
-    const cleanK = String(k).toLowerCase().trim();
-    if (cleanK.includes('chủ trì') || cleanK.includes('phụ trách') || cleanK.includes('thực hiện')) {
+    const ck = cleanKey(k);
+    if (ck.includes('chutri') || ck.includes('phutrach') || ck.includes('thuchien')) {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
         return String(task[k]).trim();
       }
@@ -56,16 +67,16 @@ function getTaskAssignee(task) {
 function getTaskCollaborator(task) {
   if (!task) return '';
   for (let k in task) {
-    const cleanK = String(k).toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-    if (cleanK === 'nguoiphoihop') {
+    const ck = cleanKey(k);
+    if (ck === 'nguoiphoihop') {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
         return String(task[k]).trim();
       }
     }
   }
   for (let k in task) {
-    const cleanK = String(k).toLowerCase().trim();
-    if (cleanK.includes('phối hợp') && !cleanK.includes('tổ')) {
+    const ck = cleanKey(k);
+    if (ck.includes('phoihop') && !ck.includes('to')) {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
         return String(task[k]).trim();
       }
@@ -78,8 +89,8 @@ function getTaskGroup(task) {
   if (!task) return '';
   
   for (let k in task) {
-    const cleanK = String(k).toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-    if (cleanK === 'tochutri' || cleanK === 'to' || cleanK === 'tentocutri' || cleanK === 'tengroup') {
+    const ck = cleanKey(k);
+    if (ck === 'tochutri' || ck === 'to' || ck === 'tentocutri' || ck === 'tengroup') {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
         return String(task[k]).trim();
       }
@@ -89,19 +100,23 @@ function getTaskGroup(task) {
   const assignee = getTaskAssignee(task);
   if (assignee && assignee !== 'Chưa gán') {
     const usr = appState.users.find(u => {
-      const name = u['Tên'] || u['Tên nhân viên'] || u.name;
-      return String(name).trim().toLowerCase() === String(assignee).trim().toLowerCase();
+      const name = u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u.name;
+      return cleanKey(name) === cleanKey(assignee);
     });
     if (usr) {
-      let ug = usr['Tổ'] || usr['TỔ'] || usr['Tên tổ'] || usr.group;
-      if (ug) return String(ug).trim();
+      for (let k in usr) {
+        const ck = cleanKey(k);
+        if (ck === 'to' || ck === 'tochutri' || ck === 'tento') {
+          if (usr[k] && String(usr[k]).trim()) return String(usr[k]).trim();
+        }
+      }
     }
   }
 
   for (let k in task) {
-    const cleanK = String(k).toLowerCase().trim();
-    if (cleanK.includes('chủ trì') && (cleanK.includes('tổ') || cleanK.includes('to'))) {
-      if (task[k]) return String(task[k]).trim();
+    const ck = cleanKey(k);
+    if (ck.includes('chutri') && ck.includes('to')) {
+      if (task[k] && String(task[k]).trim()) return String(task[k]).trim();
     }
   }
 
@@ -111,17 +126,17 @@ function getTaskGroup(task) {
 function getTaskCollaboratorGroup(task) {
   if (!task) return '';
   for (let k in task) {
-    const cleanK = String(k).toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-    if (cleanK === 'tophoihop') {
+    const ck = cleanKey(k);
+    if (ck === 'tophoihop') {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
         return String(task[k]).trim();
       }
     }
   }
   for (let k in task) {
-    const cleanK = String(k).toLowerCase().trim();
-    if (cleanK.includes('phối hợp') && (cleanK.includes('tổ') || cleanK.includes('to'))) {
-      if (task[k]) return String(task[k]).trim();
+    const ck = cleanKey(k);
+    if (ck.includes('phoihop') && ck.includes('to')) {
+      if (task[k] && String(task[k]).trim()) return String(task[k]).trim();
     }
   }
   return '';
@@ -287,13 +302,22 @@ function populateSelects() {
   const assignees = new Set();
   
   appState.users.forEach(u => {
-    const g = u['Tổ'] || u['TỔ'] || u['Tên tổ'] || u.group;
-    const n = u['Tên'] || u['Tên nhân viên'] || u.name;
-    if (g && String(g).trim()) {
-      hostGroups.add(String(g).trim());
-      allGroups.add(String(g).trim());
+    let name = '';
+    let group = '';
+    for (let k in u) {
+      const ck = cleanKey(k);
+      if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group') {
+        if (u[k] && String(u[k]).trim()) group = String(u[k]).trim();
+      }
+      if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'name') {
+        if (u[k] && String(u[k]).trim()) name = String(u[k]).trim();
+      }
     }
-    if (n && String(n).trim()) assignees.add(String(n).trim());
+    if (group) {
+      hostGroups.add(group);
+      allGroups.add(group);
+    }
+    if (name) assignees.add(name);
   });
 
   appState.tasks.forEach(t => {
@@ -301,18 +325,34 @@ function populateSelects() {
     const c = getTaskCollaborator(t);
     const tg = getTaskGroup(t);
     const tcg = getTaskCollaboratorGroup(t);
-    if (a && a !== 'Chưa gán') assignees.add(String(a).trim());
-    if (c && String(c).trim()) assignees.add(String(c).trim());
+    
+    if (a && a !== 'Chưa gán') assignees.add(a);
+    if (c && String(c).trim()) assignees.add(c);
     if (tg && String(tg).trim()) {
-      hostGroups.add(String(tg).trim());
-      allGroups.add(String(tg).trim());
+      hostGroups.add(tg);
+      allGroups.add(tg);
     }
-    if (tcg && String(tcg).trim()) allGroups.add(String(tcg).trim());
+    if (tcg && String(tcg).trim()) allGroups.add(tcg);
+
+    for (let k in t) {
+      const ck = cleanKey(k);
+      if (ck.includes('to') && t[k] && typeof t[k] === 'string' && t[k].trim()) {
+        const val = t[k].trim();
+        if (val.toLowerCase().includes('tổ') || val.toLowerCase().includes('to ')) {
+          hostGroups.add(val);
+          allGroups.add(val);
+        }
+      }
+    }
   });
 
   appState.cvluuy.forEach(item => {
-    const g = item['Tổ'] || item['TỔ'] || item['Tên tổ'];
-    if (g && String(g).trim()) allGroups.add(String(g).trim());
+    for (let k in item) {
+      const ck = cleanKey(k);
+      if (ck.includes('to') && item[k] && typeof item[k] === 'string' && item[k].trim()) {
+        allGroups.add(item[k].trim());
+      }
+    }
   });
 
   if (groupSelect) {
