@@ -1604,14 +1604,37 @@ function onStatsUserGroupChange() {
 function getUserTeamName(personName) {
   if (!personName || !appState.users || !Array.isArray(appState.users)) return '';
   const pClean = cleanKey(personName);
-  const foundUser = appState.users.find(u => {
+  if (!pClean) return '';
+
+  let foundUser = appState.users.find(u => {
     const { name } = getUserNameAndGroup(u);
     return cleanKey(name) === pClean;
   });
+
+  if (!foundUser) {
+    foundUser = appState.users.find(u => {
+      const { name } = getUserNameAndGroup(u);
+      const uClean = cleanKey(name);
+      return uClean && (uClean.includes(pClean) || pClean.includes(uClean));
+    });
+  }
+
   if (foundUser) {
     const { group } = getUserNameAndGroup(foundUser);
-    if (group) return group;
+    if (group && group !== 'Chưa phân tổ') return group;
   }
+
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    const hostTask = appState.tasks.find(t => {
+      const a = getTaskAssignee(t);
+      return a && cleanKey(a).includes(pClean);
+    });
+    if (hostTask) {
+      const tg = getTaskGroup(hostTask);
+      if (tg && tg !== 'Khác') return tg;
+    }
+  }
+
   return '';
 }
 
@@ -1718,6 +1741,14 @@ function renderUserStatistics() {
   let userList = Object.values(userStatsMap).filter(u => {
     const n = String(u.name || '').trim();
     return n !== '' && n !== '0' && n !== 'undefined' && n !== 'null';
+  });
+
+  // Re-verify official team for all users
+  userList.forEach(u => {
+    const officialTeam = getUserTeamName(u.name);
+    if (officialTeam) {
+      u.group = officialTeam;
+    }
   });
 
   if (grpClean) {
