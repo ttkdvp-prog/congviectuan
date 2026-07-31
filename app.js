@@ -1600,6 +1600,20 @@ function onStatsUserGroupChange() {
   renderUserStatistics();
 }
 
+function getUserTeamName(personName) {
+  if (!personName || !appState.users || !Array.isArray(appState.users)) return '';
+  const pClean = cleanKey(personName);
+  const foundUser = appState.users.find(u => {
+    const { name } = getUserNameAndGroup(u);
+    return cleanKey(name) === pClean;
+  });
+  if (foundUser) {
+    const { group } = getUserNameAndGroup(foundUser);
+    if (group) return group;
+  }
+  return '';
+}
+
 function renderUserStatistics() {
   const container = document.getElementById('stats-user-container');
   if (!container) return;
@@ -1629,6 +1643,31 @@ function renderUserStatistics() {
     });
   }
 
+  function findOrCreateUserStat(rawName, taskGroupFallback) {
+    const cleanN = cleanKey(rawName);
+    let matchedKey = Object.keys(userStatsMap).find(k => cleanKey(k) === cleanN);
+
+    if (!matchedKey) {
+      const userTeam = getUserTeamName(rawName) || taskGroupFallback || 'Khác';
+      matchedKey = rawName.trim();
+      userStatsMap[matchedKey] = {
+        name: matchedKey,
+        group: userTeam,
+        hostTasks: 0,
+        collabTasks: 0,
+        total: 0,
+        inProgress: 0,
+        done: 0,
+        overdue: 0
+      };
+    } else {
+      const officialTeam = getUserTeamName(matchedKey);
+      if (officialTeam) userStatsMap[matchedKey].group = officialTeam;
+    }
+
+    return userStatsMap[matchedKey];
+  }
+
   const todayStr = new Date().toISOString().split('T')[0];
 
   if (appState.tasks && Array.isArray(appState.tasks)) {
@@ -1647,19 +1686,7 @@ function renderUserStatistics() {
         assigneeStr.split(',').forEach(rawName => {
           const uName = rawName.trim();
           if (uName) {
-            if (!userStatsMap[uName]) {
-              userStatsMap[uName] = {
-                name: uName,
-                group: tg || 'Khác',
-                hostTasks: 0,
-                collabTasks: 0,
-                total: 0,
-                inProgress: 0,
-                done: 0,
-                overdue: 0
-              };
-            }
-            const stat = userStatsMap[uName];
+            const stat = findOrCreateUserStat(uName, tg);
             stat.hostTasks++;
             stat.total++;
             if (isDone) stat.done++;
@@ -1674,19 +1701,7 @@ function renderUserStatistics() {
         collabStr.split(',').forEach(rawName => {
           const uName = rawName.trim();
           if (uName) {
-            if (!userStatsMap[uName]) {
-              userStatsMap[uName] = {
-                name: uName,
-                group: tg || 'Khác',
-                hostTasks: 0,
-                collabTasks: 0,
-                total: 0,
-                inProgress: 0,
-                done: 0,
-                overdue: 0
-              };
-            }
-            const stat = userStatsMap[uName];
+            const stat = findOrCreateUserStat(uName, tg);
             stat.collabTasks++;
             stat.total++;
             if (isDone) stat.done++;
