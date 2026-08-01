@@ -2334,6 +2334,19 @@ function getTovienRowInfo(row) {
   return { group, leaderName, leaderCode, empName, empCode };
 }
 
+function getToTruongTaskGroup(task) {
+  if (!task || typeof task !== 'object') return '';
+  for (let k in task) {
+    const ck = cleanKey(k);
+    if (ck === 'to' || ck === 'tochutri' || ck === 'tohatang' || ck === 'tento') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  return task['Tổ'] || getTaskGroup(task) || '';
+}
+
 function getTaskLeaderName(task) {
   if (!task || typeof task !== 'object') return '';
   for (let k in task) {
@@ -2689,27 +2702,69 @@ function renderToTruongTaskList() {
     }
 
     if (grpClean) {
-      const taskGroup = t['Tổ'] || getTaskGroup(t);
+      const taskGroup = getToTruongTaskGroup(t);
       const tgClean = cleanKey(taskGroup);
-      if (!tgClean || (!tgClean.includes(grpClean) && !grpClean.includes(tgClean))) {
-        return false;
+      const rawLeaderName = getTaskLeaderName(t);
+      const taskLeaderClean = cleanKey(rawLeaderName);
+
+      let matchGroup = false;
+      if (tgClean && (tgClean.includes(grpClean) || grpClean.includes(tgClean))) {
+        matchGroup = true;
       }
+      if (!matchGroup && taskLeaderClean) {
+        if (currentTeamUsers.has(taskLeaderClean) || currentTeamUsers.has(rawLeaderName)) {
+          matchGroup = true;
+        }
+      }
+      if (!matchGroup) {
+        // If task has no group and no leader, allow if group clean matches fallback
+        const fallbackGroup = cleanKey(getTaskGroup(t));
+        if (fallbackGroup && (fallbackGroup.includes(grpClean) || grpClean.includes(fallbackGroup))) {
+          matchGroup = true;
+        }
+      }
+
+      if (!matchGroup) return false;
     }
 
     if (usrClean) {
       const isLeader = isLeaderUser(selUser);
       if (isLeader) {
-        // STRICT FILTER FOR LEADER / SUB-LEADER: Match Column E (Tên tổ trưởng) / Column D (Mã NV tổ trưởng) ONLY!
-        const taskLeaderName = cleanKey(getTaskLeaderName(t) || t['Tên tổ trưởng'] || '');
-        const taskLeaderCode = cleanKey(getTaskLeaderCode(t) || t['Mã NV tổ trưởng'] || '');
-
+        // FLEXIBLE MATCH FOR LEADER / SUB-LEADER
+        const targetClean = cleanKey(selUser);
         const subInfo = getSubLeaderInfo(selUser);
-        const subCode = subInfo ? cleanKey(subInfo.code) : '';
+        const targetCode = subInfo ? cleanKey(subInfo.code) : '';
 
-        const matchName = taskLeaderName && (taskLeaderName.includes(usrClean) || usrClean.includes(taskLeaderName));
-        const matchCode = subCode && taskLeaderCode && taskLeaderCode === subCode;
+        const rawLeaderName = getTaskLeaderName(t) || t['Tên tổ trưởng'] || '';
+        const rawLeaderCode = getTaskLeaderCode(t) || t['Mã NV tổ trưởng'] || '';
 
-        if (!matchName && !matchCode) return false;
+        const taskLeaderClean = cleanKey(rawLeaderName);
+        const taskCodeClean = cleanKey(rawLeaderCode);
+
+        let match = false;
+
+        if (taskLeaderClean && targetClean) {
+          if (taskLeaderClean.includes(targetClean) || targetClean.includes(taskLeaderClean)) {
+            match = true;
+          }
+        }
+
+        if (!match && taskCodeClean) {
+          if (targetCode && taskCodeClean === targetCode) {
+            match = true;
+          } else if (targetClean && taskCodeClean.includes(targetClean)) {
+            match = true;
+          }
+        }
+
+        if (!match && subInfo) {
+          const subNameClean = cleanKey(subInfo.name);
+          if (taskLeaderClean && (taskLeaderClean.includes(subNameClean) || subNameClean.includes(taskLeaderClean))) {
+            match = true;
+          }
+        }
+
+        if (!match) return false;
       } else {
         // REGULAR TEAM MEMBER FILTER: Match Assignee (Tên NV A / Người chủ trì) or Collaborator (Người phối hợp)
         const chuTriClean = cleanKey(chuTri);
