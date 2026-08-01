@@ -2549,10 +2549,11 @@ function renderToTruongTaskList() {
     }
 
     if (grpClean) {
-      const matchHostGroup = cleanKey(toChuTri).includes(grpClean) || grpClean.includes(cleanKey(toChuTri));
-      const matchCollabGroup = cleanKey(toPhoiHop).includes(grpClean) || grpClean.includes(cleanKey(toPhoiHop));
-      const matchMember = currentTeamUsers.has(cleanKey(chuTri));
-      if (!matchHostGroup && !matchCollabGroup && !matchMember) return false;
+      const taskGroup = t['Tổ'] || getTaskGroup(t);
+      const tgClean = cleanKey(taskGroup);
+      if (!tgClean || (!tgClean.includes(grpClean) && !grpClean.includes(tgClean))) {
+        return false;
+      }
     }
 
     if (usrClean) {
