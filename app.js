@@ -7,6 +7,7 @@
 const appState = {
   tasks: [],
   users: [],
+  tovien: [],
   cvluuy: [],
   documents: [],
   currentTab: 'tongquan',
@@ -287,6 +288,7 @@ function onDataLoaded(response, showNotification = false) {
   if (response && response.success) {
     if (response.tasks && response.tasks.length > 0) appState.tasks = response.tasks;
     if (response.users && response.users.length > 0) appState.users = response.users;
+    if (response.tovien && response.tovien.length > 0) appState.tovien = response.tovien;
     if (response.cvluuy && response.cvluuy.length > 0) appState.cvluuy = response.cvluuy;
     if (response.documents && response.documents.length > 0) appState.documents = response.documents;
     
@@ -308,6 +310,7 @@ function onDataLoaded(response, showNotification = false) {
     try {
       localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks));
       localStorage.setItem('TTHT_USERS_CACHE', JSON.stringify(appState.users));
+      localStorage.setItem('TTHT_TOVIEN_CACHE', JSON.stringify(appState.tovien));
       localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy));
       localStorage.setItem('TTHT_DOCUMENTS_CACHE', JSON.stringify(appState.documents));
     } catch(e) {}
@@ -1606,16 +1609,27 @@ function onStatsUserGroupChange() {
 }
 
 function getUserTeamName(personName) {
-  if (!personName || !appState.users || !Array.isArray(appState.users)) return '';
+  if (!personName) return '';
   const pClean = cleanKey(personName);
   if (!pClean) return '';
 
-  let foundUser = appState.users.find(u => {
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    const foundInTovien = appState.tovien.find(row => {
+      const nv = row['Tên NV'] || row['Tên nhân viên'] || row['Họ và tên'] || row['Tên tổ trưởng'];
+      return nv && cleanKey(nv) === pClean;
+    });
+    if (foundInTovien) {
+      const grp = foundInTovien['Tổ hạ tầng'] || foundInTovien['Tổ'] || foundInTovien['Tên tổ'];
+      if (grp && String(grp).trim()) return String(grp).trim();
+    }
+  }
+
+  let foundUser = appState.users && Array.isArray(appState.users) ? appState.users.find(u => {
     const { name } = getUserNameAndGroup(u);
     return cleanKey(name) === pClean;
-  });
+  }) : null;
 
-  if (!foundUser) {
+  if (!foundUser && appState.users && Array.isArray(appState.users)) {
     foundUser = appState.users.find(u => {
       const { name } = getUserNameAndGroup(u);
       const uClean = cleanKey(name);
@@ -2266,6 +2280,13 @@ function populateToTruongFilters() {
   const currentGrp = gSelect.value;
   const groups = new Set();
 
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    appState.tovien.forEach(row => {
+      const grp = row['Tổ hạ tầng'] || row['Tổ'] || row['Tên tổ'] || row['Tổ công tác'];
+      if (grp && String(grp).trim()) groups.add(String(grp).trim());
+    });
+  }
+
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { group } = getUserNameAndGroup(u);
@@ -2301,8 +2322,31 @@ function onToTruongGroupChange() {
   const selGrpClean = cleanKey(selGroup);
   const currentUsr = uSelect.value;
   const teamUsers = new Set();
+  let leaderInfo = null;
 
   if (selGrpClean) {
+    if (appState.tovien && Array.isArray(appState.tovien)) {
+      appState.tovien.forEach(row => {
+        const grp = row['Tổ hạ tầng'] || row['Tổ'] || row['Tên tổ'];
+        const ckG = cleanKey(grp);
+        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG))) {
+          const nvName = row['Tên NV'] || row['Tên nhân viên'] || row['Họ và tên'];
+          const leaderName = row['Tên tổ trưởng'];
+          const leaderCode = row['Mã NV tổ trưởng'];
+
+          if (nvName && String(nvName).trim()) {
+            teamUsers.add(String(nvName).trim());
+          }
+          if (leaderName && String(leaderName).trim()) {
+            teamUsers.add(String(leaderName).trim());
+            if (!leaderInfo) {
+              leaderInfo = { name: leaderName.trim(), code: leaderCode ? String(leaderCode).trim() : '' };
+            }
+          }
+        }
+      });
+    }
+
     if (appState.users && Array.isArray(appState.users)) {
       appState.users.forEach(u => {
         const { name, group } = getUserNameAndGroup(u);
@@ -2324,11 +2368,32 @@ function onToTruongGroupChange() {
       });
     }
   } else {
+    if (appState.tovien && Array.isArray(appState.tovien)) {
+      appState.tovien.forEach(row => {
+        const nv = row['Tên NV'] || row['Tên nhân viên'] || row['Họ và tên'];
+        const leader = row['Tên tổ trưởng'];
+        if (nv && String(nv).trim()) teamUsers.add(String(nv).trim());
+        if (leader && String(leader).trim()) teamUsers.add(String(leader).trim());
+      });
+    }
     if (appState.users && Array.isArray(appState.users)) {
       appState.users.forEach(u => {
         const { name } = getUserNameAndGroup(u);
         if (name) teamUsers.add(name);
       });
+    }
+  }
+
+  const leaderBanner = document.getElementById('totruong-leader-info-banner');
+  if (leaderBanner) {
+    if (selGroup && leaderInfo) {
+      leaderBanner.style.display = 'inline-flex';
+      leaderBanner.innerHTML = `<i class="fa-solid fa-user-tie" style="color:#00c897; margin-right:6px;"></i> <strong>Tổ trưởng:</strong>&nbsp;<span style="color:#38bdf8; font-weight:700;">${escapeHtml(leaderInfo.name)}</span> ${leaderInfo.code ? `<span style="color:#94a3b8; font-weight:normal; margin-left:4px;">(${escapeHtml(leaderInfo.code)})</span>` : ''} <span style="margin:0 10px; opacity:0.3;">|</span> <i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
+    } else if (selGroup) {
+      leaderBanner.style.display = 'inline-flex';
+      leaderBanner.innerHTML = `<i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
+    } else {
+      leaderBanner.style.display = 'none';
     }
   }
 
