@@ -391,7 +391,10 @@ function loadToTruongBackup() {
             // Update debug banner with error details
             const banner = document.getElementById('totruong-debug-banner');
             if (banner) {
-              banner.innerHTML = `⚠️ Backup load thất bại. Response: ${JSON.stringify(res).substring(0, 200)}. <button onclick="appState._toTruongBackupTriggered=false; loadToTruongBackup(); this.textContent='Đang tải...'" style="background:#ef4444;color:white;border:none;padding:2px 10px;border-radius:4px;cursor:pointer;margin-left:8px;">Thử lại</button>`;
+              const sheetInfo = res.sheetNames ? '📋 Sheets: ' + res.sheetNames.join(', ') : '';
+              const sheetNameUsed = res.sheetName ? '📄 Found: "' + res.sheetName + '"' : '❌ Sheet NOT FOUND';
+              const errMsg = res.error || 'data rỗng';
+              banner.innerHTML = `⚠️ ${sheetNameUsed}. ${errMsg}. ${sheetInfo}. <button onclick="appState._toTruongBackupTriggered=false; loadToTruongBackup(); this.textContent='Đang tải...'" style="background:#ef4444;color:white;border:none;padding:2px 10px;border-radius:4px;cursor:pointer;margin-left:8px;">Thử lại</button>`;
             }
           }
         })

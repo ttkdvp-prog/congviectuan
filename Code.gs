@@ -143,12 +143,84 @@ function getInitialData(forceRefresh) {
 // Can be called independently as a backup when getInitialData doesn't include it
 function getToTruongSheetData() {
   try {
-    const data = getSheetDataAsObjects('totruonggiaoviec');
-    Logger.log('getToTruongSheetData: loaded ' + data.length + ' records');
-    if (data.length > 0) {
-      Logger.log('getToTruongSheetData keys: ' + JSON.stringify(Object.keys(data[0])));
+    const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
+    const allSheets = ss.getSheets();
+    const allSheetNames = allSheets.map(s => s.getName());
+    Logger.log('ALL SHEET NAMES: ' + JSON.stringify(allSheetNames));
+    
+    // Try multiple name variants
+    const nameVariants = [
+      'totruonggiaoviec',
+      'totruonggiaoviẹc',
+      'totruonggiaovịec', 
+      'tổ trưởng giao việc',
+      'Totruonggiaoviec',
+      'TotruongGiaoviec'
+    ];
+    
+    let foundSheet = null;
+    
+    // Try exact matches first
+    for (const name of nameVariants) {
+      foundSheet = ss.getSheetByName(name);
+      if (foundSheet) {
+        Logger.log('Found sheet by exact name: ' + name);
+        break;
+      }
     }
-    return { success: true, data: data };
+    
+    // If not found, try fuzzy contains match on all sheets
+    if (!foundSheet) {
+      for (let i = 0; i < allSheets.length; i++) {
+        const sName = allSheets[i].getName().toLowerCase();
+        // Check if sheet name contains 'totruong' and 'giao' or 'viec'
+        if (sName.includes('totruong') || (sName.includes('truong') && sName.includes('giao'))) {
+          foundSheet = allSheets[i];
+          Logger.log('Found sheet by fuzzy match: ' + allSheets[i].getName());
+          break;
+        }
+      }
+    }
+    
+    if (!foundSheet) {
+      Logger.log('Sheet NOT FOUND! Available sheets: ' + JSON.stringify(allSheetNames));
+      return { success: true, data: [], sheetNames: allSheetNames, error: 'Sheet not found. Available: ' + allSheetNames.join(', ') };
+    }
+    
+    // Read data from found sheet
+    const data = foundSheet.getDataRange().getValues();
+    Logger.log('Sheet "' + foundSheet.getName() + '" has ' + data.length + ' rows');
+    
+    if (data.length < 2) {
+      return { success: true, data: [], sheetName: foundSheet.getName(), rows: data.length };
+    }
+    
+    const headers = data[0].map(h => String(h).trim());
+    Logger.log('Headers: ' + JSON.stringify(headers));
+    
+    const result = [];
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const isRowEmpty = row.every(cell => cell === "" || cell === null || cell === undefined);
+      if (isRowEmpty) continue;
+      const obj = {};
+      headers.forEach((h, idx) => {
+        let val = row[idx];
+        if (val instanceof Date) {
+          val = Utilities.formatDate(val, ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+        }
+        obj[h] = val;
+      });
+      result.push(obj);
+    }
+    
+    Logger.log('getToTruongSheetData: loaded ' + result.length + ' records from "' + foundSheet.getName() + '"');
+    if (result.length > 0) {
+      Logger.log('First record keys: ' + JSON.stringify(Object.keys(result[0])));
+      Logger.log('First record: ' + JSON.stringify(result[0]));
+    }
+    
+    return { success: true, data: result, sheetName: foundSheet.getName() };
   } catch(e) {
     Logger.log('getToTruongSheetData error: ' + e);
     return { success: false, error: e.toString(), data: [] };
