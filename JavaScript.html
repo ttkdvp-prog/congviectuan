@@ -568,11 +568,22 @@ function handleModalGroupChange(selectedGroup) {
   const chuTriInput = document.getElementById('task-chutri-input');
   if (!chuTriInput) return;
 
+  // Immediately populate from cache first for responsiveness
+  populateDropdownFromCache(selectedGroup);
+
+  // Then fetch fresh data from backend for real-time sync
+  if (selectedGroup) {
+    fetchFreshTeamMembers(selectedGroup);
+  }
+}
+
+// Populate dropdown from cached appState data (instant, offline-capable)
+function populateDropdownFromCache(selectedGroup) {
   const filteredUsers = new Set();
   const selGrpClean = cleanKey(selectedGroup);
 
   if (selGrpClean) {
-    // Pull employees from tovien (most reliable for team members)
+    // Pull employees from tovien
     if (appState.tovien && Array.isArray(appState.tovien)) {
       let lastGroup = '';
       appState.tovien.forEach(row => {
@@ -598,20 +609,6 @@ function handleModalGroupChange(selectedGroup) {
         }
       });
     }
-
-    // Pull from totruonggiaoviec data
-    if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
-      appState.totruonggiaoviec.forEach(t => {
-        const tg = getToTruongTaskGroup(t);
-        const ckTg = cleanKey(tg);
-        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg))) {
-          const rName = getTaskEmpRName(t);
-          const cName = getTaskEmpCName(t);
-          if (rName) rName.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
-          if (cName) cName.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
-        }
-      });
-    }
   }
 
   if (!selGrpClean || filteredUsers.size === 0) {
@@ -634,6 +631,76 @@ function handleModalGroupChange(selectedGroup) {
   if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
   appState.dropdownData.chutri = sortedUsers;
   appState.dropdownData.phoihop = sortedUsers;
+}
+
+// Fetch fresh team members from Google Sheets (real-time sync)
+function fetchFreshTeamMembers(groupName) {
+  const fetchUrl = appState.apiUrl;
+  
+  if (appState.isGAS) {
+    try {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success && res.members && res.members.length > 0) {
+            applyFreshTeamMembers(res, groupName);
+          }
+        })
+        .withFailureHandler(function(err) {
+          console.warn('[fetchFreshTeamMembers] GAS call failed:', err);
+        })
+        .getTeamMembers(groupName);
+    } catch(e) {
+      console.warn('[fetchFreshTeamMembers] Error:', e);
+    }
+  } else if (fetchUrl) {
+    const url = fetchUrl + '?action=getTeamMembers&group=' + encodeURIComponent(groupName) + '&t=' + new Date().getTime();
+    fetch(url)
+      .then(res => res.json())
+      .then(res => {
+        if (res && res.success && res.members && res.members.length > 0) {
+          applyFreshTeamMembers(res, groupName);
+        }
+      })
+      .catch(err => console.warn('[fetchFreshTeamMembers] Fetch failed:', err));
+  }
+}
+
+// Apply fresh team members from backend response to dropdowns
+function applyFreshTeamMembers(res, groupName) {
+  const freshUsers = new Set();
+  
+  // Add all members
+  res.members.forEach(m => {
+    if (m.name) freshUsers.add(m.name);
+  });
+  
+  // Add leader
+  if (res.leader && res.leader.name) {
+    freshUsers.add(res.leader.name);
+  }
+  
+  const sortedUsers = Array.from(freshUsers).sort();
+  
+  if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
+  
+  // Only update if the user is still on the same group
+  const currentGroupInput = document.getElementById('task-tochutri-input')?.value || '';
+  if (cleanKey(currentGroupInput) === cleanKey(groupName)) {
+    appState.dropdownData.chutri = sortedUsers;
+    appState.dropdownData.phoihop = sortedUsers;
+    
+    console.log('[fetchFreshTeamMembers] ✅ Updated dropdowns with', sortedUsers.length, 'fresh members for', groupName);
+    
+    // If a dropdown is currently open, refresh it
+    const chuTriDropdown = document.getElementById('dropdown-chutri');
+    const phoiHopDropdown = document.getElementById('dropdown-phoihop');
+    if (chuTriDropdown && chuTriDropdown.style.display !== 'none') {
+      filterCustomDropdown('chutri', document.getElementById('task-chutri-input')?.value || '');
+    }
+    if (phoiHopDropdown && phoiHopDropdown.style.display !== 'none') {
+      filterCustomDropdown('phoihop', document.getElementById('task-phoihop-input')?.value || '');
+    }
+  }
 }
 
 /* CUSTOM SEARCHABLE DROPDOWN JS ENGINE */

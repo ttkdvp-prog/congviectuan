@@ -24,6 +24,10 @@ function doGet(e) {
   if (action === 'getToTruongSheetData') {
     return createJsonResponse(getToTruongSheetData());
   }
+  if (action === 'getTeamMembers') {
+    const groupName = e.parameter.group || '';
+    return createJsonResponse(getTeamMembers(groupName));
+  }
   return HtmlService.createTemplateFromFile('index')
     .evaluate()
     .setTitle('TTHT Tasks - Quản Lý Công Việc & Hồ Sơ')
@@ -224,6 +228,73 @@ function getToTruongSheetData() {
   } catch(e) {
     Logger.log('getToTruongSheetData error: ' + e);
     return { success: false, error: e.toString(), data: [] };
+  }
+}
+
+// Real-time team members lookup - reads fresh data from tovien sheet
+// Called when user opens modal and selects a group
+function getTeamMembers(groupName) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = getSheetFlexible(ss, SHEETS.TOVIEN);
+    if (!sheet) return { success: true, members: [], leader: null };
+    
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return { success: true, members: [], leader: null };
+    
+    const headers = data[0].map(h => String(h).trim());
+    
+    // Find column indices for group, employee name, employee code, leader name, leader code
+    let colGroup = -1, colEmpName = -1, colEmpCode = -1, colLeaderName = -1, colLeaderCode = -1;
+    headers.forEach((h, idx) => {
+      const cl = String(h).toLowerCase().replace(/\s+/g, '');
+      if (cl.includes('tổ') || cl.includes('to') || cl === 'tên tổ' || cl === 'tento') colGroup = idx;
+      if (cl.includes('tênthànhviên') || cl.includes('tenthanhvien') || cl.includes('tên nhân viên') || cl.includes('tennhanvien') || cl === 'tên thành viên') colEmpName = idx;
+      if (cl.includes('mãthànhviên') || cl.includes('mathanhvien') || cl.includes('mã nhân viên') || cl.includes('manhanvien') || cl === 'mã thành viên') colEmpCode = idx;
+      if (cl.includes('tổtrưởng') || cl.includes('totruong') || cl.includes('tên tổ trưởng') || cl.includes('tentotruong')) colLeaderName = idx;
+      if (cl.includes('mãtổtrưởng') || cl.includes('matotruong') || cl.includes('mã tổ trưởng')) colLeaderCode = idx;
+    });
+    
+    // If column detection fails, try by index (typical: col0=group, col1=leaderName, col2=leaderCode, col3=empName, col4=empCode)
+    if (colGroup === -1) colGroup = 0;
+    if (colLeaderName === -1 && headers.length > 1) colLeaderName = 1;
+    if (colLeaderCode === -1 && headers.length > 2) colLeaderCode = 2;
+    if (colEmpName === -1 && headers.length > 3) colEmpName = 3;
+    if (colEmpCode === -1 && headers.length > 4) colEmpCode = 4;
+    
+    const members = [];
+    let leader = null;
+    let currentGroup = '';
+    const cleanGroupInput = String(groupName).toLowerCase().replace(/[^a-zàáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ0-9]/g, '');
+    
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const grpVal = String(row[colGroup] || '').trim();
+      if (grpVal) currentGroup = grpVal;
+      
+      const cleanGrp = String(currentGroup).toLowerCase().replace(/[^a-zàáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ0-9]/g, '');
+      
+      if (!groupName || cleanGrp.includes(cleanGroupInput) || cleanGroupInput.includes(cleanGrp)) {
+        const empName = colEmpName >= 0 ? String(row[colEmpName] || '').trim() : '';
+        const empCode = colEmpCode >= 0 ? String(row[colEmpCode] || '').trim() : '';
+        const ldrName = colLeaderName >= 0 ? String(row[colLeaderName] || '').trim() : '';
+        const ldrCode = colLeaderCode >= 0 ? String(row[colLeaderCode] || '').trim() : '';
+        
+        if (empName) {
+          members.push({ name: empName, code: empCode, group: currentGroup });
+        }
+        
+        if (ldrName && (!leader || leader.name !== ldrName)) {
+          leader = { name: ldrName, code: ldrCode, group: currentGroup };
+        }
+      }
+    }
+    
+    Logger.log('getTeamMembers(' + groupName + '): found ' + members.length + ' members, leader: ' + (leader ? leader.name : 'none'));
+    return { success: true, members: members, leader: leader, group: groupName };
+  } catch(e) {
+    Logger.log('getTeamMembers error: ' + e);
+    return { success: false, error: e.toString(), members: [], leader: null };
   }
 }
 
