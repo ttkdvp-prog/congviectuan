@@ -2372,36 +2372,36 @@ function getTaskLeaderCode(task) {
   return task['Mã NV (A)'] || task['Mã người giao việc'] || task['Mã NV tổ trưởng'] || '';
 }
 
-function getTaskEmpRName(task) {
-  if (!task || typeof task !== 'object') return '';
-  const exactR = getExactValueByKeyPattern(task, ['Tên NV (R)', 'Tên NV R', 'tennvr']);
-  if (exactR) return exactR;
-  if (task['Tên NV (R)']) return String(task['Tên NV (R)']).trim();
-  return '';
+function getTaskEmpRName(t) {
+  if (!t || typeof t !== 'object') return '';
+  if (t['Tên NV (R)'] !== undefined && t['Tên NV (R)'] !== null && String(t['Tên NV (R)']).trim() !== '') {
+    return String(t['Tên NV (R)']).trim();
+  }
+  return getExactValueByKeyPattern(t, ['Tên NV (R)', 'Tên NV R', 'tennvr']);
 }
 
-function getTaskEmpRCode(task) {
-  if (!task || typeof task !== 'object') return '';
-  const exactR = getExactValueByKeyPattern(task, ['Mã NV (R)', 'Mã NV R', 'manvr']);
-  if (exactR) return exactR;
-  if (task['Mã NV (R)']) return String(task['Mã NV (R)']).trim();
-  return '';
+function getTaskEmpRCode(t) {
+  if (!t || typeof t !== 'object') return '';
+  if (t['Mã NV (R)'] !== undefined && t['Mã NV (R)'] !== null && String(t['Mã NV (R)']).trim() !== '') {
+    return String(t['Mã NV (R)']).trim();
+  }
+  return getExactValueByKeyPattern(t, ['Mã NV (R)', 'Mã NV R', 'manvr']);
 }
 
-function getTaskEmpCName(task) {
-  if (!task || typeof task !== 'object') return '';
-  const exactC = getExactValueByKeyPattern(task, ['Tên NV (C)', 'Tên NV C', 'tennvc']);
-  if (exactC) return exactC;
-  if (task['Tên NV (C)']) return String(task['Tên NV (C)']).trim();
-  return '';
+function getTaskEmpCName(t) {
+  if (!t || typeof t !== 'object') return '';
+  if (t['Tên NV (C)'] !== undefined && t['Tên NV (C)'] !== null && String(t['Tên NV (C)']).trim() !== '') {
+    return String(t['Tên NV (C)']).trim();
+  }
+  return getExactValueByKeyPattern(t, ['Tên NV (C)', 'Tên NV C', 'tennvc']);
 }
 
-function getTaskEmpCCode(task) {
-  if (!task || typeof task !== 'object') return '';
-  const exactC = getExactValueByKeyPattern(task, ['Mã NV (C)', 'Mã NV C', 'manvc']);
-  if (exactC) return exactC;
-  if (task['Mã NV (C)']) return String(task['Mã NV (C)']).trim();
-  return '';
+function getTaskEmpCCode(t) {
+  if (!t || typeof t !== 'object') return '';
+  if (t['Mã NV (C)'] !== undefined && t['Mã NV (C)'] !== null && String(t['Mã NV (C)']).trim() !== '') {
+    return String(t['Mã NV (C)']).trim();
+  }
+  return getExactValueByKeyPattern(t, ['Mã NV (C)', 'Mã NV C', 'manvc']);
 }
 
 function formatEmpNameWithCode(name, code) {
@@ -2459,23 +2459,21 @@ function isLeaderUser(userName) {
 }
 
 function getToTruongTasks() {
-  const source = (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec) && appState.totruonggiaoviec.length > 0)
-    ? appState.totruonggiaoviec
-    : appState.tasks;
+  if (!appState.totruonggiaoviec || !Array.isArray(appState.totruonggiaoviec) || appState.totruonggiaoviec.length === 0) {
+    return [];
+  }
 
-  if (!source || !Array.isArray(source)) return [];
-
-  return source.map(t => {
+  return appState.totruonggiaoviec.map(t => {
     const title = t['Tiêu đề'] || t['Tiêu đề công việc'] || '';
     const desc = t['Mô tả'] || t['Mô tả công việc'] || '';
 
-    const leaderName = getTaskLeaderName(t) || getTaskAssignee(t);
+    const leaderName = getTaskLeaderName(t);
     const leaderCode = getTaskLeaderCode(t);
 
-    const empRName = getTaskEmpRName(t) || (getTaskAssignee(t) !== leaderName ? getTaskAssignee(t) : '');
+    const empRName = getTaskEmpRName(t);
     const empRCode = getTaskEmpRCode(t);
 
-    const empCName = getTaskEmpCName(t) || getTaskCollaborator(t);
+    const empCName = getTaskEmpCName(t);
     const empCCode = getTaskEmpCCode(t);
 
     const toChuTri = getToTruongTaskGroup(t);
@@ -2496,7 +2494,7 @@ function getToTruongTasks() {
       'Mã NV (R)': empRCode,
       'Tên NV (C)': empCName,
       'Mã NV (C)': empCCode,
-      'Người chủ trì': empRName || leaderName,
+      'Người chủ trì': empRName,
       'Người phối hợp': empCName,
       'Tổ chủ trì': toChuTri,
       'Tổ': toChuTri,
