@@ -2150,39 +2150,36 @@ function openTaskModal(taskId = null) {
     refreshTovienFromSheet();
     
     if (taskId) {
-      const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
+      let task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
+      if (!task && appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+        task = appState.totruonggiaoviec.find(t => String(t.ID || t.id) === String(taskId));
+      }
       if (task) {
         if (document.getElementById('modal-task-title')) document.getElementById('modal-task-title').innerText = 'Chỉnh Sửa Công Việc #' + taskId;
         if (document.getElementById('task-id')) document.getElementById('task-id').value = task.ID || task.id;
-        if (document.getElementById('task-title-input')) document.getElementById('task-title-input').value = task['Tiêu đề'] || '';
-        if (document.getElementById('task-desc-input')) document.getElementById('task-desc-input').value = task['Mô tả'] || '';
+        if (document.getElementById('task-title-input')) document.getElementById('task-title-input').value = task['Tiêu đề công việc'] || task['Tiêu đề'] || '';
+        if (document.getElementById('task-desc-input')) document.getElementById('task-desc-input').value = task['Mô tả công việc'] || task['Mô tả'] || '';
         if (document.getElementById('task-priority-input')) document.getElementById('task-priority-input').value = task['Mức độ ưu tiên'] || 'Trung bình';
         if (document.getElementById('task-status-input')) document.getElementById('task-status-input').value = task['Trạng thái'] || 'Đang thực hiện';
         if (document.getElementById('task-start-input')) document.getElementById('task-start-input').value = task['Ngày bắt đầu'] || '';
-        if (document.getElementById('task-end-input')) document.getElementById('task-end-input').value = task['Ngày kết thúc'] || '';
+        if (document.getElementById('task-end-input')) document.getElementById('task-end-input').value = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
         if (document.getElementById('task-kehoach-input')) document.getElementById('task-kehoach-input').value = task['Kế hoạch'] !== undefined ? task['Kế hoạch'] : 1;
         if (document.getElementById('task-thuchien-input')) document.getElementById('task-thuchien-input').value = task['Thực hiện'] !== undefined ? task['Thực hiện'] : 0;
         
-        const grp = getTaskGroup(task);
+        const grp = task['Tổ'] || getTaskGroup(task);
         const toSelect = document.getElementById('task-tochutri-input');
         if (toSelect) toSelect.value = grp;
         handleModalGroupChange(grp);
 
         const chuTriSelect = document.getElementById('task-chutri-input');
-        const assigneeName = getTaskAssignee(task);
+        const assigneeName = getTaskEmpRName(task) || getTaskAssignee(task);
         if (chuTriSelect) {
-          if (assigneeName && !Array.from(chuTriSelect.options).some(o => o.value === assigneeName)) {
-            chuTriSelect.innerHTML += `<option value="${escapeHtml(assigneeName)}">${escapeHtml(assigneeName)}</option>`;
-          }
           chuTriSelect.value = assigneeName;
         }
 
         const phoiHopSelect = document.getElementById('task-phoihop-input');
-        const collabName = getTaskCollaborator(task);
+        const collabName = getTaskEmpCName(task) || getTaskCollaborator(task);
         if (phoiHopSelect) {
-          if (collabName && !Array.from(phoiHopSelect.options).some(o => o.value === collabName)) {
-            phoiHopSelect.innerHTML += `<option value="${escapeHtml(collabName)}">${escapeHtml(collabName)}</option>`;
-          }
           phoiHopSelect.value = collabName;
         }
 
@@ -2257,7 +2254,7 @@ function handleTaskFormSubmit(e) {
   const chuTriName = document.getElementById('task-chutri-input')?.value || '';
   const phoiHopName = document.getElementById('task-phoihop-input')?.value || '';
 
-  const isToTruongTab = appState.currentTab === 'totruong';
+  const isToTruongTab = appState.currentTab === 'totruong' || appState.currentTab === 'totruonggiaoviec';
 
   if (isToTruongTab) {
     // === SAVE TO totruonggiaoviec sheet ===
@@ -2281,7 +2278,9 @@ function handleTaskFormSubmit(e) {
       id: newId,
       'ID': newId,
       'Tiêu đề': titleVal,
+      'Tiêu đề công việc': titleVal,
       'Mô tả': descVal,
+      'Mô tả công việc': descVal,
       'Trạng thái': statusVal,
       'Tổ': toChuTriInput,
       'Tên NV (A)': leaderName,
@@ -2292,6 +2291,7 @@ function handleTaskFormSubmit(e) {
       'Mã NV (C)': '',
       'Ngày bắt đầu': startVal,
       'Ngày kết thúc': endVal,
+      'Hạn hoàn thành': endVal,
       'Kế hoạch': kehoachVal,
       'Thực hiện': thuchienVal,
       'Tiến độ (%)': Number(document.getElementById('task-progress-input')?.value || 0),
@@ -2300,6 +2300,7 @@ function handleTaskFormSubmit(e) {
     };
 
     // Update local state (totruonggiaoviec)
+    if (!appState.totruonggiaoviec) appState.totruonggiaoviec = [];
     const existingIdx = appState.totruonggiaoviec.findIndex(t => String(t.ID || t.id) === String(newId));
     if (existingIdx >= 0) {
       appState.totruonggiaoviec[existingIdx] = { ...appState.totruonggiaoviec[existingIdx], ...payload };
@@ -2309,6 +2310,7 @@ function handleTaskFormSubmit(e) {
 
     try { localStorage.setItem('TTHT_TOTRUONGGIAOVIEC_CACHE', JSON.stringify(appState.totruonggiaoviec)); } catch(e) {}
 
+    clearTaskCaches();
     populateSelects();
     renderActiveTab();
     closeModal('modal-task');
