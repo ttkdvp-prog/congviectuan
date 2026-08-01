@@ -2465,24 +2465,30 @@ function isLeaderUser(userName) {
 }
 
 function getToTruongTasks() {
-  if (!appState.totruonggiaoviec || !Array.isArray(appState.totruonggiaoviec) || appState.totruonggiaoviec.length === 0) {
-    console.warn('[getToTruongTasks] appState.totruonggiaoviec is EMPTY. Length:', appState.totruonggiaoviec ? appState.totruonggiaoviec.length : 'null');
+  // Determine data source
+  const hasTTGV = appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec) && appState.totruonggiaoviec.length > 0;
+  const source = hasTTGV ? appState.totruonggiaoviec : appState.tasks;
+
+  if (!source || !Array.isArray(source) || source.length === 0) {
+    console.warn('[getToTruongTasks] NO DATA available. totruonggiaoviec:', 
+      appState.totruonggiaoviec ? appState.totruonggiaoviec.length : 'null',
+      'tasks:', appState.tasks ? appState.tasks.length : 'null');
     return [];
   }
 
-  // Debug: log the raw keys and first record so we can see exactly what's coming from the sheet
-  if (appState.totruonggiaoviec.length > 0) {
-    const sample = appState.totruonggiaoviec[0];
-    const keys = Object.keys(sample);
-    console.log('[getToTruongTasks] RAW DATA KEYS:', JSON.stringify(keys));
-    console.log('[getToTruongTasks] RAW FIRST RECORD:', JSON.stringify(sample));
+  console.log('[getToTruongTasks] Using source:', hasTTGV ? 'totruonggiaoviec' : 'congviec(fallback)', 'Records:', source.length);
+
+  // Debug: log raw keys from first record
+  if (source.length > 0) {
+    const sample = source[0];
+    console.log('[getToTruongTasks] FIRST RECORD KEYS:', JSON.stringify(Object.keys(sample)));
+    console.log('[getToTruongTasks] FIRST RECORD VALUES:', JSON.stringify(sample));
   }
 
-  return appState.totruonggiaoviec.map(t => {
-    // Read ALL keys from the raw object to find R and C columns by key pattern
+  return source.map(t => {
+    // Scan ALL keys to find R, C, A, Tổ columns by cleanKey matching
     const allKeys = Object.keys(t);
     
-    // Find exact key names for R and C columns
     let rNameKey = '', rCodeKey = '', cNameKey = '', cCodeKey = '';
     let aNameKey = '', aCodeKey = '', toKey = '';
     
@@ -2500,13 +2506,15 @@ function getToTruongTasks() {
     const title = t['Tiêu đề'] || t['Tiêu đề công việc'] || '';
     const desc = t['Mô tả'] || t['Mô tả công việc'] || '';
 
-    // Read DIRECTLY from the discovered key names
+    // A column: leader / tổ trưởng
     const leaderName = aNameKey ? String(t[aNameKey] || '').trim() : getTaskLeaderName(t);
     const leaderCode = aCodeKey ? String(t[aCodeKey] || '').trim() : getTaskLeaderCode(t);
 
-    const empRName = rNameKey ? String(t[rNameKey] || '').trim() : '';
+    // R column: ONLY read from totruonggiaoviec data, NEVER from congviec
+    const empRName = rNameKey ? String(t[rNameKey] || '').trim() : (hasTTGV ? '' : getTaskAssignee(t));
     const empRCode = rCodeKey ? String(t[rCodeKey] || '').trim() : '';
 
+    // C column: ONLY read from totruonggiaoviec data, NEVER from congviec
     const empCName = cNameKey ? String(t[cNameKey] || '').trim() : '';
     const empCCode = cCodeKey ? String(t[cCodeKey] || '').trim() : '';
 
@@ -2528,7 +2536,7 @@ function getToTruongTasks() {
       'Mã NV (R)': empRCode,
       'Tên NV (C)': empCName,
       'Mã NV (C)': empCCode,
-      'Người chủ trì': empRName,
+      'Người chủ trì': empRName || leaderName,
       'Người phối hợp': empCName,
       'Tổ chủ trì': toChuTri,
       'Tổ': toChuTri,

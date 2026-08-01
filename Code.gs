@@ -101,31 +101,36 @@ function ensureTaskHeaders(sheet) {
 }
 
 function getInitialData(forceRefresh) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
-    
-    let taskSheet = ss.getSheetByName(SHEETS.TASKS);
+  const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
+  
+  let tasks = [], users = [], cvluuy = [], documents = [], tovien = [], totruonggiaoviec = [];
+  
+  try { 
+    let taskSheet = getSheetFlexible(ss, SHEETS.TASKS);
     if (taskSheet) ensureTaskHeaders(taskSheet);
+    tasks = getSheetDataAsObjects(SHEETS.TASKS); 
+  } catch(e) { Logger.log('Error loading tasks: ' + e); }
+  
+  try { users = getSheetDataAsObjects(SHEETS.USERS); } catch(e) { Logger.log('Error loading users: ' + e); }
+  try { cvluuy = getSheetDataAsObjects(SHEETS.CVLUUY); } catch(e) { Logger.log('Error loading cvluuy: ' + e); }
+  try { documents = getSheetDataAsObjects(SHEETS.DOCUMENTS); } catch(e) { Logger.log('Error loading documents: ' + e); }
+  try { tovien = getSheetDataAsObjects(SHEETS.TOVIEN); } catch(e) { Logger.log('Error loading tovien: ' + e); }
+  try { totruonggiaoviec = getSheetDataAsObjects(SHEETS.TOTRUONGGIAOVIEC); } catch(e) { Logger.log('Error loading totruonggiaoviec: ' + e); }
 
-    const tasks = getSheetDataAsObjects(SHEETS.TASKS);
-    const users = getSheetDataAsObjects(SHEETS.USERS);
-    const cvluuy = getSheetDataAsObjects(SHEETS.CVLUUY);
-    const documents = getSheetDataAsObjects(SHEETS.DOCUMENTS);
-    const tovien = getSheetDataAsObjects(SHEETS.TOVIEN);
-    const totruonggiaoviec = getSheetDataAsObjects(SHEETS.TOTRUONGGIAOVIEC);
-
-    return {
-      success: true,
-      tasks: tasks,
-      users: users,
-      cvluuy: cvluuy,
-      documents: documents,
-      tovien: tovien,
-      totruonggiaoviec: totruonggiaoviec
-    };
-  } catch (err) {
-    return { success: false, error: err.toString() };
+  Logger.log('Data loaded - tasks:' + tasks.length + ' users:' + users.length + ' tovien:' + tovien.length + ' totruonggiaoviec:' + totruonggiaoviec.length);
+  if (totruonggiaoviec.length > 0) {
+    Logger.log('totruonggiaoviec first record keys: ' + JSON.stringify(Object.keys(totruonggiaoviec[0])));
   }
+
+  return {
+    success: true,
+    tasks: tasks,
+    users: users,
+    cvluuy: cvluuy,
+    documents: documents,
+    tovien: tovien,
+    totruonggiaoviec: totruonggiaoviec
+  };
 }
 
 function getSheetFlexible(ss, targetName) {
