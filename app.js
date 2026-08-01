@@ -2816,7 +2816,7 @@ function renderToTruongTaskList() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="16" style="text-align:center; padding:30px; color:var(--text-muted);">Không tìm thấy công việc nào phù hợp với bộ lọc Tổ trưởng.</td>
+        <td colspan="15" style="text-align:center; padding:30px; color:var(--text-muted);">Không tìm thấy công việc nào phù hợp với bộ lọc Tổ trưởng.</td>
       </tr>
     `;
     return;
@@ -2856,7 +2856,6 @@ function renderToTruongTaskList() {
       <td class="col-desc-cell">${escapeHtml(t['Mô tả công việc'] || t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
       <td>${formatEmpNameWithCode(empName, empCode)}</td>
-      <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
       <td>${formatPhoiHopWithCode(phoiHopName, phoiHopCode)}</td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(t['Ngày kết thúc'] || t['Hạn hoàn thành'])}</td>
