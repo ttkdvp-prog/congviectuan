@@ -2374,65 +2374,34 @@ function getTaskLeaderCode(task) {
 
 function getTaskEmpRName(task) {
   if (!task || typeof task !== 'object') return '';
-
   const exactR = getExactValueByKeyPattern(task, ['Tên NV (R)', 'Tên NV R', 'tennvr']);
   if (exactR) return exactR;
   if (task['Tên NV (R)']) return String(task['Tên NV (R)']).trim();
-
-  const exactNV = getExactValueByKeyPattern(task, ['Tên NV', 'tennv']);
-  if (exactNV) return exactNV;
-
-  const leaderName = getTaskLeaderName(task);
-  const chuTri = task['Người chủ trì'] || task['Người thực hiện'] || '';
-  if (chuTri && cleanKey(chuTri) !== cleanKey(leaderName)) return String(chuTri).trim();
-
-  const nameA = task['Tên NV (A)'] || '';
-  if (nameA && cleanKey(nameA) !== cleanKey(leaderName)) return String(nameA).trim();
-
-  return chuTri || nameA || '';
+  return '';
 }
 
 function getTaskEmpRCode(task) {
   if (!task || typeof task !== 'object') return '';
-
   const exactR = getExactValueByKeyPattern(task, ['Mã NV (R)', 'Mã NV R', 'manvr']);
   if (exactR) return exactR;
   if (task['Mã NV (R)']) return String(task['Mã NV (R)']).trim();
-
-  const exactCode = getExactValueByKeyPattern(task, ['Mã NV', 'manv']);
-  if (exactCode) return exactCode;
-
-  const leaderCode = getTaskLeaderCode(task);
-  const codeA = task['Mã NV (A)'] || '';
-  if (codeA && cleanKey(codeA) !== cleanKey(leaderCode)) return String(codeA).trim();
-
   return '';
 }
 
 function getTaskEmpCName(task) {
   if (!task || typeof task !== 'object') return '';
-
   const exactC = getExactValueByKeyPattern(task, ['Tên NV (C)', 'Tên NV C', 'tennvc']);
   if (exactC) return exactC;
   if (task['Tên NV (C)']) return String(task['Tên NV (C)']).trim();
-
-  const exactPhoiHop = getExactValueByKeyPattern(task, ['tên người phối hợp (R)', 'Tên người phối hợp (R)', 'Tên người phối hợp', 'tennguoiphoihopr', 'tennguoiphoihop', 'nguoiphoihop']);
-  if (exactPhoiHop) return exactPhoiHop;
-
-  return task['tên người phối hợp (R)'] || task['Tên người phối hợp (R)'] || task['Người phối hợp'] || '';
+  return '';
 }
 
 function getTaskEmpCCode(task) {
   if (!task || typeof task !== 'object') return '';
-
   const exactC = getExactValueByKeyPattern(task, ['Mã NV (C)', 'Mã NV C', 'manvc']);
   if (exactC) return exactC;
   if (task['Mã NV (C)']) return String(task['Mã NV (C)']).trim();
-
-  const exactPhoiHop = getExactValueByKeyPattern(task, ['mã NV người phối hợp (R)', 'Mã NV người phối hợp (R)', 'manguoiphoihopr', 'manvnguoiphoihopr']);
-  if (exactPhoiHop) return exactPhoiHop;
-
-  return task['mã NV người phối hợp (R)'] || task['Mã NV người phối hợp (R)'] || '';
+  return '';
 }
 
 function formatEmpNameWithCode(name, code) {
