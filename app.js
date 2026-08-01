@@ -547,6 +547,23 @@ function handleModalGroupChange(selectedGroup) {
   const selGrpClean = cleanKey(selectedGroup);
 
   if (selGrpClean) {
+    // Pull employees from tovien (most reliable for team members)
+    if (appState.tovien && Array.isArray(appState.tovien)) {
+      let lastGroup = '';
+      appState.tovien.forEach(row => {
+        const info = getTovienRowInfo(row);
+        if (info.group) lastGroup = info.group;
+        else if (lastGroup) info.group = lastGroup;
+        
+        const ckG = cleanKey(info.group);
+        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG))) {
+          if (info.empName) filteredUsers.add(info.empName);
+          if (info.leaderName) filteredUsers.add(info.leaderName);
+        }
+      });
+    }
+
+    // Pull from users data
     if (appState.users && Array.isArray(appState.users)) {
       appState.users.forEach(u => {
         const { name, group } = getUserNameAndGroup(u);
@@ -557,14 +574,16 @@ function handleModalGroupChange(selectedGroup) {
       });
     }
 
-    if (appState.tasks && Array.isArray(appState.tasks)) {
-      appState.tasks.forEach(t => {
-        if (!t || typeof t !== 'object') return;
-        const tg = getTaskGroup(t);
+    // Pull from totruonggiaoviec data
+    if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+      appState.totruonggiaoviec.forEach(t => {
+        const tg = getToTruongTaskGroup(t);
         const ckTg = cleanKey(tg);
-        const a = getTaskAssignee(t);
-        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
-          a.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg))) {
+          const rName = getTaskEmpRName(t);
+          const cName = getTaskEmpCName(t);
+          if (rName) rName.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+          if (cName) cName.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
         }
       });
     }
@@ -577,23 +596,19 @@ function handleModalGroupChange(selectedGroup) {
         if (name) filteredUsers.add(name);
       });
     }
-    if (appState.tasks && Array.isArray(appState.tasks)) {
-      appState.tasks.forEach(t => {
-        if (!t || typeof t !== 'object') return;
-        const a = getTaskAssignee(t);
-        const c = getTaskCollaborator(t);
-        if (a && a !== 'Chưa gán') {
-          a.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
-        }
-        if (c && String(c).trim()) {
-          c.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
-        }
+    if (appState.tovien && Array.isArray(appState.tovien)) {
+      appState.tovien.forEach(row => {
+        const info = getTovienRowInfo(row);
+        if (info.empName) filteredUsers.add(info.empName);
+        if (info.leaderName) filteredUsers.add(info.leaderName);
       });
     }
   }
 
+  const sortedUsers = Array.from(filteredUsers).sort();
   if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
-  appState.dropdownData.chutri = Array.from(filteredUsers).sort();
+  appState.dropdownData.chutri = sortedUsers;
+  appState.dropdownData.phoihop = sortedUsers;
 }
 
 /* CUSTOM SEARCHABLE DROPDOWN JS ENGINE */
