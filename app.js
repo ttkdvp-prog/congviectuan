@@ -2630,9 +2630,27 @@ function renderToTruongTaskList() {
     }
 
     if (usrClean) {
-      const taskLeader = t['Tên tổ trưởng'] || t['Mã NV tổ trưởng'] || '';
-      const matchLeader = cleanKey(taskLeader).includes(usrClean) || usrClean.includes(cleanKey(taskLeader));
-      if (!matchLeader) return false;
+      const leaderKey = cleanKey(t['Tên tổ trưởng'] || t['Mã NV tổ trưởng'] || '');
+      const chuTriKey = cleanKey(chuTri);
+      const phoiHopKey = cleanKey(phoiHop);
+
+      let isMatch = false;
+      if (leaderKey) {
+        if (leaderKey.includes(usrClean) || usrClean.includes(leaderKey)) {
+          isMatch = true;
+        }
+      }
+      if (!isMatch && chuTriKey) {
+        if (chuTriKey.includes(usrClean) || usrClean.includes(chuTriKey)) {
+          isMatch = true;
+        }
+      }
+      if (!isMatch && phoiHopKey) {
+        if (phoiHopKey.includes(usrClean) || usrClean.includes(phoiHopKey)) {
+          isMatch = true;
+        }
+      }
+      if (!isMatch) return false;
     }
 
     return true;
