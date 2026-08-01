@@ -298,10 +298,12 @@ function onDataLoaded(response, showNotification = false) {
     if (response.totruonggiaoviec && response.totruonggiaoviec.length > 0) {
       appState.totruonggiaoviec = response.totruonggiaoviec;
       console.log('[onDataLoaded] totruonggiaoviec loaded:', response.totruonggiaoviec.length, 'records');
-      console.log('[onDataLoaded] totruonggiaoviec FIRST RECORD KEYS:', JSON.stringify(Object.keys(response.totruonggiaoviec[0])));
-      console.log('[onDataLoaded] totruonggiaoviec FIRST RECORD:', JSON.stringify(response.totruonggiaoviec[0]));
+      if (response.totruonggiaoviec[0]) {
+        console.log('[onDataLoaded] totruonggiaoviec KEYS:', JSON.stringify(Object.keys(response.totruonggiaoviec[0])));
+      }
     } else {
-      console.warn('[onDataLoaded] totruonggiaoviec is EMPTY or missing from response');
+      console.warn('[onDataLoaded] totruonggiaoviec MISSING from main response. Triggering backup load...');
+      loadToTruongBackup();
     }
     if (response.cvluuy && response.cvluuy.length > 0) appState.cvluuy = response.cvluuy;
     if (response.documents && response.documents.length > 0) appState.documents = response.documents;
@@ -334,6 +336,54 @@ function onDataLoaded(response, showNotification = false) {
     renderActiveTab();
     if (showNotification) {
       showToast('Đồng bộ dữ liệu thành công!', 'success');
+    }
+  }
+}
+
+// Backup function: independently load totruonggiaoviec data
+function loadToTruongBackup() {
+  console.log('[loadToTruongBackup] Attempting independent load of totruonggiaoviec...');
+  
+  if (appState.isGAS) {
+    // Try dedicated function first
+    try {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success && res.data && res.data.length > 0) {
+            appState.totruonggiaoviec = res.data;
+            console.log('[loadToTruongBackup] SUCCESS via getToTruongSheetData:', res.data.length, 'records');
+            if (res.data[0]) console.log('[loadToTruongBackup] KEYS:', JSON.stringify(Object.keys(res.data[0])));
+            try { localStorage.setItem('TTHT_TOTRUONGGIAOVIEC_CACHE', JSON.stringify(res.data)); } catch(e) {}
+            renderActiveTab();
+          } else {
+            console.warn('[loadToTruongBackup] getToTruongSheetData returned empty/failed:', JSON.stringify(res));
+          }
+        })
+        .withFailureHandler(function(err) {
+          console.warn('[loadToTruongBackup] getToTruongSheetData failed (function may not exist in deployed Code.gs):', err);
+        })
+        .getToTruongSheetData();
+    } catch(e) {
+      console.warn('[loadToTruongBackup] Error calling getToTruongSheetData:', e);
+    }
+  } else {
+    const fetchUrl = appState.apiUrl;
+    if (fetchUrl) {
+      fetch(fetchUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'getToTruongSheetData' })
+      })
+        .then(res => res.json())
+        .then(res => {
+          if (res && res.success && res.data && res.data.length > 0) {
+            appState.totruonggiaoviec = res.data;
+            console.log('[loadToTruongBackup] SUCCESS via fetch:', res.data.length, 'records');
+            try { localStorage.setItem('TTHT_TOTRUONGGIAOVIEC_CACHE', JSON.stringify(res.data)); } catch(e) {}
+            renderActiveTab();
+          }
+        })
+        .catch(err => console.warn('[loadToTruongBackup] Fetch failed:', err));
     }
   }
 }

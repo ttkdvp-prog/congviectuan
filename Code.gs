@@ -49,6 +49,7 @@ function doPost(e) {
     else if (action === 'deleteCvLuuY') result = deleteCvLuuY(payload);
     else if (action === 'saveDocument') result = saveDocument(payload);
     else if (action === 'deleteDocument') result = deleteDocument(payload);
+    else if (action === 'getToTruongSheetData') result = getToTruongSheetData();
 
     return createJsonResponse(result);
   } catch (err) {
@@ -131,6 +132,22 @@ function getInitialData(forceRefresh) {
     tovien: tovien,
     totruonggiaoviec: totruonggiaoviec
   };
+}
+
+// Standalone function to load ONLY totruonggiaoviec sheet data
+// Can be called independently as a backup when getInitialData doesn't include it
+function getToTruongSheetData() {
+  try {
+    const data = getSheetDataAsObjects('totruonggiaoviec');
+    Logger.log('getToTruongSheetData: loaded ' + data.length + ' records');
+    if (data.length > 0) {
+      Logger.log('getToTruongSheetData keys: ' + JSON.stringify(Object.keys(data[0])));
+    }
+    return { success: true, data: data };
+  } catch(e) {
+    Logger.log('getToTruongSheetData error: ' + e);
+    return { success: false, error: e.toString(), data: [] };
+  }
 }
 
 function getSheetFlexible(ss, targetName) {
