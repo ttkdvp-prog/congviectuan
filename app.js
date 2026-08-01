@@ -2517,9 +2517,17 @@ function onToTruongGroupChange() {
     if (selGroup) {
       leaderBanner.style.display = 'inline-flex';
       let leaderItems = [];
-      leadersMap.forEach(l => {
-        leaderItems.push(getLeaderDisplayHtml(l.name, l.code));
-      });
+
+      const selectedSubInfo = getSubLeaderInfo(currentUsr);
+      if (selectedSubInfo) {
+        leaderItems.push(getLeaderDisplayHtml(selectedSubInfo.name, selectedSubInfo.code));
+      } else if (currentUsr) {
+        leaderItems.push(getLeaderDisplayHtml(currentUsr, ''));
+      } else {
+        leadersMap.forEach(l => {
+          leaderItems.push(getLeaderDisplayHtml(l.name, l.code));
+        });
+      }
 
       if (leaderItems.length > 0) {
         leaderBanner.innerHTML = `${leaderItems.join(' <span style="margin:0 8px; opacity:0.3;">|</span> ')} <span style="margin:0 10px; opacity:0.3;">|</span> <i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
@@ -2637,8 +2645,15 @@ function renderToTruongTaskList() {
     const toChuTriName = getTaskGroup(t);
     const phoiHopName = getTaskCollaborator(t);
 
-    const leaderName = t['Tên tổ trưởng'] || '';
-    const leaderCode = t['Mã NV tổ trưởng'] || '';
+    let leaderName = t['Tên tổ trưởng'] || '';
+    let leaderCode = t['Mã NV tổ trưởng'] || '';
+
+    if (!leaderName && selUser) {
+      leaderName = selUser;
+      const sub = getSubLeaderInfo(selUser);
+      if (sub) leaderCode = sub.code;
+    }
+
     const leaderDisplay = getLeaderDisplayHtml(leaderName, leaderCode);
 
     const tr = document.createElement('tr');
