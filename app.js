@@ -2410,6 +2410,30 @@ function populateToTruongFilters() {
   onToTruongGroupChange();
 }
 
+function getSubLeaderInfo(personName) {
+  if (!personName) return null;
+  const ck = cleanKey(personName);
+  if (!ck) return null;
+
+  if (ck.includes('vuthilanphuong') || ck.includes('lanphuong')) {
+    return { title: 'Tổ phó', name: 'Vũ Thị Lan Phương', code: 'VNPT018275' };
+  }
+  if (ck.includes('tongtienmanh') || ck.includes('ngotienmanh') || ck.includes('tienmanh')) {
+    return { title: 'Tổ phó', name: personName.trim(), code: 'VNPT018259' };
+  }
+
+  return null;
+}
+
+function getLeaderDisplayHtml(name, code) {
+  if (!name) return '<span style="color:var(--text-muted); font-size:0.8rem;">-</span>';
+  const subInfo = getSubLeaderInfo(name);
+  if (subInfo) {
+    return `<span style="color:#38bdf8; font-weight:600; font-size:0.82rem;"><i class="fa-solid fa-user-tie" style="margin-right:4px; color:#38bdf8;"></i>Tổ phó: ${escapeHtml(subInfo.name)} ${subInfo.code ? `<span style="font-weight:normal; opacity:0.8;">(${escapeHtml(subInfo.code)})</span>` : ''}</span>`;
+  }
+  return `<span style="color:#00c897; font-weight:600; font-size:0.82rem;"><i class="fa-solid fa-user-tie" style="margin-right:4px; color:#00c897;"></i>Tổ trưởng: ${escapeHtml(name)} ${code ? `<span style="font-weight:normal; opacity:0.8;">(${escapeHtml(code)})</span>` : ''}</span>`;
+}
+
 function onToTruongGroupChange() {
   const gSelect = document.getElementById('totruong-group-select');
   const uSelect = document.getElementById('totruong-user-select');
@@ -2419,7 +2443,7 @@ function onToTruongGroupChange() {
   const selGrpClean = cleanKey(selGroup);
   const currentUsr = uSelect.value;
   const teamUsers = new Set();
-  let leaderInfo = null;
+  const leadersMap = new Map(); // key: cleanKey(name), val: { name, code }
 
   if (selGrpClean) {
     if (appState.tovien && Array.isArray(appState.tovien)) {
@@ -2437,9 +2461,7 @@ function onToTruongGroupChange() {
           if (info.empName) teamUsers.add(info.empName);
           if (info.leaderName) {
             teamUsers.add(info.leaderName);
-            if (!leaderInfo) {
-              leaderInfo = { name: info.leaderName, code: info.leaderCode };
-            }
+            leadersMap.set(cleanKey(info.leaderName), { name: info.leaderName, code: info.leaderCode });
           }
         }
       });
@@ -2458,11 +2480,19 @@ function onToTruongGroupChange() {
     const toTruongTasks = getToTruongTasks();
     if (toTruongTasks && Array.isArray(toTruongTasks)) {
       toTruongTasks.forEach(t => {
-        const tg = getTaskGroup(t);
+        const tg = t['Tổ'] || getTaskGroup(t);
         const ckTg = cleanKey(tg);
-        const a = getTaskAssignee(t);
-        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
-          a.split(',').forEach(n => { if (n.trim()) teamUsers.add(n.trim()); });
+        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg))) {
+          const lName = t['Tên tổ trưởng'] || '';
+          const lCode = t['Mã NV tổ trưởng'] || '';
+          if (lName) {
+            teamUsers.add(lName);
+            leadersMap.set(cleanKey(lName), { name: lName, code: lCode });
+          }
+          const a = getTaskAssignee(t);
+          if (a && a !== 'Chưa gán') {
+            a.split(',').forEach(n => { if (n.trim()) teamUsers.add(n.trim()); });
+          }
         }
       });
     }
@@ -2482,44 +2512,20 @@ function onToTruongGroupChange() {
     }
   }
 
-function getSubLeaderInfo(personName) {
-  if (!personName) return null;
-  const ck = cleanKey(personName);
-  if (!ck) return null;
-
-  if (ck.includes('vuthilanphuong') || ck.includes('lanphuong')) {
-    return { title: 'Tổ phó', name: 'Vũ Thị Lan Phương', code: 'VNPT018275' };
-  }
-  if (ck.includes('tongtienmanh') || ck.includes('ngotienmanh') || ck.includes('tienmanh')) {
-    return { title: 'Tổ phó', name: personName.trim(), code: 'VNPT018259' };
-  }
-
-  return null;
-}
-
   const leaderBanner = document.getElementById('totruong-leader-info-banner');
   if (leaderBanner) {
-    if (selGroup && leaderInfo) {
+    if (selGroup) {
       leaderBanner.style.display = 'inline-flex';
+      let leaderItems = [];
+      leadersMap.forEach(l => {
+        leaderItems.push(getLeaderDisplayHtml(l.name, l.code));
+      });
 
-      let displayLeaderName = leaderInfo.name;
-      let displayLeaderCode = leaderInfo.code;
-      let roleTitle = 'Tổ trưởng';
-
-      const selectedSubLeader = getSubLeaderInfo(currentUsr);
-      const leaderSubLeader = getSubLeaderInfo(displayLeaderName);
-      const activeSubLeader = leaderSubLeader || selectedSubLeader;
-
-      if (activeSubLeader) {
-        roleTitle = activeSubLeader.title;
-        if (selectedSubLeader) displayLeaderName = selectedSubLeader.name;
-        if (activeSubLeader.code) displayLeaderCode = activeSubLeader.code;
+      if (leaderItems.length > 0) {
+        leaderBanner.innerHTML = `${leaderItems.join(' <span style="margin:0 8px; opacity:0.3;">|</span> ')} <span style="margin:0 10px; opacity:0.3;">|</span> <i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
+      } else {
+        leaderBanner.innerHTML = `<i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
       }
-
-      leaderBanner.innerHTML = `<i class="fa-solid fa-user-tie" style="color:#00c897; margin-right:6px;"></i> <strong>${roleTitle}:</strong>&nbsp;<span style="color:#38bdf8; font-weight:700;">${escapeHtml(displayLeaderName)}</span> ${displayLeaderCode ? `<span style="color:#94a3b8; font-weight:normal; margin-left:4px;">(${escapeHtml(displayLeaderCode)})</span>` : ''} <span style="margin:0 10px; opacity:0.3;">|</span> <i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
-    } else if (selGroup) {
-      leaderBanner.style.display = 'inline-flex';
-      leaderBanner.innerHTML = `<i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
     } else {
       leaderBanner.style.display = 'none';
     }
@@ -2631,6 +2637,10 @@ function renderToTruongTaskList() {
     const toChuTriName = getTaskGroup(t);
     const phoiHopName = getTaskCollaborator(t);
 
+    const leaderName = t['Tên tổ trưởng'] || '';
+    const leaderCode = t['Mã NV tổ trưởng'] || '';
+    const leaderDisplay = getLeaderDisplayHtml(leaderName, leaderCode);
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="text-align:center; font-weight:700; color:#38bdf8;">${idx + 1}</td>
@@ -2638,6 +2648,7 @@ function renderToTruongTaskList() {
       <td class="col-desc-cell">${escapeHtml(t['Mô tả công việc'] || t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
       <td>${formatNameList(chuTriName)}</td>
+      <td>${leaderDisplay}</td>
       <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
       <td>${formatNameList(phoiHopName)}</td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
