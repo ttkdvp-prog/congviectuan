@@ -2508,6 +2508,12 @@ function onToTruongGroupChange() {
         }
       });
     }
+    Array.from(teamUsers).forEach(uName => {
+      const sub = getSubLeaderInfo(uName);
+      if (sub) {
+        leadersMap.set(cleanKey(sub.name), { name: sub.name, code: sub.code });
+      }
+    });
   } else {
     if (appState.tovien && Array.isArray(appState.tovien)) {
       appState.tovien.forEach(row => {
