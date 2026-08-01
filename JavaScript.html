@@ -2478,6 +2478,21 @@
       }
     }
 
+  function getSubLeaderInfo(personName) {
+    if (!personName) return null;
+    const ck = cleanKey(personName);
+    if (!ck) return null;
+
+    if (ck.includes('vuthilanphuong') || ck.includes('lanphuong')) {
+      return { title: 'Tổ phó', name: 'Vũ Thị Lan Phương', code: 'VNPT018275' };
+    }
+    if (ck.includes('tongtienmanh') || ck.includes('ngotienmanh') || ck.includes('tienmanh')) {
+      return { title: 'Tổ phó', name: personName.trim(), code: 'VNPT018259' };
+    }
+
+    return null;
+  }
+
     const leaderBanner = document.getElementById('totruong-leader-info-banner');
     if (leaderBanner) {
       if (selGroup && leaderInfo) {
@@ -2487,15 +2502,14 @@
         let displayLeaderCode = leaderInfo.code;
         let roleTitle = 'Tổ trưởng';
 
-        const isLanPhuongLeader = cleanKey(displayLeaderName).includes('vuthilanphuong') || cleanKey(displayLeaderName).includes('lanphuong');
-        const isLanPhuongSelected = currentUsr && (cleanKey(currentUsr).includes('vuthilanphuong') || cleanKey(currentUsr).includes('lanphuong'));
+        const selectedSubLeader = getSubLeaderInfo(currentUsr);
+        const leaderSubLeader = getSubLeaderInfo(displayLeaderName);
+        const activeSubLeader = leaderSubLeader || selectedSubLeader;
 
-        if (isLanPhuongLeader || isLanPhuongSelected) {
-          roleTitle = 'Tổ phó';
-          if (isLanPhuongSelected) {
-            displayLeaderName = 'Vũ Thị Lan Phương';
-          }
-          displayLeaderCode = 'VNPT018275';
+        if (activeSubLeader) {
+          roleTitle = activeSubLeader.title;
+          if (selectedSubLeader) displayLeaderName = selectedSubLeader.name;
+          if (activeSubLeader.code) displayLeaderCode = activeSubLeader.code;
         }
 
         leaderBanner.innerHTML = `<i class="fa-solid fa-user-tie" style="color:#00c897; margin-right:6px;"></i> <strong>${roleTitle}:</strong>&nbsp;<span style="color:#38bdf8; font-weight:700;">${escapeHtml(displayLeaderName)}</span> ${displayLeaderCode ? `<span style="color:#94a3b8; font-weight:normal; margin-left:4px;">(${escapeHtml(displayLeaderCode)})</span>` : ''} <span style="margin:0 10px; opacity:0.3;">|</span> <i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
@@ -2509,8 +2523,8 @@
 
     uSelect.innerHTML = '<option value="">Tất cả nhân viên trong tổ</option>';
     Array.from(teamUsers).sort().forEach(u => {
-      const isLanPhuong = cleanKey(u).includes('vuthilanphuong') || cleanKey(u).includes('lanphuong');
-      const label = isLanPhuong ? 'Tổ phó: Vũ Thị Lan Phương (VNPT018275)' : u;
+      const subInfo = getSubLeaderInfo(u);
+      const label = subInfo ? `${subInfo.title}: ${subInfo.name} (${subInfo.code})` : u;
       uSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(label)}</option>`;
     });
 
