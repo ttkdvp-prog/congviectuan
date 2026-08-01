@@ -1,3 +1,5 @@
+![1785520340676](image/README/1785520340676.png)
+
 # 🚀 Task Management Web App (Quản Lý Công Việc & Hồ Sơ VNPT)
 
 Ứng dụng Web Quản lý Công việc, Hồ sơ & Nhân sự hoàn chỉnh, tối ưu hóa giao diện Single Page Application (SPA) với backend **Google Apps Script & Google Sheets**, giao diện gradient hiện đại **Electric Indigo**, hỗ trợ 3 chế độ xem (Kanban Board Drag & Drop, Danh sách chi tiết, Biểu đồ Gantt Chart).
@@ -6,19 +8,21 @@
 
 ## 📌 1. CẤU TRÚC MÃ NGUỒN (FILES OUTPUT)
 
-| Tệp tin | Mô tả |
-| :--- | :--- |
-| `Code.gs` | Mã nguồn Backend Google Apps Script xử lý ORM Google Sheets, Caching (`CacheService`), Tự động kiểm tra quá hạn, API `doGet`/`doPost`. |
-| `index.html` | Cấu trúc HTML5 SPA chính (Headers, Navigation, Filters, Views, Modals). |
-| `styles.css` / `CSS.html` | Thiết kế giao diện Glassmorphism, Gradient Electric Indigo, Responsive, Kanban & Gantt CSS. |
-| `app.js` / `JavaScript.html` | Logic Frontend (Render UI, Drag & Drop, Gantt Chart Timeline, Tính % tiến độ Subtasks tự động, Filters, Modals CRUD). |
-| `vercel.json` | Cấu hình cho việc Deploy ứng dụng lên Vercel. |
-| `README.md` | Hướng dẫn cài đặt và Triển khai (GAS & Vercel). |
+| Tệp tin                         | Mô tả                                                                                                                                                |
+| :------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Code.gs`                      | Mã nguồn Backend Google Apps Script xử lý ORM Google Sheets, Caching (`CacheService`), Tự động kiểm tra quá hạn, API `doGet`/`doPost`. |
+| `index.html`                   | Cấu trúc HTML5 SPA chính (Headers, Navigation, Filters, Views, Modals).                                                                             |
+| `styles.css` / `CSS.html`    | Thiết kế giao diện Glassmorphism, Gradient Electric Indigo, Responsive, Kanban & Gantt CSS.                                                         |
+| `app.js` / `JavaScript.html` | Logic Frontend (Render UI, Drag & Drop, Gantt Chart Timeline, Tính % tiến độ Subtasks tự động, Filters, Modals CRUD).                           |
+| `vercel.json`                  | Cấu hình cho việc Deploy ứng dụng lên Vercel.                                                                                                    |
+| `README.md`                    | Hướng dẫn cài đặt và Triển khai (GAS & Vercel).                                                                                                |
 
 ---
 
 ## 📊 2. CẤU TRÚC DỮ LIỆU GOOGLE SHEETS
+
 Cơ sở dữ liệu tự động khởi tạo trên Google Sheet `13ggsO-iGlpspavwuBk8g6ZmAqcRsOmE8dZZZl8t_oLE` với 4 bảng:
+
 1. **`congviec`**: `ID`, `Tiêu đề`, `Mô tả`, `Trạng thái`, `Mức độ ưu tiên`, `Ngày bắt đầu`, `Ngày kết thúc`, `Tiến độ (%)`, `Người thực hiện`, `Danh sách công việc con`, `Tệp đính kèm`.
 2. **`Users`**: `ID`, `Tên`, `Tổ`.
 3. **`cvluuy`**: `ID`, `Công việc`, `Mô tả`, `Tổ`, `Ngày bắt đầu`, `Ngày kết thúc`, `Ngày làm xong`, `Trạng thái`, `Ghi chú`.
@@ -48,6 +52,7 @@ Cơ sở dữ liệu tự động khởi tạo trên Google Sheet `13ggsO-iGlpsp
 ## 🌐 4. HƯỚNG DẪN ĐẨY LÊN GITHUB & DEPLOY VERCEL
 
 ### Lệnh đẩy mã nguồn lên GitHub Repo (`https://github.com/ttkdvp-prog/congviectuan`):
+
 ```bash
 git init
 git add .
@@ -58,6 +63,7 @@ git push -u origin main --force
 ```
 
 ### Deploy lên Vercel:
+
 1. Đăng nhập vào [Vercel.com](https://vercel.com).
 2. Nhấn **Add New...** ➔ **Project** ➔ Chọn Repository `ttkdvp-prog/congviectuan`.
 3. Giữ nguyên cấu hình mặc định (Root Directory `./`) và nhấn **Deploy**.
