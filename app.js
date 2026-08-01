@@ -2270,6 +2270,58 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function getTovienRowInfo(row) {
+  let group = '';
+  let leaderName = '';
+  let leaderCode = '';
+  let empName = '';
+  let empCode = '';
+
+  if (!row || typeof row !== 'object') return { group, leaderName, leaderCode, empName, empCode };
+
+  for (let k in row) {
+    const ck = cleanKey(k);
+    const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
+    if (!val) continue;
+
+    if (ck.includes('manvtotruong') || ck.includes('matotruong')) {
+      leaderCode = val;
+    } else if (ck.includes('tentotruong') || ck === 'totruong') {
+      leaderName = val;
+    } else if (ck === 'manv' || ck === 'manhanvien') {
+      empCode = val;
+    } else if (ck === 'tennv' || ck === 'tennhanvien' || ck === 'hovaten') {
+      empName = val;
+    } else if (ck === 'tohatang' || ck === 'tento' || ck === 'to' || ck === 'tochutri') {
+      if (!group) group = val;
+    }
+  }
+
+  if (!group) {
+    for (let k in row) {
+      const ck = cleanKey(k);
+      const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
+      if (val && (ck.includes('to') || ck.includes('donvi')) && !ck.includes('truong') && !ck.includes('vien') && !ck.includes('nv')) {
+        group = val;
+        break;
+      }
+    }
+  }
+
+  if (!empName) {
+    for (let k in row) {
+      const ck = cleanKey(k);
+      const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
+      if (val && (ck.includes('ten') || ck.includes('nhanvien') || ck.includes('nv')) && !ck.includes('totruong') && !ck.includes('to')) {
+        empName = val;
+        break;
+      }
+    }
+  }
+
+  return { group, leaderName, leaderCode, empName, empCode };
+}
+
 /* ==============================================================================
  * TỔ TRƯỞNG GIAO VIỆC ENGINE
  * ============================================================================== */
@@ -2282,8 +2334,8 @@ function populateToTruongFilters() {
 
   if (appState.tovien && Array.isArray(appState.tovien)) {
     appState.tovien.forEach(row => {
-      const grp = row['Tổ hạ tầng'] || row['Tổ'] || row['Tên tổ'] || row['Tổ công tác'];
-      if (grp && String(grp).trim()) groups.add(String(grp).trim());
+      const info = getTovienRowInfo(row);
+      if (info.group) groups.add(info.group);
     });
   }
 
@@ -2327,20 +2379,14 @@ function onToTruongGroupChange() {
   if (selGrpClean) {
     if (appState.tovien && Array.isArray(appState.tovien)) {
       appState.tovien.forEach(row => {
-        const grp = row['Tổ hạ tầng'] || row['Tổ'] || row['Tên tổ'];
-        const ckG = cleanKey(grp);
+        const info = getTovienRowInfo(row);
+        const ckG = cleanKey(info.group);
         if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG))) {
-          const nvName = row['Tên NV'] || row['Tên nhân viên'] || row['Họ và tên'];
-          const leaderName = row['Tên tổ trưởng'];
-          const leaderCode = row['Mã NV tổ trưởng'];
-
-          if (nvName && String(nvName).trim()) {
-            teamUsers.add(String(nvName).trim());
-          }
-          if (leaderName && String(leaderName).trim()) {
-            teamUsers.add(String(leaderName).trim());
+          if (info.empName) teamUsers.add(info.empName);
+          if (info.leaderName) {
+            teamUsers.add(info.leaderName);
             if (!leaderInfo) {
-              leaderInfo = { name: leaderName.trim(), code: leaderCode ? String(leaderCode).trim() : '' };
+              leaderInfo = { name: info.leaderName, code: info.leaderCode };
             }
           }
         }
@@ -2370,10 +2416,9 @@ function onToTruongGroupChange() {
   } else {
     if (appState.tovien && Array.isArray(appState.tovien)) {
       appState.tovien.forEach(row => {
-        const nv = row['Tên NV'] || row['Tên nhân viên'] || row['Họ và tên'];
-        const leader = row['Tên tổ trưởng'];
-        if (nv && String(nv).trim()) teamUsers.add(String(nv).trim());
-        if (leader && String(leader).trim()) teamUsers.add(String(leader).trim());
+        const info = getTovienRowInfo(row);
+        if (info.empName) teamUsers.add(info.empName);
+        if (info.leaderName) teamUsers.add(info.leaderName);
       });
     }
     if (appState.users && Array.isArray(appState.users)) {
@@ -2421,6 +2466,20 @@ function renderToTruongTaskList() {
   const grpClean = cleanKey(selGroup);
   const usrClean = cleanKey(selUser);
 
+  const currentTeamUsers = new Set();
+  if (grpClean) {
+    if (appState.tovien && Array.isArray(appState.tovien)) {
+      appState.tovien.forEach(row => {
+        const info = getTovienRowInfo(row);
+        const ckG = cleanKey(info.group);
+        if (ckG && (ckG.includes(grpClean) || grpClean.includes(ckG))) {
+          if (info.empName) currentTeamUsers.add(cleanKey(info.empName));
+          if (info.leaderName) currentTeamUsers.add(cleanKey(info.leaderName));
+        }
+      });
+    }
+  }
+
   let filtered = appState.tasks.filter(t => {
     const chuTri = getTaskAssignee(t);
     const phoiHop = getTaskCollaborator(t);
@@ -2438,7 +2497,8 @@ function renderToTruongTaskList() {
     if (grpClean) {
       const matchHostGroup = cleanKey(toChuTri).includes(grpClean) || grpClean.includes(cleanKey(toChuTri));
       const matchCollabGroup = cleanKey(toPhoiHop).includes(grpClean) || grpClean.includes(cleanKey(toPhoiHop));
-      if (!matchHostGroup && !matchCollabGroup) return false;
+      const matchMember = currentTeamUsers.has(cleanKey(chuTri));
+      if (!matchHostGroup && !matchCollabGroup && !matchMember) return false;
     }
 
     if (usrClean) {
