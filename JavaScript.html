@@ -291,6 +291,8 @@ function callBackendSilent(action, payload) {
 }
 
 function onDataLoaded(response, showNotification = false) {
+  console.log('[onDataLoaded] Response keys:', response ? Object.keys(response) : 'null');
+  console.log('[onDataLoaded] totruonggiaoviec in response:', response?.totruonggiaoviec ? response.totruonggiaoviec.length + ' records' : 'MISSING');
   if (response && response.success) {
     if (response.tasks && response.tasks.length > 0) appState.tasks = response.tasks;
     if (response.users && response.users.length > 0) appState.users = response.users;
@@ -369,21 +371,40 @@ function loadToTruongBackup() {
   } else {
     const fetchUrl = appState.apiUrl;
     if (fetchUrl) {
-      fetch(fetchUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'getToTruongSheetData' })
-      })
-        .then(res => res.json())
+      const getUrl = fetchUrl + '?action=getToTruongSheetData&t=' + new Date().getTime();
+      console.log('[loadToTruongBackup] Fetching via GET:', getUrl);
+      fetch(getUrl)
         .then(res => {
+          console.log('[loadToTruongBackup] Response status:', res.status);
+          return res.json();
+        })
+        .then(res => {
+          console.log('[loadToTruongBackup] Response data:', JSON.stringify(res).substring(0, 500));
           if (res && res.success && res.data && res.data.length > 0) {
             appState.totruonggiaoviec = res.data;
-            console.log('[loadToTruongBackup] SUCCESS via fetch:', res.data.length, 'records');
+            appState._toTruongBackupTriggered = false; // Reset so it can try again if needed
+            console.log('[loadToTruongBackup] SUCCESS via GET:', res.data.length, 'records');
+            if (res.data[0]) console.log('[loadToTruongBackup] KEYS:', JSON.stringify(Object.keys(res.data[0])));
             try { localStorage.setItem('TTHT_TOTRUONGGIAOVIEC_CACHE', JSON.stringify(res.data)); } catch(e) {}
             renderActiveTab();
+          } else {
+            console.warn('[loadToTruongBackup] Response empty/failed:', JSON.stringify(res));
+            // Update debug banner with error details
+            const banner = document.getElementById('totruong-debug-banner');
+            if (banner) {
+              banner.innerHTML = `⚠️ Backup load thất bại. Response: ${JSON.stringify(res).substring(0, 200)}. <button onclick="appState._toTruongBackupTriggered=false; loadToTruongBackup(); this.textContent='Đang tải...'" style="background:#ef4444;color:white;border:none;padding:2px 10px;border-radius:4px;cursor:pointer;margin-left:8px;">Thử lại</button>`;
+            }
           }
         })
-        .catch(err => console.warn('[loadToTruongBackup] Fetch failed:', err));
+        .catch(err => {
+          console.warn('[loadToTruongBackup] Fetch FAILED:', err);
+          const banner = document.getElementById('totruong-debug-banner');
+          if (banner) {
+            banner.innerHTML = `⚠️ Lỗi kết nối: ${err.message || err}. URL: ${fetchUrl ? 'CÓ' : 'KHÔNG'}. <button onclick="appState._toTruongBackupTriggered=false; loadToTruongBackup(); this.textContent='Đang tải...'" style="background:#ef4444;color:white;border:none;padding:2px 10px;border-radius:4px;cursor:pointer;margin-left:8px;">Thử lại</button>`;
+          }
+        });
+    } else {
+      console.warn('[loadToTruongBackup] No apiUrl configured!');
     }
   }
 }

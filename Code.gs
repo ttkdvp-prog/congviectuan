@@ -21,6 +21,9 @@ function doGet(e) {
   if (action === 'getInitialData') {
     return createJsonResponse(getInitialData(true));
   }
+  if (action === 'getToTruongSheetData') {
+    return createJsonResponse(getToTruongSheetData());
+  }
   return HtmlService.createTemplateFromFile('index')
     .evaluate()
     .setTitle('TTHT Tasks - Quản Lý Công Việc & Hồ Sơ')
