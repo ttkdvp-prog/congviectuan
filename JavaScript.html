@@ -200,11 +200,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Restore local cache for zero-latency initial view on F5 across all devices
   const cachedTasks = localStorage.getItem('TTHT_TASKS_CACHE');
   const cachedUsers = localStorage.getItem('TTHT_USERS_CACHE');
+  const cachedTovien = localStorage.getItem('TTHT_TOVIEN_CACHE');
+  const cachedToTruong = localStorage.getItem('TTHT_TOTRUONGGIAOVIEC_CACHE');
   const cachedCvLuuY = localStorage.getItem('TTHT_CVLUUY_CACHE');
   const cachedDocs = localStorage.getItem('TTHT_DOCUMENTS_CACHE');
 
   if (cachedTasks) { try { appState.tasks = JSON.parse(cachedTasks); } catch(e) {} }
   if (cachedUsers) { try { appState.users = JSON.parse(cachedUsers); } catch(e) {} }
+  if (cachedTovien) { try { appState.tovien = JSON.parse(cachedTovien); } catch(e) {} }
+  if (cachedToTruong) { try { appState.totruonggiaoviec = JSON.parse(cachedToTruong); } catch(e) {} }
   if (cachedCvLuuY) { try { appState.cvluuy = JSON.parse(cachedCvLuuY); } catch(e) {} }
   if (cachedDocs) { try { appState.documents = JSON.parse(cachedDocs); } catch(e) {} }
 
@@ -2331,6 +2335,64 @@ function getTovienRowInfo(row) {
   return { group, leaderName, leaderCode, empName, empCode };
 }
 
+function getTaskLeaderName(task) {
+  if (!task || typeof task !== 'object') return '';
+  for (let k in task) {
+    const ck = cleanKey(k);
+    if (ck === 'tentotruong' || ck === 'totruong' || ck === 'nguoigiaoviec' || ck === 'tennguoigiaoviec') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  for (let k in task) {
+    const ck = cleanKey(k);
+    if (ck.includes('totruong') && !ck.includes('ma')) {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  return task['Tên tổ trưởng'] || '';
+}
+
+function getTaskLeaderCode(task) {
+  if (!task || typeof task !== 'object') return '';
+  for (let k in task) {
+    const ck = cleanKey(k);
+    if (ck === 'manvtotruong' || ck === 'matotruong' || ck === 'manguoigiaoviec') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  return task['Mã NV tổ trưởng'] || '';
+}
+
+function isLeaderUser(userName) {
+  if (!userName) return false;
+  const ck = cleanKey(userName);
+  if (!ck) return false;
+
+  if (getSubLeaderInfo(userName)) return true;
+
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+    for (let i = 0; i < appState.totruonggiaoviec.length; i++) {
+      const lName = getTaskLeaderName(appState.totruonggiaoviec[i]);
+      if (lName && cleanKey(lName) === ck) return true;
+    }
+  }
+
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    for (let i = 0; i < appState.tovien.length; i++) {
+      const info = getTovienRowInfo(appState.tovien[i]);
+      if (info.leaderName && cleanKey(info.leaderName) === ck) return true;
+    }
+  }
+
+  return false;
+}
+
 function getToTruongTasks() {
   if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec) && appState.totruonggiaoviec.length > 0) {
     return appState.totruonggiaoviec.map(t => {
@@ -2339,8 +2401,8 @@ function getToTruongTasks() {
       const chuTri = t['Tên NV (A)'] || t['Tên NV'] || t['Người chủ trì'] || t['Người thực hiện'] || '';
       const toChuTri = t['Tổ'] || t['Tổ chủ trì'] || t['Tổ hạ tầng'] || '';
       const phoiHop = t['Tên người phối hợp (R)'] || t['Tên người phối hợp'] || t['Người phối hợp'] || '';
-      const leaderName = t['Tên tổ trưởng'] || '';
-      const leaderCode = t['Mã NV tổ trưởng'] || '';
+      const leaderName = getTaskLeaderName(t);
+      const leaderCode = getTaskLeaderCode(t);
 
       return {
         ...t,
@@ -2631,27 +2693,29 @@ function renderToTruongTaskList() {
     }
 
     if (usrClean) {
-      const leaderKey = cleanKey(t['Tên tổ trưởng'] || t['Mã NV tổ trưởng'] || '');
-      const chuTriKey = cleanKey(chuTri);
-      const phoiHopKey = cleanKey(phoiHop);
+      const isLeader = isLeaderUser(selUser);
+      if (isLeader) {
+        // STRICT FILTER FOR LEADER / SUB-LEADER: Match Column E (Tên tổ trưởng) / Column D (Mã NV tổ trưởng) ONLY!
+        const taskLeaderName = cleanKey(getTaskLeaderName(t) || t['Tên tổ trưởng'] || '');
+        const taskLeaderCode = cleanKey(getTaskLeaderCode(t) || t['Mã NV tổ trưởng'] || '');
 
-      let isMatch = false;
-      if (leaderKey) {
-        if (leaderKey.includes(usrClean) || usrClean.includes(leaderKey)) {
-          isMatch = true;
-        }
+        const subInfo = getSubLeaderInfo(selUser);
+        const subCode = subInfo ? cleanKey(subInfo.code) : '';
+
+        const matchName = taskLeaderName && (taskLeaderName.includes(usrClean) || usrClean.includes(taskLeaderName));
+        const matchCode = subCode && taskLeaderCode && taskLeaderCode === subCode;
+
+        if (!matchName && !matchCode) return false;
+      } else {
+        // REGULAR TEAM MEMBER FILTER: Match Assignee (Tên NV A / Người chủ trì) or Collaborator (Người phối hợp)
+        const chuTriClean = cleanKey(chuTri);
+        const phoiHopClean = cleanKey(phoiHop);
+
+        const matchChuTri = chuTriClean && (chuTriClean.includes(usrClean) || usrClean.includes(chuTriClean));
+        const matchPhoiHop = phoiHopClean && (phoiHopClean.includes(usrClean) || usrClean.includes(phoiHopClean));
+
+        if (!matchChuTri && !matchPhoiHop) return false;
       }
-      if (!isMatch && chuTriKey) {
-        if (chuTriKey.includes(usrClean) || usrClean.includes(chuTriKey)) {
-          isMatch = true;
-        }
-      }
-      if (!isMatch && phoiHopKey) {
-        if (phoiHopKey.includes(usrClean) || usrClean.includes(phoiHopKey)) {
-          isMatch = true;
-        }
-      }
-      if (!isMatch) return false;
     }
 
     return true;
