@@ -2459,21 +2459,25 @@ function isLeaderUser(userName) {
 }
 
 function getToTruongTasks() {
-  if (!appState.totruonggiaoviec || !Array.isArray(appState.totruonggiaoviec) || appState.totruonggiaoviec.length === 0) {
-    return [];
-  }
+  const source = (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec) && appState.totruonggiaoviec.length > 0)
+    ? appState.totruonggiaoviec
+    : appState.tasks;
 
-  return appState.totruonggiaoviec.map(t => {
+  if (!source || !Array.isArray(source)) return [];
+
+  const isFromToTruongSheet = (source === appState.totruonggiaoviec);
+
+  return source.map(t => {
     const title = t['Tiêu đề'] || t['Tiêu đề công việc'] || '';
     const desc = t['Mô tả'] || t['Mô tả công việc'] || '';
 
-    const leaderName = getTaskLeaderName(t);
+    const leaderName = getTaskLeaderName(t) || (isFromToTruongSheet ? '' : getTaskAssignee(t));
     const leaderCode = getTaskLeaderCode(t);
 
-    const empRName = getTaskEmpRName(t);
+    const empRName = getTaskEmpRName(t) || (isFromToTruongSheet ? '' : (getTaskAssignee(t) !== leaderName ? getTaskAssignee(t) : ''));
     const empRCode = getTaskEmpRCode(t);
 
-    const empCName = getTaskEmpCName(t);
+    const empCName = getTaskEmpCName(t) || (isFromToTruongSheet ? '' : getTaskCollaborator(t));
     const empCCode = getTaskEmpCCode(t);
 
     const toChuTri = getToTruongTaskGroup(t);
@@ -2494,7 +2498,7 @@ function getToTruongTasks() {
       'Mã NV (R)': empRCode,
       'Tên NV (C)': empCName,
       'Mã NV (C)': empCCode,
-      'Người chủ trì': empRName,
+      'Người chủ trì': empRName || leaderName,
       'Người phối hợp': empCName,
       'Tổ chủ trì': toChuTri,
       'Tổ': toChuTri,

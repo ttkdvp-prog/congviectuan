@@ -128,9 +128,26 @@ function getInitialData(forceRefresh) {
   }
 }
 
+function getSheetFlexible(ss, targetName) {
+  if (!ss || !targetName) return null;
+  let sheet = ss.getSheetByName(targetName);
+  if (sheet) return sheet;
+
+  const cleanTarget = String(targetName).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const sheets = ss.getSheets();
+  for (let i = 0; i < sheets.length; i++) {
+    const sName = sheets[i].getName();
+    const cleanS = String(sName).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanS === cleanTarget || cleanS.includes(cleanTarget) || cleanTarget.includes(cleanS)) {
+      return sheets[i];
+    }
+  }
+  return null;
+}
+
 function getSheetDataAsObjects(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(sheetName);
+  const sheet = getSheetFlexible(ss, sheetName);
   if (!sheet) return [];
   
   const data = sheet.getDataRange().getValues();
