@@ -294,7 +294,14 @@ function onDataLoaded(response, showNotification = false) {
     if (response.tasks && response.tasks.length > 0) appState.tasks = response.tasks;
     if (response.users && response.users.length > 0) appState.users = response.users;
     if (response.tovien && response.tovien.length > 0) appState.tovien = response.tovien;
-    if (response.totruonggiaoviec && response.totruonggiaoviec.length > 0) appState.totruonggiaoviec = response.totruonggiaoviec;
+    if (response.totruonggiaoviec && response.totruonggiaoviec.length > 0) {
+      appState.totruonggiaoviec = response.totruonggiaoviec;
+      console.log('[onDataLoaded] totruonggiaoviec loaded:', response.totruonggiaoviec.length, 'records');
+      console.log('[onDataLoaded] totruonggiaoviec FIRST RECORD KEYS:', JSON.stringify(Object.keys(response.totruonggiaoviec[0])));
+      console.log('[onDataLoaded] totruonggiaoviec FIRST RECORD:', JSON.stringify(response.totruonggiaoviec[0]));
+    } else {
+      console.warn('[onDataLoaded] totruonggiaoviec is EMPTY or missing from response');
+    }
     if (response.cvluuy && response.cvluuy.length > 0) appState.cvluuy = response.cvluuy;
     if (response.documents && response.documents.length > 0) appState.documents = response.documents;
     
@@ -2459,23 +2466,51 @@ function isLeaderUser(userName) {
 
 function getToTruongTasks() {
   if (!appState.totruonggiaoviec || !Array.isArray(appState.totruonggiaoviec) || appState.totruonggiaoviec.length === 0) {
+    console.warn('[getToTruongTasks] appState.totruonggiaoviec is EMPTY. Length:', appState.totruonggiaoviec ? appState.totruonggiaoviec.length : 'null');
     return [];
   }
 
+  // Debug: log the raw keys and first record so we can see exactly what's coming from the sheet
+  if (appState.totruonggiaoviec.length > 0) {
+    const sample = appState.totruonggiaoviec[0];
+    const keys = Object.keys(sample);
+    console.log('[getToTruongTasks] RAW DATA KEYS:', JSON.stringify(keys));
+    console.log('[getToTruongTasks] RAW FIRST RECORD:', JSON.stringify(sample));
+  }
+
   return appState.totruonggiaoviec.map(t => {
+    // Read ALL keys from the raw object to find R and C columns by key pattern
+    const allKeys = Object.keys(t);
+    
+    // Find exact key names for R and C columns
+    let rNameKey = '', rCodeKey = '', cNameKey = '', cCodeKey = '';
+    let aNameKey = '', aCodeKey = '', toKey = '';
+    
+    for (const k of allKeys) {
+      const ck = cleanKey(k);
+      if (ck === 'tennvr') rNameKey = k;
+      else if (ck === 'manvr') rCodeKey = k;
+      else if (ck === 'tennvc') cNameKey = k;
+      else if (ck === 'manvc') cCodeKey = k;
+      else if (ck === 'tennva') aNameKey = k;
+      else if (ck === 'manva') aCodeKey = k;
+      else if (ck === 'to') toKey = k;
+    }
+    
     const title = t['Tiêu đề'] || t['Tiêu đề công việc'] || '';
     const desc = t['Mô tả'] || t['Mô tả công việc'] || '';
 
-    const leaderName = getTaskLeaderName(t);
-    const leaderCode = getTaskLeaderCode(t);
+    // Read DIRECTLY from the discovered key names
+    const leaderName = aNameKey ? String(t[aNameKey] || '').trim() : getTaskLeaderName(t);
+    const leaderCode = aCodeKey ? String(t[aCodeKey] || '').trim() : getTaskLeaderCode(t);
 
-    const empRName = getTaskEmpRName(t);
-    const empRCode = getTaskEmpRCode(t);
+    const empRName = rNameKey ? String(t[rNameKey] || '').trim() : '';
+    const empRCode = rCodeKey ? String(t[rCodeKey] || '').trim() : '';
 
-    const empCName = getTaskEmpCName(t);
-    const empCCode = getTaskEmpCCode(t);
+    const empCName = cNameKey ? String(t[cNameKey] || '').trim() : '';
+    const empCCode = cCodeKey ? String(t[cCodeKey] || '').trim() : '';
 
-    const toChuTri = getToTruongTaskGroup(t);
+    const toChuTri = toKey ? String(t[toKey] || '').trim() : getToTruongTaskGroup(t);
 
     return {
       ...t,
@@ -2857,10 +2892,10 @@ function renderToTruongTaskList() {
     const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
     const ghiChu = t['Ghi chú'] || '';
     const ngayLamXong = t['Ngày làm xong'] || '';
-    const empRName = getTaskEmpRName(t);
-    const empRCode = getTaskEmpRCode(t);
-    const empCName = getTaskEmpCName(t);
-    const empCCode = getTaskEmpCCode(t);
+    const empRName = t['Tên NV (R)'] || '';
+    const empRCode = t['Mã NV (R)'] || '';
+    const empCName = t['Tên NV (C)'] || '';
+    const empCCode = t['Mã NV (C)'] || '';
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
