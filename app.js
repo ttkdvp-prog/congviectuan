@@ -2434,6 +2434,18 @@ function getLeaderDisplayHtml(name, code) {
   return `<span style="color:#00c897; font-weight:600; font-size:0.82rem;"><i class="fa-solid fa-user-tie" style="margin-right:4px; color:#00c897;"></i>Tổ trưởng: ${escapeHtml(name)} ${code ? `<span style="font-weight:normal; opacity:0.8;">(${escapeHtml(code)})</span>` : ''}</span>`;
 }
 
+function filterToTruongByLeader(leaderName) {
+  const uSelect = document.getElementById('totruong-user-select');
+  if (!uSelect) return;
+
+  if (cleanKey(uSelect.value) === cleanKey(leaderName)) {
+    uSelect.value = '';
+  } else {
+    uSelect.value = leaderName;
+  }
+  onToTruongGroupChange();
+}
+
 function onToTruongGroupChange() {
   const gSelect = document.getElementById('totruong-group-select');
   const uSelect = document.getElementById('totruong-user-select');
@@ -2516,21 +2528,32 @@ function onToTruongGroupChange() {
   if (leaderBanner) {
     if (selGroup) {
       leaderBanner.style.display = 'inline-flex';
-      let leaderItems = [];
+      let leaderPills = [];
 
-      const selectedSubInfo = getSubLeaderInfo(currentUsr);
-      if (selectedSubInfo) {
-        leaderItems.push(getLeaderDisplayHtml(selectedSubInfo.name, selectedSubInfo.code));
-      } else if (currentUsr) {
-        leaderItems.push(getLeaderDisplayHtml(currentUsr, ''));
-      } else {
-        leadersMap.forEach(l => {
-          leaderItems.push(getLeaderDisplayHtml(l.name, l.code));
-        });
-      }
+      leadersMap.forEach(l => {
+        const sub = getSubLeaderInfo(l.name);
+        const roleTitle = sub ? sub.title : 'Tổ trưởng';
+        const roleColor = sub ? '#38bdf8' : '#00c897';
+        const isSelected = cleanKey(currentUsr) === cleanKey(l.name);
 
-      if (leaderItems.length > 0) {
-        leaderBanner.innerHTML = `${leaderItems.join(' <span style="margin:0 8px; opacity:0.3;">|</span> ')} <span style="margin:0 10px; opacity:0.3;">|</span> <i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
+        leaderPills.push(`
+          <span class="leader-badge-pill ${isSelected ? 'active-pill' : ''}" 
+                onclick="filterToTruongByLeader('${escapeHtml(l.name)}')" 
+                style="cursor:pointer; padding:5px 12px; border-radius:20px; background:${isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255,255,255,0.06)'}; border:1px solid ${roleColor}; color:${roleColor}; font-weight:600; font-size:0.85rem; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s; user-select:none;"
+                title="Bấm để xem các công việc do ${roleTitle} ${escapeHtml(l.name)} giao">
+            <i class="fa-solid fa-user-tie"></i> <strong>${roleTitle}:</strong>&nbsp;${escapeHtml(l.name)} ${l.code ? `<span style="font-weight:normal; opacity:0.8;">(${escapeHtml(l.code)})</span>` : ''}
+          </span>
+        `);
+      });
+
+      if (leaderPills.length > 0) {
+        leaderBanner.innerHTML = `
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; width:100%;">
+            ${leaderPills.join('')}
+            <span style="margin:0 4px; opacity:0.3;">|</span>
+            <span style="color:#e2e8f0;"><i class="fa-solid fa-users" style="color:#a78bfa; margin-right:4px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span></span>
+          </div>
+        `;
       } else {
         leaderBanner.innerHTML = `<i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
       }
@@ -2541,9 +2564,7 @@ function onToTruongGroupChange() {
 
   uSelect.innerHTML = '<option value="">Tất cả nhân viên trong tổ</option>';
   Array.from(teamUsers).sort().forEach(u => {
-    const subInfo = getSubLeaderInfo(u);
-    const label = subInfo ? `${subInfo.title}: ${subInfo.name} (${subInfo.code})` : u;
-    uSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(label)}</option>`;
+    uSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
   });
 
   if (currentUsr && Array.from(teamUsers).includes(currentUsr)) {
@@ -2603,9 +2624,11 @@ function renderToTruongTaskList() {
     }
 
     if (usrClean) {
+      const taskLeader = t['Tên tổ trưởng'] || '';
+      const matchLeader = cleanKey(taskLeader).includes(usrClean) || usrClean.includes(cleanKey(taskLeader));
       const matchChuTri = cleanKey(chuTri).includes(usrClean) || usrClean.includes(cleanKey(chuTri));
       const matchPhoiHop = cleanKey(phoiHop).includes(usrClean) || usrClean.includes(cleanKey(phoiHop));
-      if (!matchChuTri && !matchPhoiHop) return false;
+      if (!matchLeader && !matchChuTri && !matchPhoiHop) return false;
     }
 
     return true;
