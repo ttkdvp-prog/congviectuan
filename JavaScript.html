@@ -2463,13 +2463,17 @@ function getToTruongTasks() {
     return appState.totruonggiaoviec.map(t => {
       const title = t['Tiêu đề'] || t['Tiêu đề công việc'] || '';
       const desc = t['Mô tả'] || t['Mô tả công việc'] || '';
-      const chuTri = getTaskEmpName(t);
-      const chuTriCode = getTaskEmpCode(t);
-      const toChuTri = getToTruongTaskGroup(t);
-      const phoiHop = getTaskPhoiHopName(t);
-      const phoiHopCode = getTaskPhoiHopCode(t);
+
       const leaderName = getTaskLeaderName(t);
       const leaderCode = getTaskLeaderCode(t);
+
+      const empRName = getTaskEmpRName(t);
+      const empRCode = getTaskEmpRCode(t);
+
+      const empCName = getTaskEmpCName(t);
+      const empCCode = getTaskEmpCCode(t);
+
+      const toChuTri = getToTruongTaskGroup(t);
 
       return {
         ...t,
@@ -2477,21 +2481,27 @@ function getToTruongTasks() {
         'Tiêu đề': title,
         'Mô tả công việc': desc,
         'Mô tả': desc,
-        'Người chủ trì': chuTri,
-        'Tên NV (A)': chuTri,
+        'Tên NV (A)': leaderName,
+        'Mã NV (A)': leaderCode,
+        'Tên người giao việc': leaderName,
+        'Tên tổ trưởng': leaderName,
+        'Mã người giao việc': leaderCode,
+        'Mã NV tổ trưởng': leaderCode,
+        'Tên NV (R)': empRName,
+        'Mã NV (R)': empRCode,
+        'Tên NV (C)': empCName,
+        'Mã NV (C)': empCCode,
+        'Người chủ trì': empRName,
+        'Người phối hợp': empCName,
         'Tổ chủ trì': toChuTri,
         'Tổ': toChuTri,
-        'Người phối hợp': phoiHop,
-        'Tên người phối hợp (R)': phoiHop,
-        'Tên tổ trưởng': leaderName,
-        'Mã NV tổ trưởng': leaderCode,
         'Hạn hoàn thành': t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '',
         'Ngày kết thúc': t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '',
         'Tiến độ (%)': t['Tiến độ'] !== undefined ? t['Tiến độ'] : (t['Tiến độ (%)'] || 0)
       };
     });
   }
-  return appState.tasks;
+  return [];
 }
 
 /* ==============================================================================
@@ -2773,21 +2783,21 @@ function renderToTruongTaskList() {
     }
 
     if (usrClean) {
-      const leaderNameClean = cleanKey(getTaskLeaderName(t) || t['Tên người giao việc'] || t['Tên tổ trưởng'] || '');
-      const leaderCodeClean = cleanKey(getTaskLeaderCode(t) || t['Mã người giao việc'] || t['Mã NV tổ trưởng'] || '');
+      const leaderNameClean = cleanKey(getTaskLeaderName(t));
+      const leaderCodeClean = cleanKey(getTaskLeaderCode(t));
 
-      const empNameClean = cleanKey(getTaskEmpName(t) || t['Tên NV (A)'] || t['Người chủ trì'] || '');
-      const empCodeClean = cleanKey(getTaskEmpCode(t) || t['Mã NV (A)'] || '');
+      const empRNameClean = cleanKey(getTaskEmpRName(t));
+      const empRCodeClean = cleanKey(getTaskEmpRCode(t));
 
-      const phoiHopNameClean = cleanKey(getTaskPhoiHopName(t) || t['tên người phối hợp (R)'] || t['Người phối hợp'] || '');
-      const phoiHopCodeClean = cleanKey(getTaskPhoiHopCode(t) || t['mã NV người phối hợp (R)'] || '');
+      const empCNameClean = cleanKey(getTaskEmpCName(t));
+      const empCCodeClean = cleanKey(getTaskEmpCCode(t));
 
       const subInfo = getSubLeaderInfo(selUser);
       const subCode = subInfo ? cleanKey(subInfo.code) : '';
 
       let match = false;
 
-      // 1. Leader match (người giao việc)
+      // 1. Leader match (A)
       if (leaderNameClean && (leaderNameClean.includes(usrClean) || usrClean.includes(leaderNameClean))) {
         match = true;
       }
@@ -2795,19 +2805,19 @@ function renderToTruongTaskList() {
         match = true;
       }
 
-      // 2. Assignee match (Tên NV A)
-      if (!match && empNameClean && (empNameClean.includes(usrClean) || usrClean.includes(empNameClean))) {
+      // 2. Assignee match (R)
+      if (!match && empRNameClean && (empRNameClean.includes(usrClean) || usrClean.includes(empRNameClean))) {
         match = true;
       }
-      if (!match && empCodeClean && (empCodeClean.includes(usrClean) || usrClean.includes(empCodeClean))) {
+      if (!match && empRCodeClean && (empRCodeClean.includes(usrClean) || usrClean.includes(empRCodeClean))) {
         match = true;
       }
 
-      // 3. Collaborator match (tên người phối hợp R)
-      if (!match && phoiHopNameClean && (phoiHopNameClean.includes(usrClean) || usrClean.includes(phoiHopNameClean))) {
+      // 3. Collaborator match (C)
+      if (!match && empCNameClean && (empCNameClean.includes(usrClean) || usrClean.includes(empCNameClean))) {
         match = true;
       }
-      if (!match && phoiHopCodeClean && (phoiHopCodeClean.includes(usrClean) || usrClean.includes(phoiHopCodeClean))) {
+      if (!match && empCCodeClean && (empCCodeClean.includes(usrClean) || usrClean.includes(empCCodeClean))) {
         match = true;
       }
 
