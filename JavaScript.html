@@ -2709,15 +2709,6 @@ function onToTruongGroupChange() {
     }
   }
 
-  // Default to the first Leader (Tổ trưởng) if no user is selected for this group
-  let activeUser = currentUsr;
-  if (selGroup && !activeUser && leadersMap.size > 0) {
-    const firstLeader = leadersMap.values().next().value;
-    if (firstLeader && firstLeader.name) {
-      activeUser = firstLeader.name;
-    }
-  }
-
   const leaderBanner = document.getElementById('totruong-leader-info-banner');
   if (leaderBanner) {
     if (selGroup) {
@@ -2728,7 +2719,7 @@ function onToTruongGroupChange() {
         const sub = getSubLeaderInfo(l.name);
         const roleTitle = sub ? sub.title : 'Tổ trưởng';
         const roleColor = sub ? '#38bdf8' : '#00c897';
-        const isSelected = cleanKey(activeUser) === cleanKey(l.name);
+        const isSelected = cleanKey(currentUsr) === cleanKey(l.name);
 
         leaderPills.push(`
           <span class="leader-badge-pill ${isSelected ? 'active-pill' : ''}" 
@@ -2761,8 +2752,8 @@ function onToTruongGroupChange() {
     uSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
   });
 
-  if (activeUser && Array.from(teamUsers).includes(activeUser)) {
-    uSelect.value = activeUser;
+  if (currentUsr && Array.from(teamUsers).includes(currentUsr)) {
+    uSelect.value = currentUsr;
   }
 
   renderToTruongTaskList();
@@ -2836,53 +2827,45 @@ function renderToTruongTaskList() {
     }
 
     if (usrClean) {
-      const isLeader = isLeaderUser(selUser);
-      if (isLeader) {
-        // FLEXIBLE MATCH FOR LEADER / SUB-LEADER
-        const targetClean = cleanKey(selUser);
-        const subInfo = getSubLeaderInfo(selUser);
-        const targetCode = subInfo ? cleanKey(subInfo.code) : '';
+      const leaderNameClean = cleanKey(getTaskLeaderName(t) || t['Tên người giao việc'] || t['Tên tổ trưởng'] || '');
+      const leaderCodeClean = cleanKey(getTaskLeaderCode(t) || t['Mã người giao việc'] || t['Mã NV tổ trưởng'] || '');
 
-        const rawLeaderName = getTaskLeaderName(t) || t['Tên tổ trưởng'] || '';
-        const rawLeaderCode = getTaskLeaderCode(t) || t['Mã NV tổ trưởng'] || '';
+      const empNameClean = cleanKey(getTaskEmpName(t) || t['Tên NV (A)'] || t['Người chủ trì'] || '');
+      const empCodeClean = cleanKey(getTaskEmpCode(t) || t['Mã NV (A)'] || '');
 
-        const taskLeaderClean = cleanKey(rawLeaderName);
-        const taskCodeClean = cleanKey(rawLeaderCode);
+      const phoiHopNameClean = cleanKey(getTaskPhoiHopName(t) || t['tên người phối hợp (R)'] || t['Người phối hợp'] || '');
+      const phoiHopCodeClean = cleanKey(getTaskPhoiHopCode(t) || t['mã NV người phối hợp (R)'] || '');
 
-        let match = false;
+      const subInfo = getSubLeaderInfo(selUser);
+      const subCode = subInfo ? cleanKey(subInfo.code) : '';
 
-        if (taskLeaderClean && targetClean) {
-          if (taskLeaderClean.includes(targetClean) || targetClean.includes(taskLeaderClean)) {
-            match = true;
-          }
-        }
+      let match = false;
 
-        if (!match && taskCodeClean) {
-          if (targetCode && taskCodeClean === targetCode) {
-            match = true;
-          } else if (targetClean && taskCodeClean.includes(targetClean)) {
-            match = true;
-          }
-        }
-
-        if (!match && subInfo) {
-          const subNameClean = cleanKey(subInfo.name);
-          if (taskLeaderClean && (taskLeaderClean.includes(subNameClean) || subNameClean.includes(taskLeaderClean))) {
-            match = true;
-          }
-        }
-
-        if (!match) return false;
-      } else {
-        // REGULAR TEAM MEMBER FILTER: Match Assignee (Tên NV A / Người chủ trì) or Collaborator (Người phối hợp)
-        const chuTriClean = cleanKey(chuTri);
-        const phoiHopClean = cleanKey(phoiHop);
-
-        const matchChuTri = chuTriClean && (chuTriClean.includes(usrClean) || usrClean.includes(chuTriClean));
-        const matchPhoiHop = phoiHopClean && (phoiHopClean.includes(usrClean) || usrClean.includes(phoiHopClean));
-
-        if (!matchChuTri && !matchPhoiHop) return false;
+      // 1. Leader match (người giao việc)
+      if (leaderNameClean && (leaderNameClean.includes(usrClean) || usrClean.includes(leaderNameClean))) {
+        match = true;
       }
+      if (!match && subCode && leaderCodeClean && leaderCodeClean === subCode) {
+        match = true;
+      }
+
+      // 2. Assignee match (Tên NV A)
+      if (!match && empNameClean && (empNameClean.includes(usrClean) || usrClean.includes(empNameClean))) {
+        match = true;
+      }
+      if (!match && empCodeClean && (empCodeClean.includes(usrClean) || usrClean.includes(empCodeClean))) {
+        match = true;
+      }
+
+      // 3. Collaborator match (tên người phối hợp R)
+      if (!match && phoiHopNameClean && (phoiHopNameClean.includes(usrClean) || usrClean.includes(phoiHopNameClean))) {
+        match = true;
+      }
+      if (!match && phoiHopCodeClean && (phoiHopCodeClean.includes(usrClean) || usrClean.includes(phoiHopCodeClean))) {
+        match = true;
+      }
+
+      if (!match) return false;
     }
 
     return true;
