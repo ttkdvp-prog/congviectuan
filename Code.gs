@@ -12,7 +12,8 @@ const SHEETS = {
   USERS: 'Nguoidung',
   CVLUUY: 'cvluuy',
   DOCUMENTS: 'hoso',
-  TOVIEN: 'tovien'
+  TOVIEN: 'tovien',
+  TOTRUONGGIAOVIEC: 'totruonggiaoviec'
 };
 
 function doGet(e) {
@@ -111,6 +112,7 @@ function getInitialData(forceRefresh) {
     const cvluuy = getSheetDataAsObjects(SHEETS.CVLUUY);
     const documents = getSheetDataAsObjects(SHEETS.DOCUMENTS);
     const tovien = getSheetDataAsObjects(SHEETS.TOVIEN);
+    const totruonggiaoviec = getSheetDataAsObjects(SHEETS.TOTRUONGGIAOVIEC);
 
     return {
       success: true,
@@ -118,7 +120,8 @@ function getInitialData(forceRefresh) {
       users: users,
       cvluuy: cvluuy,
       documents: documents,
-      tovien: tovien
+      tovien: tovien,
+      totruonggiaoviec: totruonggiaoviec
     };
   } catch (err) {
     return { success: false, error: err.toString() };

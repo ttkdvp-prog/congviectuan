@@ -1,822 +1,825 @@
 <script>
-/**
- * ==============================================================================
- * TTHT Tasks - Quản Lý Công Việc & Hồ Sơ (Vanilla JS Engine - Dark Theme)
- * ==============================================================================
- */
+  /**
+   * ==============================================================================
+   * TTHT Tasks - Quản Lý Công Việc & Hồ Sơ (Vanilla JS Engine - Dark Theme)
+   * ==============================================================================
+   */
 
-const appState = {
-  tasks: [],
-  users: [],
-  tovien: [],
-  cvluuy: [],
-  documents: [],
-  currentTab: 'tongquan',
-  filters: {
-    search: '',
-    user: '',
-    group: '',
-    kanbanAssignee: '',
-    kanbanPriority: ''
-  },
-  sortColumn: 'ID',
-  sortAscending: false,
-  apiUrl: localStorage.getItem('GAS_WEB_APP_URL') || '',
-  isGAS: typeof google !== 'undefined' && google.script && google.script.run,
-  donutChart: null
-};
+  const appState = {
+    tasks: [],
+    users: [],
+    tovien: [],
+    totruonggiaoviec: [],
+    cvluuy: [],
+    documents: [],
+    currentTab: 'tongquan',
+    filters: {
+      search: '',
+      user: '',
+      group: '',
+      kanbanAssignee: '',
+      kanbanPriority: ''
+    },
+    sortColumn: 'ID',
+    sortAscending: false,
+    apiUrl: localStorage.getItem('GAS_WEB_APP_URL') || '',
+    isGAS: typeof google !== 'undefined' && google.script && google.script.run,
+    donutChart: null
+  };
 
-const noteDebounceTimers = {};
+  const noteDebounceTimers = {};
 
-function autoResizeTextarea(el) {
-  if (!el) return;
-  el.style.height = 'auto';
-  el.style.height = Math.max(38, el.scrollHeight) + 'px';
-}
-
-function cleanKey(str) {
-  if (!str) return '';
-  return String(str)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/[^a-z0-9]/g, '')
-    .trim();
-}
-
-function getTaskAssignee(task) {
-  if (!task) return 'Chưa gán';
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'nguoichutri' || ck === 'nguoiphutrach' || ck === 'nguoithuchien' || ck === 'assignee') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
-      }
-    }
-  }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck.includes('chutri') || ck.includes('phutrach') || ck.includes('thuchien')) {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
-      }
-    }
-  }
-  return 'Chưa gán';
-}
-
-function getTaskCollaborator(task) {
-  if (!task) return '';
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'nguoiphoihop') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
-      }
-    }
-  }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck.includes('phoihop') && !ck.includes('to')) {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
-      }
-    }
-  }
-  return '';
-}
-
-function formatUniqueGroups(groupStr) {
-  if (!groupStr) return '';
-  const parts = String(groupStr).split(',').map(p => p.trim()).filter(Boolean);
-  const unique = Array.from(new Set(parts));
-  return unique.join(', ');
-}
-
-function getTaskGroup(task) {
-  if (!task) return '';
-  
-  let rawGroup = '';
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'tochutri' || ck === 'to' || ck === 'tentocutri' || ck === 'tengroup') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        rawGroup = String(task[k]).trim();
-        break;
-      }
-    }
+  function autoResizeTextarea(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.max(38, el.scrollHeight) + 'px';
   }
 
-  if (!rawGroup) {
-    const assignee = getTaskAssignee(task);
-    if (assignee && assignee !== 'Chưa gán') {
-      const names = assignee.split(',').map(n => n.trim()).filter(Boolean);
-      const groups = new Set();
-      names.forEach(name => {
-        const usr = appState.users.find(u => {
-          const uName = u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u.name;
-          return cleanKey(uName) === cleanKey(name);
-        });
-        if (usr) {
-          for (let k in usr) {
-            const ck = cleanKey(k);
-            if (ck === 'to' || ck === 'tochutri' || ck === 'tento') {
-              if (usr[k] && String(usr[k]).trim()) groups.add(String(usr[k]).trim());
-            }
-          }
-        }
-      });
-      if (groups.size > 0) rawGroup = Array.from(groups).join(', ');
-    }
+  function cleanKey(str) {
+    if (!str) return '';
+    return String(str)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
   }
 
-  if (!rawGroup) {
+  function getTaskAssignee(task) {
+    if (!task) return 'Chưa gán';
     for (let k in task) {
       const ck = cleanKey(k);
-      if (ck.includes('chutri') && ck.includes('to')) {
-        if (task[k] && String(task[k]).trim()) {
+      if (ck === 'nguoichutri' || ck === 'nguoiphutrach' || ck === 'nguoithuchien' || ck === 'assignee') {
+        if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+          return String(task[k]).trim();
+        }
+      }
+    }
+    for (let k in task) {
+      const ck = cleanKey(k);
+      if (ck.includes('chutri') || ck.includes('phutrach') || ck.includes('thuchien')) {
+        if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+          return String(task[k]).trim();
+        }
+      }
+    }
+    return 'Chưa gán';
+  }
+
+  function getTaskCollaborator(task) {
+    if (!task) return '';
+    for (let k in task) {
+      const ck = cleanKey(k);
+      if (ck === 'nguoiphoihop') {
+        if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+          return String(task[k]).trim();
+        }
+      }
+    }
+    for (let k in task) {
+      const ck = cleanKey(k);
+      if (ck.includes('phoihop') && !ck.includes('to')) {
+        if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+          return String(task[k]).trim();
+        }
+      }
+    }
+    return '';
+  }
+
+  function formatUniqueGroups(groupStr) {
+    if (!groupStr) return '';
+    const parts = String(groupStr).split(',').map(p => p.trim()).filter(Boolean);
+    const unique = Array.from(new Set(parts));
+    return unique.join(', ');
+  }
+
+  function getTaskGroup(task) {
+    if (!task) return '';
+
+    let rawGroup = '';
+    for (let k in task) {
+      const ck = cleanKey(k);
+      if (ck === 'tochutri' || ck === 'to' || ck === 'tentocutri' || ck === 'tengroup') {
+        if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
           rawGroup = String(task[k]).trim();
           break;
         }
       }
     }
-  }
 
-  return formatUniqueGroups(rawGroup);
-}
-
-function getTaskCollaboratorGroup(task) {
-  if (!task) return '';
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'tophoihop') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
+    if (!rawGroup) {
+      const assignee = getTaskAssignee(task);
+      if (assignee && assignee !== 'Chưa gán') {
+        const names = assignee.split(',').map(n => n.trim()).filter(Boolean);
+        const groups = new Set();
+        names.forEach(name => {
+          const usr = appState.users.find(u => {
+            const uName = u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u.name;
+            return cleanKey(uName) === cleanKey(name);
+          });
+          if (usr) {
+            for (let k in usr) {
+              const ck = cleanKey(k);
+              if (ck === 'to' || ck === 'tochutri' || ck === 'tento') {
+                if (usr[k] && String(usr[k]).trim()) groups.add(String(usr[k]).trim());
+              }
+            }
+          }
+        });
+        if (groups.size > 0) rawGroup = Array.from(groups).join(', ');
       }
     }
+
+    if (!rawGroup) {
+      for (let k in task) {
+        const ck = cleanKey(k);
+        if (ck.includes('chutri') && ck.includes('to')) {
+          if (task[k] && String(task[k]).trim()) {
+            rawGroup = String(task[k]).trim();
+            break;
+          }
+        }
+      }
+    }
+
+    return formatUniqueGroups(rawGroup);
   }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck.includes('phoihop') && ck.includes('to')) {
-      if (task[k] && String(task[k]).trim()) return String(task[k]).trim();
+
+  function getTaskCollaboratorGroup(task) {
+    if (!task) return '';
+    for (let k in task) {
+      const ck = cleanKey(k);
+      if (ck === 'tophoihop') {
+        if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+          return String(task[k]).trim();
+        }
+      }
+    }
+    for (let k in task) {
+      const ck = cleanKey(k);
+      if (ck.includes('phoihop') && ck.includes('to')) {
+        if (task[k] && String(task[k]).trim()) return String(task[k]).trim();
+      }
+    }
+    return '';
+  }
+
+  function ensureSelectsPopulated() {
+    const gSelect = document.getElementById('global-group-select');
+    if (!gSelect || gSelect.options.length <= 1) {
+      populateSelects();
     }
   }
-  return '';
-}
 
-function ensureSelectsPopulated() {
-  const gSelect = document.getElementById('global-group-select');
-  if (!gSelect || gSelect.options.length <= 1) {
-    populateSelects();
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const urlInput = document.getElementById('gas-api-url-input');
-  if (urlInput && appState.apiUrl) {
-    urlInput.value = appState.apiUrl;
-  }
-  
-  // Attach event listeners to sidebar tab buttons
-  document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const tabName = btn.getAttribute('data-tab');
-      if (tabName) switchSidebarTab(tabName);
-    });
-  });
-
-  // Attach search & group filter event listeners
-  const sInput = document.getElementById('global-search-input');
-  const uSelect = document.getElementById('global-user-select');
-  const gSelect = document.getElementById('global-group-select');
-
-  if (sInput) sInput.addEventListener('input', handleGlobalFilter);
-  if (uSelect) uSelect.addEventListener('change', handleGlobalFilter);
-  if (gSelect) gSelect.addEventListener('change', onGlobalGroupChange);
-
-  // Restore local cache for zero-latency initial view on F5 across all devices
-  const cachedTasks = localStorage.getItem('TTHT_TASKS_CACHE');
-  const cachedUsers = localStorage.getItem('TTHT_USERS_CACHE');
-  const cachedCvLuuY = localStorage.getItem('TTHT_CVLUUY_CACHE');
-  const cachedDocs = localStorage.getItem('TTHT_DOCUMENTS_CACHE');
-
-  if (cachedTasks) { try { appState.tasks = JSON.parse(cachedTasks); } catch(e) {} }
-  if (cachedUsers) { try { appState.users = JSON.parse(cachedUsers); } catch(e) {} }
-  if (cachedCvLuuY) { try { appState.cvluuy = JSON.parse(cachedCvLuuY); } catch(e) {} }
-  if (cachedDocs) { try { appState.documents = JSON.parse(cachedDocs); } catch(e) {} }
-
-  populateSelects();
-  renderActiveTab();
-
-  // Background silent sync with backend if available
-  appState.loadData();
-  setupKanbanDragAndDrop();
-});
-
-appState.loadData = function (forceRefresh = false, showNotification = false) {
-  if (appState.isGAS) {
-    google.script.run
-      .withSuccessHandler(data => onDataLoaded(data, showNotification))
-      .withFailureHandler(err => console.warn('Background GAS sync failed, using local cache:', err))
-      .getInitialData(forceRefresh);
-  } else {
-    const fetchUrl = appState.apiUrl;
-    if (!fetchUrl) {
-      console.log('Running in local offline mode (no apiUrl configured).');
-      return;
+  document.addEventListener('DOMContentLoaded', () => {
+    const urlInput = document.getElementById('gas-api-url-input');
+    if (urlInput && appState.apiUrl) {
+      urlInput.value = appState.apiUrl;
     }
-    fetch(fetchUrl + '?action=getInitialData&t=' + new Date().getTime())
-      .then(res => res.json())
-      .then(data => onDataLoaded(data, showNotification))
-      .catch(err => console.warn('Background fetch failed, using local cache:', err));
-  }
-};
 
-function callBackend(action, payload, successCallback) {
-  if (appState.isGAS) {
-    google.script.run
-      .withSuccessHandler(res => {
-        if (successCallback) successCallback(res);
-      })
-      .withFailureHandler(err => {
-        console.warn('GAS backend call failed, using local cache:', action, err);
-        if (successCallback) successCallback({ success: true, localOnly: true });
-      })[action](payload);
-  } else {
-    const fetchUrl = appState.apiUrl;
-    if (!fetchUrl) {
-      console.warn('No apiUrl set for standalone backend call:', action);
-      if (successCallback) successCallback({ success: true, localOnly: true });
-      return;
-    }
-    fetch(fetchUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: action, payload: payload })
-    })
-      .then(res => res.json())
-      .then(res => {
-        if (successCallback) successCallback(res);
-      })
-      .catch(err => {
-        console.warn('Backend fetch failed, using local cache:', action, err);
-        if (successCallback) successCallback({ success: true, localOnly: true });
+    // Attach event listeners to sidebar tab buttons
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const tabName = btn.getAttribute('data-tab');
+        if (tabName) switchSidebarTab(tabName);
       });
-  }
-}
-
-function callBackendSilent(action, payload) {
-  if (appState.isGAS) {
-    google.script.run
-      .withSuccessHandler(res => {
-        console.log('Silent sync success:', action, res);
-      })
-      .withFailureHandler(err => console.error('Silent sync error:', err))[action](payload);
-  } else {
-    const fetchUrl = appState.apiUrl;
-    if (!fetchUrl) return;
-    fetch(fetchUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: action, payload: payload })
-    }).catch(err => console.error('Silent sync error:', err));
-  }
-}
-
-function onDataLoaded(response, showNotification = false) {
-  if (response && response.success) {
-    if (response.tasks && response.tasks.length > 0) appState.tasks = response.tasks;
-    if (response.users && response.users.length > 0) appState.users = response.users;
-    if (response.tovien && response.tovien.length > 0) appState.tovien = response.tovien;
-    if (response.cvluuy && response.cvluuy.length > 0) appState.cvluuy = response.cvluuy;
-    if (response.documents && response.documents.length > 0) appState.documents = response.documents;
-    
-    appState.tasks.forEach(t => {
-      if (typeof t['Danh sách công việc con'] === 'string' && t['Danh sách công việc con']) {
-        try { t.subtasks = JSON.parse(t['Danh sách công việc con']); } catch (e) { t.subtasks = []; }
-      } else {
-        t.subtasks = t.subtasks || [];
-      }
-
-      // Check status: Hoàn thành quá hạn
-      const doneDate = t['Ngày làm xong'] || '';
-      const endDate = t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '';
-      if (doneDate && endDate && doneDate > endDate) {
-        t['Trạng thái'] = 'Hoàn thành quá hạn';
-      }
     });
 
-    try {
-      localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks));
-      localStorage.setItem('TTHT_USERS_CACHE', JSON.stringify(appState.users));
-      localStorage.setItem('TTHT_TOVIEN_CACHE', JSON.stringify(appState.tovien));
-      localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy));
-      localStorage.setItem('TTHT_DOCUMENTS_CACHE', JSON.stringify(appState.documents));
-    } catch(e) {}
+    // Attach search & group filter event listeners
+    const sInput = document.getElementById('global-search-input');
+    const uSelect = document.getElementById('global-user-select');
+    const gSelect = document.getElementById('global-group-select');
+
+    if (sInput) sInput.addEventListener('input', handleGlobalFilter);
+    if (uSelect) uSelect.addEventListener('change', handleGlobalFilter);
+    if (gSelect) gSelect.addEventListener('change', onGlobalGroupChange);
+
+    // Restore local cache for zero-latency initial view on F5 across all devices
+    const cachedTasks = localStorage.getItem('TTHT_TASKS_CACHE');
+    const cachedUsers = localStorage.getItem('TTHT_USERS_CACHE');
+    const cachedCvLuuY = localStorage.getItem('TTHT_CVLUUY_CACHE');
+    const cachedDocs = localStorage.getItem('TTHT_DOCUMENTS_CACHE');
+
+    if (cachedTasks) { try { appState.tasks = JSON.parse(cachedTasks); } catch (e) { } }
+    if (cachedUsers) { try { appState.users = JSON.parse(cachedUsers); } catch (e) { } }
+    if (cachedCvLuuY) { try { appState.cvluuy = JSON.parse(cachedCvLuuY); } catch (e) { } }
+    if (cachedDocs) { try { appState.documents = JSON.parse(cachedDocs); } catch (e) { } }
 
     populateSelects();
     renderActiveTab();
-    if (showNotification) {
-      showToast('Đồng bộ dữ liệu thành công!', 'success');
+
+    // Background silent sync with backend if available
+    appState.loadData();
+    setupKanbanDragAndDrop();
+  });
+
+  appState.loadData = function (forceRefresh = false, showNotification = false) {
+    if (appState.isGAS) {
+      google.script.run
+        .withSuccessHandler(data => onDataLoaded(data, showNotification))
+        .withFailureHandler(err => console.warn('Background GAS sync failed, using local cache:', err))
+        .getInitialData(forceRefresh);
+    } else {
+      const fetchUrl = appState.apiUrl;
+      if (!fetchUrl) {
+        console.log('Running in local offline mode (no apiUrl configured).');
+        return;
+      }
+      fetch(fetchUrl + '?action=getInitialData&t=' + new Date().getTime())
+        .then(res => res.json())
+        .then(data => onDataLoaded(data, showNotification))
+        .catch(err => console.warn('Background fetch failed, using local cache:', err));
+    }
+  };
+
+  function callBackend(action, payload, successCallback) {
+    if (appState.isGAS) {
+      google.script.run
+        .withSuccessHandler(res => {
+          if (successCallback) successCallback(res);
+        })
+        .withFailureHandler(err => {
+          console.warn('GAS backend call failed, using local cache:', action, err);
+          if (successCallback) successCallback({ success: true, localOnly: true });
+        })[action](payload);
+    } else {
+      const fetchUrl = appState.apiUrl;
+      if (!fetchUrl) {
+        console.warn('No apiUrl set for standalone backend call:', action);
+        if (successCallback) successCallback({ success: true, localOnly: true });
+        return;
+      }
+      fetch(fetchUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: action, payload: payload })
+      })
+        .then(res => res.json())
+        .then(res => {
+          if (successCallback) successCallback(res);
+        })
+        .catch(err => {
+          console.warn('Backend fetch failed, using local cache:', action, err);
+          if (successCallback) successCallback({ success: true, localOnly: true });
+        });
     }
   }
-}
 
-function onDataError(error) {
-  console.warn('API Warning:', error);
-}
+  function callBackendSilent(action, payload) {
+    if (appState.isGAS) {
+      google.script.run
+        .withSuccessHandler(res => {
+          console.log('Silent sync success:', action, res);
+        })
+        .withFailureHandler(err => console.error('Silent sync error:', err))[action](payload);
+    } else {
+      const fetchUrl = appState.apiUrl;
+      if (!fetchUrl) return;
+      fetch(fetchUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: action, payload: payload })
+      }).catch(err => console.error('Silent sync error:', err));
+    }
+  }
 
-function getUserNameAndGroup(u) {
-  let name = '';
-  let group = '';
-  if (!u || typeof u !== 'object') return { name, group };
+  function onDataLoaded(response, showNotification = false) {
+    if (response && response.success) {
+      if (response.tasks && response.tasks.length > 0) appState.tasks = response.tasks;
+      if (response.users && response.users.length > 0) appState.users = response.users;
+      if (response.tovien && response.tovien.length > 0) appState.tovien = response.tovien;
+      if (response.totruonggiaoviec && response.totruonggiaoviec.length > 0) appState.totruonggiaoviec = response.totruonggiaoviec;
+      if (response.cvluuy && response.cvluuy.length > 0) appState.cvluuy = response.cvluuy;
+      if (response.documents && response.documents.length > 0) appState.documents = response.documents;
 
-  for (let k in u) {
-    const ck = cleanKey(k);
-    if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'tennguoidung' || ck === 'name' || ck === 'nguoithuchien') {
-      if (u[k] && String(u[k]).trim()) {
-        name = String(u[k]).trim();
-        break;
+      appState.tasks.forEach(t => {
+        if (typeof t['Danh sách công việc con'] === 'string' && t['Danh sách công việc con']) {
+          try { t.subtasks = JSON.parse(t['Danh sách công việc con']); } catch (e) { t.subtasks = []; }
+        } else {
+          t.subtasks = t.subtasks || [];
+        }
+
+        // Check status: Hoàn thành quá hạn
+        const doneDate = t['Ngày làm xong'] || '';
+        const endDate = t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '';
+        if (doneDate && endDate && doneDate > endDate) {
+          t['Trạng thái'] = 'Hoàn thành quá hạn';
+        }
+      });
+
+      try {
+        localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks));
+        localStorage.setItem('TTHT_USERS_CACHE', JSON.stringify(appState.users));
+        localStorage.setItem('TTHT_TOVIEN_CACHE', JSON.stringify(appState.tovien));
+        localStorage.setItem('TTHT_TOTRUONGGIAOVIEC_CACHE', JSON.stringify(appState.totruonggiaoviec));
+        localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy));
+        localStorage.setItem('TTHT_DOCUMENTS_CACHE', JSON.stringify(appState.documents));
+      } catch (e) { }
+
+      populateSelects();
+      renderActiveTab();
+      if (showNotification) {
+        showToast('Đồng bộ dữ liệu thành công!', 'success');
       }
     }
   }
-  if (!name) {
+
+  function onDataError(error) {
+    console.warn('API Warning:', error);
+  }
+
+  function getUserNameAndGroup(u) {
+    let name = '';
+    let group = '';
+    if (!u || typeof u !== 'object') return { name, group };
+
     for (let k in u) {
       const ck = cleanKey(k);
-      if ((ck.includes('ten') || ck.includes('user')) && !ck.includes('to') && !ck.includes('file')) {
+      if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'tennguoidung' || ck === 'name' || ck === 'nguoithuchien') {
         if (u[k] && String(u[k]).trim()) {
           name = String(u[k]).trim();
           break;
         }
       }
     }
-  }
-
-  for (let k in u) {
-    const ck = cleanKey(k);
-    if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck === 'nhom' || ck === 'donvi') {
-      if (u[k] && String(u[k]).trim()) {
-        group = String(u[k]).trim();
-        break;
+    if (!name) {
+      for (let k in u) {
+        const ck = cleanKey(k);
+        if ((ck.includes('ten') || ck.includes('user')) && !ck.includes('to') && !ck.includes('file')) {
+          if (u[k] && String(u[k]).trim()) {
+            name = String(u[k]).trim();
+            break;
+          }
+        }
       }
     }
-  }
-  if (!group) {
+
     for (let k in u) {
       const ck = cleanKey(k);
-      if ((ck.includes('to') || ck.includes('group') || ck.includes('donvi')) && !ck.includes('tiendo') && !ck.includes('taptin') && !ck.includes('tep')) {
-        if (u[k] && String(u[k]).trim() && isNaN(u[k])) {
+      if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck === 'nhom' || ck === 'donvi') {
+        if (u[k] && String(u[k]).trim()) {
           group = String(u[k]).trim();
           break;
         }
       }
     }
-  }
-
-  return { name, group };
-}
-
-function populateSelects() {
-  const groupSelect = document.getElementById('global-group-select');
-  const cvluuyGroupSelect = document.getElementById('cvluuy-group-select');
-  const kanbanAssigneeSelect = document.getElementById('kanban-assignee-filter');
-  const taskToChuTriSelect = document.getElementById('task-tochutri-input');
-  const taskChuTriSelect = document.getElementById('task-chutri-input');
-  const taskPhoiHopSelect = document.getElementById('task-phoihop-input');
-  
-  const hostGroups = new Set();
-  const allGroups = new Set();
-  const assignees = new Set();
-  
-  if (appState.users && Array.isArray(appState.users)) {
-    appState.users.forEach(u => {
-      const { name, group } = getUserNameAndGroup(u);
-      if (group) {
-        hostGroups.add(group);
-        allGroups.add(group);
-      }
-      if (name) assignees.add(name);
-    });
-  }
-
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
-      const a = getTaskAssignee(t);
-      const c = getTaskCollaborator(t);
-      const tg = getTaskGroup(t);
-      const tcg = getTaskCollaboratorGroup(t);
-      
-      if (a && a !== 'Chưa gán') {
-        a.split(',').forEach(n => { if (n.trim()) assignees.add(n.trim()); });
-      }
-      if (c && String(c).trim()) {
-        c.split(',').forEach(n => { if (n.trim()) assignees.add(n.trim()); });
-      }
-      if (tg && String(tg).trim()) {
-        hostGroups.add(tg);
-        allGroups.add(tg);
-      }
-      if (tcg && String(tcg).trim()) allGroups.add(tcg);
-    });
-  }
-
-  if (appState.cvluuy && Array.isArray(appState.cvluuy)) {
-    appState.cvluuy.forEach(item => {
-      for (let k in item) {
+    if (!group) {
+      for (let k in u) {
         const ck = cleanKey(k);
-        if (ck.includes('to') && item[k] && typeof item[k] === 'string' && item[k].trim()) {
-          allGroups.add(item[k].trim());
+        if ((ck.includes('to') || ck.includes('group') || ck.includes('donvi')) && !ck.includes('tiendo') && !ck.includes('taptin') && !ck.includes('tep')) {
+          if (u[k] && String(u[k]).trim() && isNaN(u[k])) {
+            group = String(u[k]).trim();
+            break;
+          }
         }
       }
-    });
+    }
+
+    return { name, group };
   }
 
-  if (groupSelect) {
-    const curVal = groupSelect.value;
-    groupSelect.innerHTML = '<option value="">Tất cả tổ chủ trì</option>';
-    Array.from(hostGroups).sort().forEach(g => {
-      if (g) groupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
-    });
-    if (curVal) groupSelect.value = curVal;
-  }
+  function populateSelects() {
+    const groupSelect = document.getElementById('global-group-select');
+    const cvluuyGroupSelect = document.getElementById('cvluuy-group-select');
+    const kanbanAssigneeSelect = document.getElementById('kanban-assignee-filter');
+    const taskToChuTriSelect = document.getElementById('task-tochutri-input');
+    const taskChuTriSelect = document.getElementById('task-chutri-input');
+    const taskPhoiHopSelect = document.getElementById('task-phoihop-input');
 
-  if (cvluuyGroupSelect) {
-    const curVal = cvluuyGroupSelect.value;
-    cvluuyGroupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
-    Array.from(allGroups).sort().forEach(g => {
-      if (g) cvluuyGroupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
-    });
-    if (curVal) cvluuyGroupSelect.value = curVal;
-  }
+    const hostGroups = new Set();
+    const allGroups = new Set();
+    const assignees = new Set();
 
-  if (kanbanAssigneeSelect) {
-    const curVal = kanbanAssigneeSelect.value;
-    kanbanAssigneeSelect.innerHTML = '<option value="">Tất cả người phụ trách</option>';
-    Array.from(assignees).sort().forEach(a => {
-      if (a) kanbanAssigneeSelect.innerHTML += `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`;
-    });
-    if (curVal) kanbanAssigneeSelect.value = curVal;
-  }
-
-  if (taskToChuTriSelect) {
-    const curVal = taskToChuTriSelect.value;
-    taskToChuTriSelect.innerHTML = '<option value="">-- Tất cả tổ --</option>';
-    Array.from(hostGroups).sort().forEach(g => {
-      if (g) taskToChuTriSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
-    });
-    if (curVal) taskToChuTriSelect.value = curVal;
-  }
-
-  if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
-  appState.dropdownData.phoihop = Array.from(assignees).sort();
-  appState.dropdownData.chutri = Array.from(assignees).sort();
-
-  updateGlobalUserSelectOptions();
-}
-
-function handleModalGroupChange(selectedGroup) {
-  const chuTriInput = document.getElementById('task-chutri-input');
-  if (!chuTriInput) return;
-
-  const filteredUsers = new Set();
-  const selGrpClean = cleanKey(selectedGroup);
-
-  if (selGrpClean) {
     if (appState.users && Array.isArray(appState.users)) {
       appState.users.forEach(u => {
         const { name, group } = getUserNameAndGroup(u);
-        const ckG = cleanKey(group);
-        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
-          filteredUsers.add(name);
+        if (group) {
+          hostGroups.add(group);
+          allGroups.add(group);
         }
+        if (name) assignees.add(name);
       });
     }
 
     if (appState.tasks && Array.isArray(appState.tasks)) {
       appState.tasks.forEach(t => {
-        if (!t || typeof t !== 'object') return;
-        const tg = getTaskGroup(t);
-        const ckTg = cleanKey(tg);
-        const a = getTaskAssignee(t);
-        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
-          a.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
-        }
-      });
-    }
-  }
-
-  if (!selGrpClean || filteredUsers.size === 0) {
-    if (appState.users && Array.isArray(appState.users)) {
-      appState.users.forEach(u => {
-        const { name } = getUserNameAndGroup(u);
-        if (name) filteredUsers.add(name);
-      });
-    }
-    if (appState.tasks && Array.isArray(appState.tasks)) {
-      appState.tasks.forEach(t => {
-        if (!t || typeof t !== 'object') return;
         const a = getTaskAssignee(t);
         const c = getTaskCollaborator(t);
+        const tg = getTaskGroup(t);
+        const tcg = getTaskCollaboratorGroup(t);
+
         if (a && a !== 'Chưa gán') {
-          a.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+          a.split(',').forEach(n => { if (n.trim()) assignees.add(n.trim()); });
         }
         if (c && String(c).trim()) {
-          c.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+          c.split(',').forEach(n => { if (n.trim()) assignees.add(n.trim()); });
+        }
+        if (tg && String(tg).trim()) {
+          hostGroups.add(tg);
+          allGroups.add(tg);
+        }
+        if (tcg && String(tcg).trim()) allGroups.add(tcg);
+      });
+    }
+
+    if (appState.cvluuy && Array.isArray(appState.cvluuy)) {
+      appState.cvluuy.forEach(item => {
+        for (let k in item) {
+          const ck = cleanKey(k);
+          if (ck.includes('to') && item[k] && typeof item[k] === 'string' && item[k].trim()) {
+            allGroups.add(item[k].trim());
+          }
         }
       });
     }
+
+    if (groupSelect) {
+      const curVal = groupSelect.value;
+      groupSelect.innerHTML = '<option value="">Tất cả tổ chủ trì</option>';
+      Array.from(hostGroups).sort().forEach(g => {
+        if (g) groupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+      });
+      if (curVal) groupSelect.value = curVal;
+    }
+
+    if (cvluuyGroupSelect) {
+      const curVal = cvluuyGroupSelect.value;
+      cvluuyGroupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
+      Array.from(allGroups).sort().forEach(g => {
+        if (g) cvluuyGroupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+      });
+      if (curVal) cvluuyGroupSelect.value = curVal;
+    }
+
+    if (kanbanAssigneeSelect) {
+      const curVal = kanbanAssigneeSelect.value;
+      kanbanAssigneeSelect.innerHTML = '<option value="">Tất cả người phụ trách</option>';
+      Array.from(assignees).sort().forEach(a => {
+        if (a) kanbanAssigneeSelect.innerHTML += `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`;
+      });
+      if (curVal) kanbanAssigneeSelect.value = curVal;
+    }
+
+    if (taskToChuTriSelect) {
+      const curVal = taskToChuTriSelect.value;
+      taskToChuTriSelect.innerHTML = '<option value="">-- Tất cả tổ --</option>';
+      Array.from(hostGroups).sort().forEach(g => {
+        if (g) taskToChuTriSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+      });
+      if (curVal) taskToChuTriSelect.value = curVal;
+    }
+
+    if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
+    appState.dropdownData.phoihop = Array.from(assignees).sort();
+    appState.dropdownData.chutri = Array.from(assignees).sort();
+
+    updateGlobalUserSelectOptions();
   }
 
-  if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
-  appState.dropdownData.chutri = Array.from(filteredUsers).sort();
-}
+  function handleModalGroupChange(selectedGroup) {
+    const chuTriInput = document.getElementById('task-chutri-input');
+    if (!chuTriInput) return;
 
-/* CUSTOM SEARCHABLE DROPDOWN JS ENGINE */
-function showCustomDropdown(type) {
-  closeAllCustomDropdowns();
-  const listEl = document.getElementById('dropdown-' + type);
-  const inputEl = document.getElementById('task-' + type + '-input');
-  if (!listEl || !inputEl) return;
+    const filteredUsers = new Set();
+    const selGrpClean = cleanKey(selectedGroup);
 
-  filterCustomDropdown(type, inputEl.value);
-  listEl.classList.add('active');
-}
+    if (selGrpClean) {
+      if (appState.users && Array.isArray(appState.users)) {
+        appState.users.forEach(u => {
+          const { name, group } = getUserNameAndGroup(u);
+          const ckG = cleanKey(group);
+          if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
+            filteredUsers.add(name);
+          }
+        });
+      }
 
-function toggleCustomDropdown(type, event) {
-  if (event) event.stopPropagation();
-  const listEl = document.getElementById('dropdown-' + type);
-  if (!listEl) return;
-  if (listEl.classList.contains('active')) {
-    listEl.classList.remove('active');
-  } else {
-    showCustomDropdown(type);
+      if (appState.tasks && Array.isArray(appState.tasks)) {
+        appState.tasks.forEach(t => {
+          if (!t || typeof t !== 'object') return;
+          const tg = getTaskGroup(t);
+          const ckTg = cleanKey(tg);
+          const a = getTaskAssignee(t);
+          if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
+            a.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+          }
+        });
+      }
+    }
+
+    if (!selGrpClean || filteredUsers.size === 0) {
+      if (appState.users && Array.isArray(appState.users)) {
+        appState.users.forEach(u => {
+          const { name } = getUserNameAndGroup(u);
+          if (name) filteredUsers.add(name);
+        });
+      }
+      if (appState.tasks && Array.isArray(appState.tasks)) {
+        appState.tasks.forEach(t => {
+          if (!t || typeof t !== 'object') return;
+          const a = getTaskAssignee(t);
+          const c = getTaskCollaborator(t);
+          if (a && a !== 'Chưa gán') {
+            a.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+          }
+          if (c && String(c).trim()) {
+            c.split(',').forEach(n => { if (n.trim()) filteredUsers.add(n.trim()); });
+          }
+        });
+      }
+    }
+
+    if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
+    appState.dropdownData.chutri = Array.from(filteredUsers).sort();
   }
-}
 
-function filterCustomDropdown(type, query) {
-  const listEl = document.getElementById('dropdown-' + type);
-  if (!listEl) return;
+  /* CUSTOM SEARCHABLE DROPDOWN JS ENGINE */
+  function showCustomDropdown(type) {
+    closeAllCustomDropdowns();
+    const listEl = document.getElementById('dropdown-' + type);
+    const inputEl = document.getElementById('task-' + type + '-input');
+    if (!listEl || !inputEl) return;
 
-  const rawList = (appState.dropdownData && appState.dropdownData[type]) ? appState.dropdownData[type] : [];
-  const qClean = cleanKey(query);
-
-  let filtered = rawList;
-  if (qClean) {
-    filtered = rawList.filter(item => cleanKey(item).includes(qClean));
+    filterCustomDropdown(type, inputEl.value);
+    listEl.classList.add('active');
   }
 
-  if (filtered.length === 0) {
-    listEl.innerHTML = `<div class="custom-dropdown-empty">Không tìm thấy kết quả phù hợp</div>`;
-  } else {
-    listEl.innerHTML = filtered.map(item => `
+  function toggleCustomDropdown(type, event) {
+    if (event) event.stopPropagation();
+    const listEl = document.getElementById('dropdown-' + type);
+    if (!listEl) return;
+    if (listEl.classList.contains('active')) {
+      listEl.classList.remove('active');
+    } else {
+      showCustomDropdown(type);
+    }
+  }
+
+  function filterCustomDropdown(type, query) {
+    const listEl = document.getElementById('dropdown-' + type);
+    if (!listEl) return;
+
+    const rawList = (appState.dropdownData && appState.dropdownData[type]) ? appState.dropdownData[type] : [];
+    const qClean = cleanKey(query);
+
+    let filtered = rawList;
+    if (qClean) {
+      filtered = rawList.filter(item => cleanKey(item).includes(qClean));
+    }
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = `<div class="custom-dropdown-empty">Không tìm thấy kết quả phù hợp</div>`;
+    } else {
+      listEl.innerHTML = filtered.map(item => `
       <div class="custom-dropdown-item" onclick="selectCustomDropdownItem('${type}', '${escapeHtml(item)}')">
         ${escapeHtml(item)}
       </div>
     `).join('');
+    }
+    listEl.classList.add('active');
   }
-  listEl.classList.add('active');
-}
 
-function selectCustomDropdownItem(type, val) {
-  const inputEl = document.getElementById('task-' + type + '-input');
-  if (inputEl) inputEl.value = val;
-  const listEl = document.getElementById('dropdown-' + type);
-  if (listEl) listEl.classList.remove('active');
-}
-
-function closeAllCustomDropdowns() {
-  document.querySelectorAll('.custom-dropdown-list').forEach(el => el.classList.remove('active'));
-}
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.custom-select-box')) {
-    closeAllCustomDropdowns();
+  function selectCustomDropdownItem(type, val) {
+    const inputEl = document.getElementById('task-' + type + '-input');
+    if (inputEl) inputEl.value = val;
+    const listEl = document.getElementById('dropdown-' + type);
+    if (listEl) listEl.classList.remove('active');
   }
-});
 
-function onGlobalGroupChange() {
-  updateGlobalUserSelectOptions();
-  handleGlobalFilter();
-}
-
-function updateGlobalUserSelectOptions() {
-  const userSelect = document.getElementById('global-user-select');
-  const groupSelect = document.getElementById('global-group-select');
-  if (!userSelect || !groupSelect) return;
-
-  const selectedGroup = String(groupSelect.value || '').trim().toLowerCase();
-  const currentSelectedUser = userSelect.value;
-
-  const usersInGroup = new Set();
-
-  appState.users.forEach(u => {
-    const g = String(u['Tổ'] || u['TỔ'] || u['Tên tổ'] || u.group || '').trim();
-    const name = String(u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u.name || '').trim();
-    if (name) {
-      if (!selectedGroup || g.toLowerCase() === selectedGroup) {
-        usersInGroup.add(name);
-      }
-    }
-  });
-
-  appState.tasks.forEach(t => {
-    const tg = getTaskGroup(t).trim().toLowerCase();
-    if (!selectedGroup || tg === selectedGroup) {
-      const chuTri = getTaskAssignee(t);
-      const phoiHop = getTaskCollaborator(t);
-      if (chuTri && chuTri !== 'Chưa gán') usersInGroup.add(chuTri);
-      if (phoiHop) usersInGroup.add(phoiHop);
-    }
-  });
-
-  userSelect.innerHTML = '<option value="">Tất cả người phụ trách</option>';
-  Array.from(usersInGroup).sort().forEach(name => {
-    userSelect.innerHTML += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
-  });
-
-  if (currentSelectedUser && Array.from(usersInGroup).some(u => u.toLowerCase() === currentSelectedUser.toLowerCase())) {
-    userSelect.value = currentSelectedUser;
-  } else {
-    userSelect.value = '';
-    appState.filters.user = '';
+  function closeAllCustomDropdowns() {
+    document.querySelectorAll('.custom-dropdown-list').forEach(el => el.classList.remove('active'));
   }
-}
 
-function switchSidebarTab(tabName) {
-  appState.currentTab = tabName;
-  
-  document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
-    if (item.getAttribute('data-tab') === tabName) {
-      item.classList.add('active');
-    } else {
-      item.classList.remove('active');
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.custom-select-box')) {
+      closeAllCustomDropdowns();
     }
   });
 
-  document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
-  const activeSec = document.getElementById('section-' + tabName);
-  if (activeSec) activeSec.classList.add('active');
+  function onGlobalGroupChange() {
+    updateGlobalUserSelectOptions();
+    handleGlobalFilter();
+  }
 
-  const titles = {
-    tongquan: 'Tổng quan',
-    kanban: 'Bảng Kanban',
-    danhsach: 'Danh sách',
-    totruonggiaoviec: 'Tổ trưởng giao việc',
-    tailieu: 'Quản lý tài liệu',
-    nguoidung: 'Quản lý người dùng',
-    thongke: 'Thống kê theo tổ',
-    danhgiacanhan: 'Đánh giá cá nhân',
-    cvluuy: 'Công việc lưu ý'
-  };
-  const titleDisplay = document.getElementById('page-title-display');
-  if (titleDisplay) titleDisplay.innerText = titles[tabName] || 'TTHT Tasks';
+  function updateGlobalUserSelectOptions() {
+    const userSelect = document.getElementById('global-user-select');
+    const groupSelect = document.getElementById('global-group-select');
+    if (!userSelect || !groupSelect) return;
 
-  renderActiveTab();
-}
+    const selectedGroup = String(groupSelect.value || '').trim().toLowerCase();
+    const currentSelectedUser = userSelect.value;
 
-function handleGlobalFilter() {
-  const sEl = document.getElementById('global-search-input');
-  const uEl = document.getElementById('global-user-select');
-  const gEl = document.getElementById('global-group-select');
+    const usersInGroup = new Set();
 
-  appState.filters.search = sEl ? sEl.value.trim() : '';
-  appState.filters.user = uEl ? uEl.value : '';
-  appState.filters.group = gEl ? gEl.value : '';
-  
-  renderActiveTab();
-}
-
-function handleKanbanFilter() {
-  appState.filters.kanbanAssignee = document.getElementById('kanban-assignee-filter').value;
-  appState.filters.kanbanPriority = document.getElementById('kanban-priority-filter').value;
-  renderKanbanBoard();
-}
-
-function getFilteredTasks() {
-  const search = (appState.filters.search || '').trim().toLowerCase();
-  const groupFilter = (appState.filters.group || '').trim().toLowerCase();
-  const userFilter = (appState.filters.user || '').trim().toLowerCase();
-  const kanbanAssignee = (appState.filters.kanbanAssignee || '').trim().toLowerCase();
-  const kanbanPriority = (appState.filters.kanbanPriority || '').trim();
-
-  return appState.tasks.filter(t => {
-    const chuTri = getTaskAssignee(t);
-    const toChuTri = getTaskGroup(t);
-    const phoiHop = getTaskCollaborator(t);
-    const toPhoiHop = getTaskCollaboratorGroup(t);
-
-    // 1. Text search box filter
-    if (search) {
-      const allTextValues = Object.values(t).join(' ').toLowerCase();
-      const combinedText = `${allTextValues} ${chuTri.toLowerCase()} ${toChuTri.toLowerCase()} ${phoiHop.toLowerCase()} ${toPhoiHop.toLowerCase()}`;
-      if (!combinedText.includes(search)) return false;
-    }
-    
-    // 2. Group filter (Tổ chủ trì)
-    if (groupFilter) {
-      if (toChuTri.toLowerCase() !== groupFilter) return false;
-    }
-
-    // 3. User / Person in charge filter (Chủ trì hoặc Phối hợp)
-    if (userFilter) {
-      const matchChuTri = chuTri.toLowerCase() === userFilter;
-      const matchPhoiHop = phoiHop.toLowerCase() === userFilter;
-      if (!matchChuTri && !matchPhoiHop) return false;
-    }
-
-    // 4. Kanban specific filters
-    if (kanbanAssignee && chuTri.toLowerCase() !== kanbanAssignee) return false;
-    if (kanbanPriority && String(t['Mức độ ưu tiên'] || '').trim() !== kanbanPriority) return false;
-
-    return true;
-  });
-}
-
-function renderActiveTab() {
-  const tab = appState.currentTab;
-  if (tab === 'tongquan') renderDashboard();
-  else if (tab === 'kanban') renderKanbanBoard();
-  else if (tab === 'danhsach') renderTaskListTable();
-  else if (tab === 'totruonggiaoviec') { populateToTruongFilters(); renderToTruongTaskList(); }
-  else if (tab === 'tailieu') renderDocumentsTable();
-  else if (tab === 'nguoidung') renderUsersTable();
-  else if (tab === 'thongke') renderOrgStatistics();
-  else if (tab === 'danhgiacanhan') { populateStatsUserFilters(); renderUserStatistics(); }
-  else if (tab === 'cvluuy') renderCvLuuYTable();
-}
-
-/* 1. DASHBOARD */
-function renderDashboard() {
-  const filtered = getFilteredTasks();
-  let countDoing = 0, countDone = 0, countOverdue = 0, countCanceled = 0;
-  filtered.forEach(t => {
-    const st = t['Trạng thái'] || 'Đang thực hiện';
-    if (st === 'Đang thực hiện') countDoing++;
-    else if (st === 'Hoàn thành' || st === 'Hoàn thành quá hạn') countDone++;
-    else if (st === 'Quá hạn') countOverdue++;
-    else if (st === 'Đã hủy') countCanceled++;
-  });
-  
-  const total = filtered.length;
-  if (document.getElementById('kpi-total-val')) document.getElementById('kpi-total-val').innerText = total;
-  if (document.getElementById('kpi-doing-val')) document.getElementById('kpi-doing-val').innerText = countDoing;
-  if (document.getElementById('kpi-done-val')) document.getElementById('kpi-done-val').innerText = countDone;
-  if (document.getElementById('kpi-overdue-val')) document.getElementById('kpi-overdue-val').innerText = countOverdue;
-
-  const pctDone = total > 0 ? Math.round((countDone / total) * 100) : 0;
-  if (document.getElementById('donut-percent')) document.getElementById('donut-percent').innerText = pctDone + '%';
-  if (document.getElementById('lg-doing')) document.getElementById('lg-doing').innerText = countDoing;
-  if (document.getElementById('lg-done')) document.getElementById('lg-done').innerText = countDone;
-  if (document.getElementById('lg-overdue')) document.getElementById('lg-overdue').innerText = countOverdue;
-  if (document.getElementById('lg-canceled')) document.getElementById('lg-canceled').innerText = countCanceled;
-
-  renderDonutChart(countDoing, countDone, countOverdue, countCanceled);
-  renderHighPriorityTasks(filtered);
-  renderRecentTasks(filtered);
-}
-
-function renderDonutChart(doing, done, overdue, canceled) {
-  const ctx = document.getElementById('statusDonutChart');
-  if (!ctx || typeof Chart === 'undefined') return;
-  if (appState.donutChart) appState.donutChart.destroy();
-  
-  try {
-    appState.donutChart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Đang thực hiện', 'Hoàn thành', 'Quá hạn', 'Đã hủy'],
-        datasets: [{
-          data: [doing, done, overdue, canceled],
-          backgroundColor: ['#38bdf8', '#10b981', '#ef4444', '#64748b'],
-          borderWidth: 0,
-          hoverOffset: 4
-        }]
-      },
-      options: {
-        cutout: '78%',
-        plugins: { legend: { display: false }, tooltip: { enabled: true } },
-        responsive: true,
-        maintainAspectRatio: false
+    appState.users.forEach(u => {
+      const g = String(u['Tổ'] || u['TỔ'] || u['Tên tổ'] || u.group || '').trim();
+      const name = String(u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u.name || '').trim();
+      if (name) {
+        if (!selectedGroup || g.toLowerCase() === selectedGroup) {
+          usersInGroup.add(name);
+        }
       }
     });
-  } catch (e) {
-    console.error('Chart error:', e);
-  }
-}
 
-function renderHighPriorityTasks(tasks) {
-  const container = document.getElementById('high-priority-container');
-  if (!container) return;
-  const highPriority = tasks.filter(t => t['Mức độ ưu tiên'] === 'Cao');
-  if (highPriority.length === 0) {
-    container.innerHTML = `<div class="empty-widget-state"><i class="fa-solid fa-angles-down"></i> Không có công việc ưu tiên cao</div>`;
-    return;
+    appState.tasks.forEach(t => {
+      const tg = getTaskGroup(t).trim().toLowerCase();
+      if (!selectedGroup || tg === selectedGroup) {
+        const chuTri = getTaskAssignee(t);
+        const phoiHop = getTaskCollaborator(t);
+        if (chuTri && chuTri !== 'Chưa gán') usersInGroup.add(chuTri);
+        if (phoiHop) usersInGroup.add(phoiHop);
+      }
+    });
+
+    userSelect.innerHTML = '<option value="">Tất cả người phụ trách</option>';
+    Array.from(usersInGroup).sort().forEach(name => {
+      userSelect.innerHTML += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+    });
+
+    if (currentSelectedUser && Array.from(usersInGroup).some(u => u.toLowerCase() === currentSelectedUser.toLowerCase())) {
+      userSelect.value = currentSelectedUser;
+    } else {
+      userSelect.value = '';
+      appState.filters.user = '';
+    }
   }
-  let html = '';
-  highPriority.slice(0, 5).forEach((t, idx) => {
-    html += `
+
+  function switchSidebarTab(tabName) {
+    appState.currentTab = tabName;
+
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
+      if (item.getAttribute('data-tab') === tabName) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+
+    document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
+    const activeSec = document.getElementById('section-' + tabName);
+    if (activeSec) activeSec.classList.add('active');
+
+    const titles = {
+      tongquan: 'Tổng quan',
+      kanban: 'Bảng Kanban',
+      danhsach: 'Danh sách',
+      totruonggiaoviec: 'Tổ trưởng giao việc',
+      tailieu: 'Quản lý tài liệu',
+      nguoidung: 'Quản lý người dùng',
+      thongke: 'Thống kê theo tổ',
+      danhgiacanhan: 'Đánh giá cá nhân',
+      cvluuy: 'Công việc lưu ý'
+    };
+    const titleDisplay = document.getElementById('page-title-display');
+    if (titleDisplay) titleDisplay.innerText = titles[tabName] || 'TTHT Tasks';
+
+    renderActiveTab();
+  }
+
+  function handleGlobalFilter() {
+    const sEl = document.getElementById('global-search-input');
+    const uEl = document.getElementById('global-user-select');
+    const gEl = document.getElementById('global-group-select');
+
+    appState.filters.search = sEl ? sEl.value.trim() : '';
+    appState.filters.user = uEl ? uEl.value : '';
+    appState.filters.group = gEl ? gEl.value : '';
+
+    renderActiveTab();
+  }
+
+  function handleKanbanFilter() {
+    appState.filters.kanbanAssignee = document.getElementById('kanban-assignee-filter').value;
+    appState.filters.kanbanPriority = document.getElementById('kanban-priority-filter').value;
+    renderKanbanBoard();
+  }
+
+  function getFilteredTasks() {
+    const search = (appState.filters.search || '').trim().toLowerCase();
+    const groupFilter = (appState.filters.group || '').trim().toLowerCase();
+    const userFilter = (appState.filters.user || '').trim().toLowerCase();
+    const kanbanAssignee = (appState.filters.kanbanAssignee || '').trim().toLowerCase();
+    const kanbanPriority = (appState.filters.kanbanPriority || '').trim();
+
+    return appState.tasks.filter(t => {
+      const chuTri = getTaskAssignee(t);
+      const toChuTri = getTaskGroup(t);
+      const phoiHop = getTaskCollaborator(t);
+      const toPhoiHop = getTaskCollaboratorGroup(t);
+
+      // 1. Text search box filter
+      if (search) {
+        const allTextValues = Object.values(t).join(' ').toLowerCase();
+        const combinedText = `${allTextValues} ${chuTri.toLowerCase()} ${toChuTri.toLowerCase()} ${phoiHop.toLowerCase()} ${toPhoiHop.toLowerCase()}`;
+        if (!combinedText.includes(search)) return false;
+      }
+
+      // 2. Group filter (Tổ chủ trì)
+      if (groupFilter) {
+        if (toChuTri.toLowerCase() !== groupFilter) return false;
+      }
+
+      // 3. User / Person in charge filter (Chủ trì hoặc Phối hợp)
+      if (userFilter) {
+        const matchChuTri = chuTri.toLowerCase() === userFilter;
+        const matchPhoiHop = phoiHop.toLowerCase() === userFilter;
+        if (!matchChuTri && !matchPhoiHop) return false;
+      }
+
+      // 4. Kanban specific filters
+      if (kanbanAssignee && chuTri.toLowerCase() !== kanbanAssignee) return false;
+      if (kanbanPriority && String(t['Mức độ ưu tiên'] || '').trim() !== kanbanPriority) return false;
+
+      return true;
+    });
+  }
+
+  function renderActiveTab() {
+    const tab = appState.currentTab;
+    if (tab === 'tongquan') renderDashboard();
+    else if (tab === 'kanban') renderKanbanBoard();
+    else if (tab === 'danhsach') renderTaskListTable();
+    else if (tab === 'totruonggiaoviec') { populateToTruongFilters(); renderToTruongTaskList(); }
+    else if (tab === 'tailieu') renderDocumentsTable();
+    else if (tab === 'nguoidung') renderUsersTable();
+    else if (tab === 'thongke') renderOrgStatistics();
+    else if (tab === 'danhgiacanhan') { populateStatsUserFilters(); renderUserStatistics(); }
+    else if (tab === 'cvluuy') renderCvLuuYTable();
+  }
+
+  /* 1. DASHBOARD */
+  function renderDashboard() {
+    const filtered = getFilteredTasks();
+    let countDoing = 0, countDone = 0, countOverdue = 0, countCanceled = 0;
+    filtered.forEach(t => {
+      const st = t['Trạng thái'] || 'Đang thực hiện';
+      if (st === 'Đang thực hiện') countDoing++;
+      else if (st === 'Hoàn thành' || st === 'Hoàn thành quá hạn') countDone++;
+      else if (st === 'Quá hạn') countOverdue++;
+      else if (st === 'Đã hủy') countCanceled++;
+    });
+
+    const total = filtered.length;
+    if (document.getElementById('kpi-total-val')) document.getElementById('kpi-total-val').innerText = total;
+    if (document.getElementById('kpi-doing-val')) document.getElementById('kpi-doing-val').innerText = countDoing;
+    if (document.getElementById('kpi-done-val')) document.getElementById('kpi-done-val').innerText = countDone;
+    if (document.getElementById('kpi-overdue-val')) document.getElementById('kpi-overdue-val').innerText = countOverdue;
+
+    const pctDone = total > 0 ? Math.round((countDone / total) * 100) : 0;
+    if (document.getElementById('donut-percent')) document.getElementById('donut-percent').innerText = pctDone + '%';
+    if (document.getElementById('lg-doing')) document.getElementById('lg-doing').innerText = countDoing;
+    if (document.getElementById('lg-done')) document.getElementById('lg-done').innerText = countDone;
+    if (document.getElementById('lg-overdue')) document.getElementById('lg-overdue').innerText = countOverdue;
+    if (document.getElementById('lg-canceled')) document.getElementById('lg-canceled').innerText = countCanceled;
+
+    renderDonutChart(countDoing, countDone, countOverdue, countCanceled);
+    renderHighPriorityTasks(filtered);
+    renderRecentTasks(filtered);
+  }
+
+  function renderDonutChart(doing, done, overdue, canceled) {
+    const ctx = document.getElementById('statusDonutChart');
+    if (!ctx || typeof Chart === 'undefined') return;
+    if (appState.donutChart) appState.donutChart.destroy();
+
+    try {
+      appState.donutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Đang thực hiện', 'Hoàn thành', 'Quá hạn', 'Đã hủy'],
+          datasets: [{
+            data: [doing, done, overdue, canceled],
+            backgroundColor: ['#38bdf8', '#10b981', '#ef4444', '#64748b'],
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          cutout: '78%',
+          plugins: { legend: { display: false }, tooltip: { enabled: true } },
+          responsive: true,
+          maintainAspectRatio: false
+        }
+      });
+    } catch (e) {
+      console.error('Chart error:', e);
+    }
+  }
+
+  function renderHighPriorityTasks(tasks) {
+    const container = document.getElementById('high-priority-container');
+    if (!container) return;
+    const highPriority = tasks.filter(t => t['Mức độ ưu tiên'] === 'Cao');
+    if (highPriority.length === 0) {
+      container.innerHTML = `<div class="empty-widget-state"><i class="fa-solid fa-angles-down"></i> Không có công việc ưu tiên cao</div>`;
+      return;
+    }
+    let html = '';
+    highPriority.slice(0, 5).forEach((t, idx) => {
+      html += `
       <div class="recent-row-item" onclick="openTaskModal('${t.ID || t.id}')" style="cursor:pointer;">
         <div class="recent-title-group">
           <i class="fa-solid fa-circle-exclamation" style="color:#f43f5e;"></i>
@@ -827,29 +830,29 @@ function renderHighPriorityTasks(tasks) {
         </div>
       </div>
     `;
-  });
-  container.innerHTML = html;
-}
-
-function renderRecentTasks(tasks) {
-  const container = document.getElementById('recent-tasks-container');
-  if (!container) return;
-  if (tasks.length === 0) {
-    container.innerHTML = `<div class="empty-widget-state">Chưa có dữ liệu công việc</div>`;
-    return;
+    });
+    container.innerHTML = html;
   }
-  let html = '';
-  tasks.slice(0, 8).forEach((t, idx) => {
-    const status = t['Trạng thái'] || '';
-    
-    let statusHtml = `<span style="font-size:0.75rem; color:#94a3b8;">${status}</span>`;
-    if (status === 'Hoàn thành quá hạn') {
-      statusHtml = `<span style="color:#f59e0b; font-weight:600; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
-    } else if (status === 'Quá hạn') {
-      statusHtml = `<span class="tag-status-overdue">Quá hạn</span>`;
-    }
 
-    html += `
+  function renderRecentTasks(tasks) {
+    const container = document.getElementById('recent-tasks-container');
+    if (!container) return;
+    if (tasks.length === 0) {
+      container.innerHTML = `<div class="empty-widget-state">Chưa có dữ liệu công việc</div>`;
+      return;
+    }
+    let html = '';
+    tasks.slice(0, 8).forEach((t, idx) => {
+      const status = t['Trạng thái'] || '';
+
+      let statusHtml = `<span style="font-size:0.75rem; color:#94a3b8;">${status}</span>`;
+      if (status === 'Hoàn thành quá hạn') {
+        statusHtml = `<span style="color:#f59e0b; font-weight:600; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
+      } else if (status === 'Quá hạn') {
+        statusHtml = `<span class="tag-status-overdue">Quá hạn</span>`;
+      }
+
+      html += `
       <div class="recent-row-item" onclick="openTaskModal('${t.ID || t.id}')" style="cursor:pointer;">
         <div class="recent-title-group">
           <span><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span>${escapeHtml(t['Tiêu đề'])}</span>
@@ -860,49 +863,49 @@ function renderRecentTasks(tasks) {
         </div>
       </div>
     `;
-  });
-  container.innerHTML = html;
-}
+    });
+    container.innerHTML = html;
+  }
 
-/* 2. KANBAN BOARD */
-function renderKanbanBoard() {
-  const filtered = getFilteredTasks();
-  const cols = {
-    'Đang thực hiện': document.getElementById('cards-doing'),
-    'Hoàn thành': document.getElementById('cards-done'),
-    'Quá hạn': document.getElementById('cards-overdue'),
-    'Đã hủy': document.getElementById('cards-canceled')
-  };
-  const counts = { 'Đang thực hiện': 0, 'Hoàn thành': 0, 'Quá hạn': 0, 'Đã hủy': 0 };
-  Object.values(cols).forEach(c => { if (c) c.innerHTML = ''; });
-  
-  filtered.forEach(t => {
-    let st = t['Trạng thái'] || 'Đang thực hiện';
-    if (st === 'Hoàn thành quá hạn') st = 'Hoàn thành';
-    if (cols[st]) {
-      counts[st]++;
-      cols[st].appendChild(createDarkTaskCard(t, counts[st]));
-    }
-  });
+  /* 2. KANBAN BOARD */
+  function renderKanbanBoard() {
+    const filtered = getFilteredTasks();
+    const cols = {
+      'Đang thực hiện': document.getElementById('cards-doing'),
+      'Hoàn thành': document.getElementById('cards-done'),
+      'Quá hạn': document.getElementById('cards-overdue'),
+      'Đã hủy': document.getElementById('cards-canceled')
+    };
+    const counts = { 'Đang thực hiện': 0, 'Hoàn thành': 0, 'Quá hạn': 0, 'Đã hủy': 0 };
+    Object.values(cols).forEach(c => { if (c) c.innerHTML = ''; });
 
-  if (document.getElementById('kb-count-doing')) document.getElementById('kb-count-doing').innerText = counts['Đang thực hiện'];
-  if (document.getElementById('kb-count-done')) document.getElementById('kb-count-done').innerText = counts['Hoàn thành'];
-  if (document.getElementById('kb-count-overdue')) document.getElementById('kb-count-overdue').innerText = counts['Quá hạn'];
-  if (document.getElementById('kb-count-canceled')) document.getElementById('kb-count-canceled').innerText = counts['Đã hủy'];
-}
+    filtered.forEach(t => {
+      let st = t['Trạng thái'] || 'Đang thực hiện';
+      if (st === 'Hoàn thành quá hạn') st = 'Hoàn thành';
+      if (cols[st]) {
+        counts[st]++;
+        cols[st].appendChild(createDarkTaskCard(t, counts[st]));
+      }
+    });
 
-function createDarkTaskCard(task, index) {
-  const card = document.createElement('div');
-  card.className = 'dark-card';
-  card.draggable = true;
-  card.dataset.id = task.ID || task.id;
-  
-  const assignee = getTaskAssignee(task);
-  const avatarLetter = assignee.charAt(0).toUpperCase();
+    if (document.getElementById('kb-count-doing')) document.getElementById('kb-count-doing').innerText = counts['Đang thực hiện'];
+    if (document.getElementById('kb-count-done')) document.getElementById('kb-count-done').innerText = counts['Hoàn thành'];
+    if (document.getElementById('kb-count-overdue')) document.getElementById('kb-count-overdue').innerText = counts['Quá hạn'];
+    if (document.getElementById('kb-count-canceled')) document.getElementById('kb-count-canceled').innerText = counts['Đã hủy'];
+  }
 
-  const numPrefix = index ? `<span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index}.</span>` : '';
+  function createDarkTaskCard(task, index) {
+    const card = document.createElement('div');
+    card.className = 'dark-card';
+    card.draggable = true;
+    card.dataset.id = task.ID || task.id;
 
-  card.innerHTML = `
+    const assignee = getTaskAssignee(task);
+    const avatarLetter = assignee.charAt(0).toUpperCase();
+
+    const numPrefix = index ? `<span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index}.</span>` : '';
+
+    card.innerHTML = `
     <div class="dark-card-title">${numPrefix}${escapeHtml(task['Tiêu đề'] || '')}</div>
     ${task['Mô tả'] ? `<div class="dark-card-sub">${escapeHtml(task['Mô tả'])}</div>` : ''}
     <div class="dark-card-footer">
@@ -913,90 +916,90 @@ function createDarkTaskCard(task, index) {
       </div>
     </div>
   `;
-  
-  card.addEventListener('dragstart', (e) => {
-    card.classList.add('dragging');
-    e.dataTransfer.setData('text/plain', task.ID || task.id);
-  });
-  card.addEventListener('dragend', () => card.classList.remove('dragging'));
-  
-  return card;
-}
 
-function setupKanbanDragAndDrop() {
-  document.querySelectorAll('.kanban-cards-dark').forEach(container => {
-    container.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      container.style.background = 'rgba(0, 200, 151, 0.08)';
+    card.addEventListener('dragstart', (e) => {
+      card.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', task.ID || task.id);
     });
-    container.addEventListener('dragleave', () => container.style.background = 'transparent');
-    container.addEventListener('drop', (e) => {
-      e.preventDefault();
-      container.style.background = 'transparent';
-      const taskId = e.dataTransfer.getData('text/plain');
-      const newStatus = container.dataset.status;
-      
-      if (taskId && newStatus) {
-        const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
-        if (task) {
-          task['Trạng thái'] = newStatus;
-          if (newStatus === 'Hoàn thành') task['Tiến độ (%)'] = 100;
-          try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
-          renderKanbanBoard();
-          callBackendSilent('updateTaskStatus', { id: taskId, status: newStatus });
-          showToast(`Đã chuyển công việc sang "${newStatus}"`, 'success');
-        }
-      }
-    });
-  });
-}
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
 
-function formatNameList(nameStr) {
-  if (!nameStr) return '';
-  const names = String(nameStr).split(',').map(n => n.trim()).filter(Boolean);
-  if (names.length === 0) return '';
-  return names.map(n => `<div style="line-height:1.35; margin:3px 0; word-break:break-word;">${escapeHtml(n)}</div>`).join('');
-}
-
-/* 3. DANH SÁCH (TABLE) */
-function renderTaskListTable() {
-  const filtered = getFilteredTasks();
-  const tbody = document.getElementById('task-list-tbody');
-  if (!tbody) return;
-  
-  tbody.innerHTML = '';
-  if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="15" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
-    return;
+    return card;
   }
-  
-  filtered.forEach((t, index) => {
-    const taskId = t.ID || t.id;
-    const status = t['Trạng thái'] || 'Đang thực hiện';
-    
-    let statusBadge = '';
-    if (status === 'Hoàn thành quá hạn') {
-      statusBadge = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
-    } else if (status === 'Quá hạn') {
-      statusBadge = `<span class="tag-status-overdue">Quá hạn</span>`;
-    } else if (status === 'Hoàn thành') {
-      statusBadge = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
-    } else {
-      statusBadge = `<span style="color:#94a3b8; font-size:0.78rem;">${escapeHtml(status)}</span>`;
+
+  function setupKanbanDragAndDrop() {
+    document.querySelectorAll('.kanban-cards-dark').forEach(container => {
+      container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        container.style.background = 'rgba(0, 200, 151, 0.08)';
+      });
+      container.addEventListener('dragleave', () => container.style.background = 'transparent');
+      container.addEventListener('drop', (e) => {
+        e.preventDefault();
+        container.style.background = 'transparent';
+        const taskId = e.dataTransfer.getData('text/plain');
+        const newStatus = container.dataset.status;
+
+        if (taskId && newStatus) {
+          const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
+          if (task) {
+            task['Trạng thái'] = newStatus;
+            if (newStatus === 'Hoàn thành') task['Tiến độ (%)'] = 100;
+            try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch (e) { }
+            renderKanbanBoard();
+            callBackendSilent('updateTaskStatus', { id: taskId, status: newStatus });
+            showToast(`Đã chuyển công việc sang "${newStatus}"`, 'success');
+          }
+        }
+      });
+    });
+  }
+
+  function formatNameList(nameStr) {
+    if (!nameStr) return '';
+    const names = String(nameStr).split(',').map(n => n.trim()).filter(Boolean);
+    if (names.length === 0) return '';
+    return names.map(n => `<div style="line-height:1.35; margin:3px 0; word-break:break-word;">${escapeHtml(n)}</div>`).join('');
+  }
+
+  /* 3. DANH SÁCH (TABLE) */
+  function renderTaskListTable() {
+    const filtered = getFilteredTasks();
+    const tbody = document.getElementById('task-list-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="15" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
+      return;
     }
 
-    const progress = Number(t['Tiến độ (%)'] || 0);
-    const keHoach = t['Kế hoạch'] !== undefined && t['Kế hoạch'] !== '' ? t['Kế hoạch'] : 1;
-    const thucHien = t['Thực hiện'] !== undefined && t['Thực hiện'] !== '' ? t['Thực hiện'] : 0;
-    const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
-    const ghiChu = t['Ghi chú'] || '';
-    const ngayLamXong = t['Ngày làm xong'] || '';
-    const chuTriName = getTaskAssignee(t);
-    const toChuTriName = getTaskGroup(t);
-    const phoiHopName = getTaskCollaborator(t);
+    filtered.forEach((t, index) => {
+      const taskId = t.ID || t.id;
+      const status = t['Trạng thái'] || 'Đang thực hiện';
 
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
+      let statusBadge = '';
+      if (status === 'Hoàn thành quá hạn') {
+        statusBadge = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
+      } else if (status === 'Quá hạn') {
+        statusBadge = `<span class="tag-status-overdue">Quá hạn</span>`;
+      } else if (status === 'Hoàn thành') {
+        statusBadge = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
+      } else {
+        statusBadge = `<span style="color:#94a3b8; font-size:0.78rem;">${escapeHtml(status)}</span>`;
+      }
+
+      const progress = Number(t['Tiến độ (%)'] || 0);
+      const keHoach = t['Kế hoạch'] !== undefined && t['Kế hoạch'] !== '' ? t['Kế hoạch'] : 1;
+      const thucHien = t['Thực hiện'] !== undefined && t['Thực hiện'] !== '' ? t['Thực hiện'] : 0;
+      const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
+      const ghiChu = t['Ghi chú'] || '';
+      const ngayLamXong = t['Ngày làm xong'] || '';
+      const chuTriName = getTaskAssignee(t);
+      const toChuTriName = getTaskGroup(t);
+      const phoiHopName = getTaskCollaborator(t);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
       <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index + 1}.</span><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
       <td class="col-desc-cell">${escapeHtml(t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
@@ -1031,67 +1034,67 @@ function renderTaskListTable() {
         </div>
       </td>
     `;
-    tbody.appendChild(tr);
-  });
+      tbody.appendChild(tr);
+    });
 
-  setTimeout(() => {
-    document.querySelectorAll('.inline-note-textarea').forEach(autoResizeTextarea);
-  }, 50);
-}
-
-function handleInlineTaskChange(taskId, field, value, element) {
-  const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
-  if (!task) return;
-  const payload = { id: taskId };
-
-  if (field === 'ghiChu') {
-    task['Ghi chú'] = value;
-    payload.ghiChu = value;
-    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
-
-    if (noteDebounceTimers[taskId]) clearTimeout(noteDebounceTimers[taskId]);
-    noteDebounceTimers[taskId] = setTimeout(() => {
-      callBackendSilent('updateTaskInline', payload);
-    }, 500);
-    return;
+    setTimeout(() => {
+      document.querySelectorAll('.inline-note-textarea').forEach(autoResizeTextarea);
+    }, 50);
   }
 
-  if (field === 'ngayLamXong') {
-    task['Ngày làm xong'] = value;
-    payload.ngayLamXong = value;
+  function handleInlineTaskChange(taskId, field, value, element) {
+    const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
+    if (!task) return;
+    const payload = { id: taskId };
 
-    if (value) {
-      task['Tiến độ (%)'] = 100;
-      const endDate = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
-      if (endDate && value > endDate) {
-        task['Trạng thái'] = 'Hoàn thành quá hạn';
-      } else {
-        task['Trạng thái'] = 'Hoàn thành';
-      }
-    } else {
-      const kh = Number(task['Kế hoạch'] || 1);
-      const th = Number(task['Thực hiện'] || 0);
-      task['Tiến độ (%)'] = kh > 0 ? Math.min(100, Math.round((th / kh) * 100)) : 0;
-      const endDate = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
-      const todayStr = new Date().toISOString().split('T')[0];
-      if (endDate && todayStr > endDate && task['Tiến độ (%)'] < 100) {
-        task['Trạng thái'] = 'Quá hạn';
-      } else {
-        task['Trạng thái'] = 'Đang thực hiện';
-      }
+    if (field === 'ghiChu') {
+      task['Ghi chú'] = value;
+      payload.ghiChu = value;
+      try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch (e) { }
+
+      if (noteDebounceTimers[taskId]) clearTimeout(noteDebounceTimers[taskId]);
+      noteDebounceTimers[taskId] = setTimeout(() => {
+        callBackendSilent('updateTaskInline', payload);
+      }, 500);
+      return;
     }
 
-    payload.progress = task['Tiến độ (%)'];
-    payload.status = task['Trạng thái'];
+    if (field === 'ngayLamXong') {
+      task['Ngày làm xong'] = value;
+      payload.ngayLamXong = value;
 
-    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
+      if (value) {
+        task['Tiến độ (%)'] = 100;
+        const endDate = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
+        if (endDate && value > endDate) {
+          task['Trạng thái'] = 'Hoàn thành quá hạn';
+        } else {
+          task['Trạng thái'] = 'Hoàn thành';
+        }
+      } else {
+        const kh = Number(task['Kế hoạch'] || 1);
+        const th = Number(task['Thực hiện'] || 0);
+        task['Tiến độ (%)'] = kh > 0 ? Math.min(100, Math.round((th / kh) * 100)) : 0;
+        const endDate = task['Ngày kết thúc'] || task['Hạn hoàn thành'] || '';
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (endDate && todayStr > endDate && task['Tiến độ (%)'] < 100) {
+          task['Trạng thái'] = 'Quá hạn';
+        } else {
+          task['Trạng thái'] = 'Đang thực hiện';
+        }
+      }
 
-    if (element) {
-      const tr = element.closest('tr');
-      if (tr) {
-        const progressCell = tr.querySelector('.progress-col-cell');
-        if (progressCell) {
-          progressCell.innerHTML = `
+      payload.progress = task['Tiến độ (%)'];
+      payload.status = task['Trạng thái'];
+
+      try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch (e) { }
+
+      if (element) {
+        const tr = element.closest('tr');
+        if (tr) {
+          const progressCell = tr.querySelector('.progress-col-cell');
+          if (progressCell) {
+            progressCell.innerHTML = `
             <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
               <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
                 <div style="width:${task['Tiến độ (%)']}%; height:100%; background:var(--emerald-primary);"></div>
@@ -1099,50 +1102,50 @@ function handleInlineTaskChange(taskId, field, value, element) {
               <span style="font-size:0.75rem; color:#94a3b8;">${task['Tiến độ (%)']}%</span>
             </div>
           `;
-        }
-        const statusCell = tr.querySelector('.status-col-cell');
-        if (statusCell) {
-          const st = task['Trạng thái'];
-          if (st === 'Hoàn thành quá hạn') {
-            statusCell.innerHTML = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
-          } else if (st === 'Hoàn thành') {
-            statusCell.innerHTML = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
-          } else if (st === 'Quá hạn') {
-            statusCell.innerHTML = `<span class="tag-status-overdue">Quá hạn</span>`;
-          } else {
-            statusCell.innerHTML = `<span style="color:#38bdf8; font-weight:600;">${st}</span>`;
+          }
+          const statusCell = tr.querySelector('.status-col-cell');
+          if (statusCell) {
+            const st = task['Trạng thái'];
+            if (st === 'Hoàn thành quá hạn') {
+              statusCell.innerHTML = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
+            } else if (st === 'Hoàn thành') {
+              statusCell.innerHTML = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
+            } else if (st === 'Quá hạn') {
+              statusCell.innerHTML = `<span class="tag-status-overdue">Quá hạn</span>`;
+            } else {
+              statusCell.innerHTML = `<span style="color:#38bdf8; font-weight:600;">${st}</span>`;
+            }
           }
         }
       }
     }
-  }
 
-  if (field === 'thucHien') {
-    const numVal = Number(value);
-    task['Thực hiện'] = numVal;
-    payload.thucHien = numVal;
+    if (field === 'thucHien') {
+      const numVal = Number(value);
+      task['Thực hiện'] = numVal;
+      payload.thucHien = numVal;
 
-    const kh = task['Kế hoạch'] !== undefined && task['Kế hoạch'] !== '' ? Number(task['Kế hoạch']) : 1;
-    const pct = kh > 0 ? Math.round((numVal / kh) * 100) : 0;
-    task['Tỷ lệ'] = pct + '%';
-    
-    if (!task['Ngày làm xong']) {
-      task['Tiến độ (%)'] = Math.min(100, pct);
-      payload.progress = task['Tiến độ (%)'];
-    }
+      const kh = task['Kế hoạch'] !== undefined && task['Kế hoạch'] !== '' ? Number(task['Kế hoạch']) : 1;
+      const pct = kh > 0 ? Math.round((numVal / kh) * 100) : 0;
+      task['Tỷ lệ'] = pct + '%';
 
-    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
+      if (!task['Ngày làm xong']) {
+        task['Tiến độ (%)'] = Math.min(100, pct);
+        payload.progress = task['Tiến độ (%)'];
+      }
 
-    if (element) {
-      const tr = element.closest('tr');
-      if (tr) {
-        const tyLeTd = tr.querySelector('.ty-le-col-cell');
-        if (tyLeTd) {
-          tyLeTd.innerHTML = `<strong style="color:var(--emerald-primary);">${task['Tỷ lệ']}</strong>`;
-        }
-        const progressCell = tr.querySelector('.progress-col-cell');
-        if (progressCell) {
-          progressCell.innerHTML = `
+      try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch (e) { }
+
+      if (element) {
+        const tr = element.closest('tr');
+        if (tr) {
+          const tyLeTd = tr.querySelector('.ty-le-col-cell');
+          if (tyLeTd) {
+            tyLeTd.innerHTML = `<strong style="color:var(--emerald-primary);">${task['Tỷ lệ']}</strong>`;
+          }
+          const progressCell = tr.querySelector('.progress-col-cell');
+          if (progressCell) {
+            progressCell.innerHTML = `
             <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
               <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
                 <div style="width:${task['Tiến độ (%)']}%; height:100%; background:var(--emerald-primary);"></div>
@@ -1150,46 +1153,46 @@ function handleInlineTaskChange(taskId, field, value, element) {
               <span style="font-size:0.75rem; color:#94a3b8;">${task['Tiến độ (%)']}%</span>
             </div>
           `;
+          }
         }
       }
     }
+
+    callBackendSilent('updateTaskInline', payload);
   }
 
-  callBackendSilent('updateTaskInline', payload);
-}
+  function sortTable(columnName) {
+    if (appState.sortColumn === columnName) {
+      appState.sortAscending = !appState.sortAscending;
+    } else {
+      appState.sortColumn = columnName;
+      appState.sortAscending = true;
+    }
 
-function sortTable(columnName) {
-  if (appState.sortColumn === columnName) {
-    appState.sortAscending = !appState.sortAscending;
-  } else {
-    appState.sortColumn = columnName;
-    appState.sortAscending = true;
-  }
-  
-  appState.tasks.sort((a, b) => {
-    let valA = a[columnName] || '';
-    let valB = b[columnName] || '';
-    if (valA < valB) return appState.sortAscending ? -1 : 1;
-    if (valA > valB) return appState.sortAscending ? 1 : -1;
-    return 0;
-  });
-  
-  renderTaskListTable();
-}
+    appState.tasks.sort((a, b) => {
+      let valA = a[columnName] || '';
+      let valB = b[columnName] || '';
+      if (valA < valB) return appState.sortAscending ? -1 : 1;
+      if (valA > valB) return appState.sortAscending ? 1 : -1;
+      return 0;
+    });
 
-function renderGanttChart() {
-  const container = document.getElementById('gantt-chart-container');
-  if (!container) return;
-  const filtered = getFilteredTasks();
-  if (filtered.length === 0) {
-    container.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted);">Không có dữ liệu công việc</div>`;
-    return;
+    renderTaskListTable();
   }
-  const months = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
-  const curM = new Date().getMonth();
-  const displayMonths = months.slice(curM, curM + 4);
-  
-  let html = `
+
+  function renderGanttChart() {
+    const container = document.getElementById('gantt-chart-container');
+    if (!container) return;
+    const filtered = getFilteredTasks();
+    if (filtered.length === 0) {
+      container.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted);">Không có dữ liệu công việc</div>`;
+      return;
+    }
+    const months = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
+    const curM = new Date().getMonth();
+    const displayMonths = months.slice(curM, curM + 4);
+
+    let html = `
     <div style="display:flex; background:#141b2d; border-bottom:1px solid var(--card-border); padding:10px 16px; font-weight:600;">
       <div style="width:240px;">Tên Công Việc</div>
       <div style="flex:1; display:flex; justify-content:space-around;">
@@ -1199,9 +1202,9 @@ function renderGanttChart() {
     <div style="padding:16px;">
   `;
 
-  filtered.forEach(t => {
-    const progress = Number(t['Tiến độ (%)'] || 0);
-    html += `
+    filtered.forEach(t => {
+      const progress = Number(t['Tiến độ (%)'] || 0);
+      html += `
       <div style="display:flex; align-items:center; height:44px; border-bottom:1px dashed rgba(255,255,255,0.06);">
         <div style="width:240px; font-size:0.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(t['Tiêu đề'])}</div>
         <div style="flex:1; position:relative; height:100%;">
@@ -1211,31 +1214,31 @@ function renderGanttChart() {
         </div>
       </div>
     `;
-  });
-  
-  html += `</div>`;
-  container.innerHTML = html;
-}
+    });
 
-function renderCvLuuYTable() {
-  const tbody = document.getElementById('cvluuy-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-  
-  const search = (document.getElementById('cvluuy-search-input')?.value || '').toLowerCase();
-  const group = document.getElementById('cvluuy-group-select')?.value || '';
+    html += `</div>`;
+    container.innerHTML = html;
+  }
 
-  const filtered = appState.cvluuy.filter(item => {
-    const task = (item['Công việc'] || '').toLowerCase();
-    const desc = (item['Mô tả'] || '').toLowerCase();
-    if (search && !task.includes(search) && !desc.includes(search)) return false;
-    if (group && item['Tổ'] !== group) return false;
-    return true;
-  });
+  function renderCvLuuYTable() {
+    const tbody = document.getElementById('cvluuy-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
-  filtered.forEach((item, idx) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
+    const search = (document.getElementById('cvluuy-search-input')?.value || '').toLowerCase();
+    const group = document.getElementById('cvluuy-group-select')?.value || '';
+
+    const filtered = appState.cvluuy.filter(item => {
+      const task = (item['Công việc'] || '').toLowerCase();
+      const desc = (item['Mô tả'] || '').toLowerCase();
+      if (search && !task.includes(search) && !desc.includes(search)) return false;
+      if (group && item['Tổ'] !== group) return false;
+      return true;
+    });
+
+    filtered.forEach((item, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
       <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span><strong>${escapeHtml(item['Công việc'] || '')}</strong></td>
       <td class="col-desc-cell">${escapeHtml(item['Mô tả'] || '')}</td>
       <td><span class="tag-org">${escapeHtml(item['Tổ'] || 'Chung')}</span></td>
@@ -1253,27 +1256,27 @@ function renderCvLuuYTable() {
         </div>
       </td>
     `;
-    tbody.appendChild(tr);
-  });
+      tbody.appendChild(tr);
+    });
 
-  setTimeout(() => {
-    document.querySelectorAll('.inline-note-textarea').forEach(autoResizeTextarea);
-  }, 50);
-}
+    setTimeout(() => {
+      document.querySelectorAll('.inline-note-textarea').forEach(autoResizeTextarea);
+    }, 50);
+  }
 
-function renderDocumentsTable() {
-  const tbody = document.getElementById('documents-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-  
-  appState.documents.forEach((doc, idx) => {
-    const valHD = Number(doc['Giá trị HĐ'] || 0).toLocaleString('vi-VN');
-    const valTH = Number(doc['Giá trị thực hiện'] || 0).toLocaleString('vi-VN');
-    const diffVal = Number(doc['Chênh lệch'] || 0).toLocaleString('vi-VN');
-    const fileBtn = doc['File URL'] ? `<a href="${doc['File URL']}" target="_blank" class="btn-dark-sec btn-sm"><i class="fa-solid fa-file-pdf"></i> Tệp</a>` : 'N/A';
+  function renderDocumentsTable() {
+    const tbody = document.getElementById('documents-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
+    appState.documents.forEach((doc, idx) => {
+      const valHD = Number(doc['Giá trị HĐ'] || 0).toLocaleString('vi-VN');
+      const valTH = Number(doc['Giá trị thực hiện'] || 0).toLocaleString('vi-VN');
+      const diffVal = Number(doc['Chênh lệch'] || 0).toLocaleString('vi-VN');
+      const fileBtn = doc['File URL'] ? `<a href="${doc['File URL']}" target="_blank" class="btn-dark-sec btn-sm"><i class="fa-solid fa-file-pdf"></i> Tệp</a>` : 'N/A';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
       <td><strong>${escapeHtml(doc['Số hồ sơ'] || '')}</strong></td>
       <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span><strong>${escapeHtml(doc['Tên hồ sơ'] || '')}</strong></td>
       <td>${escapeHtml(doc['Danh mục'] || '')}</td>
@@ -1291,18 +1294,18 @@ function renderDocumentsTable() {
         </div>
       </td>
     `;
-    tbody.appendChild(tr);
-  });
-}
+      tbody.appendChild(tr);
+    });
+  }
 
-function renderUsersTable() {
-  const tbody = document.getElementById('users-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-  
-  appState.users.forEach((usr, idx) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
+  function renderUsersTable() {
+    const tbody = document.getElementById('users-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    appState.users.forEach((usr, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
       <td><strong>${usr.ID || usr.id}</strong></td>
       <td><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${idx + 1}.</span><strong>${escapeHtml(usr['Tên'] || '')}</strong></td>
       <td>${escapeHtml(usr['Tổ'] || '')}</td>
@@ -1313,90 +1316,90 @@ function renderUsersTable() {
         </div>
       </td>
     `;
-    tbody.appendChild(tr);
-  });
-}
-
-function renderOrgStatistics() {
-  const container = document.getElementById('stats-org-container');
-  if (!container) return;
-
-  const orgMap = {};
-
-  if (appState.users && Array.isArray(appState.users)) {
-    appState.users.forEach(u => {
-      const { group } = getUserNameAndGroup(u);
-      if (group && !orgMap[group]) {
-        orgMap[group] = { total: 0, inProgress: 0, done: 0, overdue: 0 };
-      }
+      tbody.appendChild(tr);
     });
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  function renderOrgStatistics() {
+    const container = document.getElementById('stats-org-container');
+    if (!container) return;
 
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
-      let grp = getTaskGroup(t);
-      if (!grp) {
-        const assignee = getTaskAssignee(t);
-        const usr = appState.users.find(u => {
-          const { name } = getUserNameAndGroup(u);
-          return name === assignee;
-        });
-        if (usr) {
-          const { group } = getUserNameAndGroup(usr);
-          grp = group;
+    const orgMap = {};
+
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        const { group } = getUserNameAndGroup(u);
+        if (group && !orgMap[group]) {
+          orgMap[group] = { total: 0, inProgress: 0, done: 0, overdue: 0 };
         }
-      }
-      if (!grp) grp = 'Chưa phân tổ';
+      });
+    }
 
-      if (!orgMap[grp]) {
-        orgMap[grp] = { total: 0, inProgress: 0, done: 0, overdue: 0 };
-      }
+    const todayStr = new Date().toISOString().split('T')[0];
 
-      orgMap[grp].total++;
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        let grp = getTaskGroup(t);
+        if (!grp) {
+          const assignee = getTaskAssignee(t);
+          const usr = appState.users.find(u => {
+            const { name } = getUserNameAndGroup(u);
+            return name === assignee;
+          });
+          if (usr) {
+            const { group } = getUserNameAndGroup(usr);
+            grp = group;
+          }
+        }
+        if (!grp) grp = 'Chưa phân tổ';
 
-      const st = t['Trạng thái'] || '';
-      const endDate = t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '';
+        if (!orgMap[grp]) {
+          orgMap[grp] = { total: 0, inProgress: 0, done: 0, overdue: 0 };
+        }
 
-      const isDone = (st === 'Hoàn thành');
-      const isDoneOverdue = (st === 'Hoàn thành quá hạn');
-      const isOverdue = isDoneOverdue || (!isDone && endDate && endDate < todayStr);
+        orgMap[grp].total++;
 
-      if (isDone) {
-        orgMap[grp].done++;
-      } else if (isDoneOverdue) {
-        orgMap[grp].done++;
-        orgMap[grp].overdue++;
-      } else if (isOverdue) {
-        orgMap[grp].overdue++;
-        orgMap[grp].inProgress++;
-      } else {
-        orgMap[grp].inProgress++;
-      }
+        const st = t['Trạng thái'] || '';
+        const endDate = t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '';
+
+        const isDone = (st === 'Hoàn thành');
+        const isDoneOverdue = (st === 'Hoàn thành quá hạn');
+        const isOverdue = isDoneOverdue || (!isDone && endDate && endDate < todayStr);
+
+        if (isDone) {
+          orgMap[grp].done++;
+        } else if (isDoneOverdue) {
+          orgMap[grp].done++;
+          orgMap[grp].overdue++;
+        } else if (isOverdue) {
+          orgMap[grp].overdue++;
+          orgMap[grp].inProgress++;
+        } else {
+          orgMap[grp].inProgress++;
+        }
+      });
+    }
+
+    const groups = Object.keys(orgMap).sort();
+    let grandTotal = 0, grandInProgress = 0, grandDone = 0, grandOverdue = 0;
+
+    groups.forEach(g => {
+      grandTotal += orgMap[g].total;
+      grandInProgress += orgMap[g].inProgress;
+      grandDone += orgMap[g].done;
+      grandOverdue += orgMap[g].overdue;
     });
-  }
 
-  const groups = Object.keys(orgMap).sort();
-  let grandTotal = 0, grandInProgress = 0, grandDone = 0, grandOverdue = 0;
-
-  groups.forEach(g => {
-    grandTotal += orgMap[g].total;
-    grandInProgress += orgMap[g].inProgress;
-    grandDone += orgMap[g].done;
-    grandOverdue += orgMap[g].overdue;
-  });
-
-  let html = `
+    let html = `
     <div style="display:flex; flex-direction:column; gap:20px;">
       <!-- TOP PROGRESS SUMMARY CARDS -->
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
   `;
 
-  groups.forEach(g => {
-    const data = orgMap[g];
-    const pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
-    html += `
+    groups.forEach(g => {
+      const data = orgMap[g];
+      const pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
+      html += `
       <div style="background:rgba(255,255,255,0.03); border:1px solid var(--card-border); border-radius:12px; padding:14px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
           <strong style="color:var(--text-white); font-size:0.92rem;"><i class="fa-solid fa-users icon-green" style="margin-right:6px;"></i>${escapeHtml(g)}</strong>
@@ -1413,9 +1416,9 @@ function renderOrgStatistics() {
         </div>
       </div>
     `;
-  });
+    });
 
-  html += `
+    html += `
       </div>
 
       <!-- DETAILED STATISTICS TABLE -->
@@ -1439,10 +1442,10 @@ function renderOrgStatistics() {
             <tbody>
   `;
 
-  groups.forEach((g, idx) => {
-    const data = orgMap[g];
-    const pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
-    html += `
+    groups.forEach((g, idx) => {
+      const data = orgMap[g];
+      const pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
+      html += `
       <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
         <td style="padding:10px 14px; font-weight:700; color:#38bdf8;">${idx + 1}</td>
         <td style="padding:10px 14px; text-align:left; font-weight:600; color:#ffffff;">${escapeHtml(g)}</td>
@@ -1460,10 +1463,10 @@ function renderOrgStatistics() {
         </td>
       </tr>
     `;
-  });
+    });
 
-  const grandPct = grandTotal > 0 ? Math.round((grandDone / grandTotal) * 100) : 0;
-  html += `
+    const grandPct = grandTotal > 0 ? Math.round((grandDone / grandTotal) * 100) : 0;
+    html += `
             </tbody>
             <tfoot>
               <tr style="background:rgba(0,200,151,0.1); font-weight:700; color:#ffffff; border-top:2px solid var(--card-border);">
@@ -1481,200 +1484,221 @@ function renderOrgStatistics() {
     </div>
   `;
 
-  container.innerHTML = html;
-}
-
-let currentStatsSubTab = 'org';
-
-function switchStatsSubTab(type) {
-  currentStatsSubTab = type;
-  const btnOrg = document.getElementById('btn-subtab-org');
-  const btnUser = document.getElementById('btn-subtab-user');
-  const contentOrg = document.getElementById('subtab-org-content');
-  const contentUser = document.getElementById('subtab-user-content');
-  const filterBar = document.getElementById('stats-user-filter-bar');
-
-  if (type === 'org') {
-    if (btnOrg) btnOrg.classList.add('active');
-    if (btnUser) btnUser.classList.remove('active');
-    if (contentOrg) contentOrg.style.display = 'block';
-    if (contentUser) contentUser.style.display = 'none';
-    if (filterBar) filterBar.style.display = 'none';
-    renderOrgStatistics();
-  } else {
-    if (btnUser) btnUser.classList.add('active');
-    if (btnOrg) btnOrg.classList.remove('active');
-    if (contentUser) contentUser.style.display = 'block';
-    if (contentOrg) contentOrg.style.display = 'none';
-    if (filterBar) filterBar.style.display = 'flex';
-    populateStatsUserFilters();
-    renderUserStatistics();
-  }
-}
-
-function populateStatsUserFilters() {
-  const grpSelect = document.getElementById('stats-user-group-filter');
-  const usrSelect = document.getElementById('stats-user-person-filter');
-  if (!grpSelect || !usrSelect) return;
-
-  const currentGrp = grpSelect.value;
-  const hostGroups = new Set();
-
-  if (appState.users && Array.isArray(appState.users)) {
-    appState.users.forEach(u => {
-      const { group } = getUserNameAndGroup(u);
-      if (group) hostGroups.add(group);
-    });
+    container.innerHTML = html;
   }
 
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
-      const tg = getTaskGroup(t);
-      if (tg) hostGroups.add(tg);
-    });
+  let currentStatsSubTab = 'org';
+
+  function switchStatsSubTab(type) {
+    currentStatsSubTab = type;
+    const btnOrg = document.getElementById('btn-subtab-org');
+    const btnUser = document.getElementById('btn-subtab-user');
+    const contentOrg = document.getElementById('subtab-org-content');
+    const contentUser = document.getElementById('subtab-user-content');
+    const filterBar = document.getElementById('stats-user-filter-bar');
+
+    if (type === 'org') {
+      if (btnOrg) btnOrg.classList.add('active');
+      if (btnUser) btnUser.classList.remove('active');
+      if (contentOrg) contentOrg.style.display = 'block';
+      if (contentUser) contentUser.style.display = 'none';
+      if (filterBar) filterBar.style.display = 'none';
+      renderOrgStatistics();
+    } else {
+      if (btnUser) btnUser.classList.add('active');
+      if (btnOrg) btnOrg.classList.remove('active');
+      if (contentUser) contentUser.style.display = 'block';
+      if (contentOrg) contentOrg.style.display = 'none';
+      if (filterBar) filterBar.style.display = 'flex';
+      populateStatsUserFilters();
+      renderUserStatistics();
+    }
   }
 
-  grpSelect.innerHTML = '<option value="">Tất cả tổ</option>';
-  Array.from(hostGroups).sort().forEach(g => {
-    grpSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
-  });
-  if (currentGrp) grpSelect.value = currentGrp;
+  function populateStatsUserFilters() {
+    const grpSelect = document.getElementById('stats-user-group-filter');
+    const usrSelect = document.getElementById('stats-user-person-filter');
+    if (!grpSelect || !usrSelect) return;
 
-  onStatsUserGroupChange();
-}
+    const currentGrp = grpSelect.value;
+    const hostGroups = new Set();
 
-function onStatsUserGroupChange() {
-  const grpSelect = document.getElementById('stats-user-group-filter');
-  const usrSelect = document.getElementById('stats-user-person-filter');
-  if (!grpSelect || !usrSelect) return;
-
-  const selGrp = grpSelect.value;
-  const selGrpClean = cleanKey(selGrp);
-  const currentUsr = usrSelect.value;
-
-  const usersInGrp = new Set();
-
-  if (selGrpClean) {
     if (appState.users && Array.isArray(appState.users)) {
       appState.users.forEach(u => {
-        const { name, group } = getUserNameAndGroup(u);
-        const ckG = cleanKey(group);
-        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
-          usersInGrp.add(name);
-        }
+        const { group } = getUserNameAndGroup(u);
+        if (group) hostGroups.add(group);
       });
     }
 
     if (appState.tasks && Array.isArray(appState.tasks)) {
       appState.tasks.forEach(t => {
         const tg = getTaskGroup(t);
-        const ckTg = cleanKey(tg);
+        if (tg) hostGroups.add(tg);
+      });
+    }
+
+    grpSelect.innerHTML = '<option value="">Tất cả tổ</option>';
+    Array.from(hostGroups).sort().forEach(g => {
+      grpSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+    });
+    if (currentGrp) grpSelect.value = currentGrp;
+
+    onStatsUserGroupChange();
+  }
+
+  function onStatsUserGroupChange() {
+    const grpSelect = document.getElementById('stats-user-group-filter');
+    const usrSelect = document.getElementById('stats-user-person-filter');
+    if (!grpSelect || !usrSelect) return;
+
+    const selGrp = grpSelect.value;
+    const selGrpClean = cleanKey(selGrp);
+    const currentUsr = usrSelect.value;
+
+    const usersInGrp = new Set();
+
+    if (selGrpClean) {
+      if (appState.users && Array.isArray(appState.users)) {
+        appState.users.forEach(u => {
+          const { name, group } = getUserNameAndGroup(u);
+          const ckG = cleanKey(group);
+          if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
+            usersInGrp.add(name);
+          }
+        });
+      }
+
+      if (appState.tasks && Array.isArray(appState.tasks)) {
+        appState.tasks.forEach(t => {
+          const tg = getTaskGroup(t);
+          const ckTg = cleanKey(tg);
+          const a = getTaskAssignee(t);
+          if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
+            a.split(',').forEach(n => { if (n.trim()) usersInGrp.add(n.trim()); });
+          }
+        });
+      }
+    } else {
+      if (appState.users && Array.isArray(appState.users)) {
+        appState.users.forEach(u => {
+          const { name } = getUserNameAndGroup(u);
+          if (name) usersInGrp.add(name);
+        });
+      }
+      if (appState.tasks && Array.isArray(appState.tasks)) {
+        appState.tasks.forEach(t => {
+          const a = getTaskAssignee(t);
+          const c = getTaskCollaborator(t);
+          if (a && a !== 'Chưa gán') a.split(',').forEach(n => { if (n.trim()) usersInGrp.add(n.trim()); });
+          if (c && String(c).trim()) c.split(',').forEach(n => { if (n.trim()) usersInGrp.add(n.trim()); });
+        });
+      }
+    }
+
+    usrSelect.innerHTML = '<option value="">Tất cả cá nhân</option>';
+    Array.from(usersInGrp).sort().forEach(u => {
+      usrSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
+    });
+
+    if (currentUsr && Array.from(usersInGrp).includes(currentUsr)) {
+      usrSelect.value = currentUsr;
+    }
+
+    renderUserStatistics();
+  }
+
+  function getUserTeamName(personName) {
+    if (!personName) return '';
+    const pClean = cleanKey(personName);
+    if (!pClean) return '';
+
+    if (appState.tovien && Array.isArray(appState.tovien)) {
+      let lastGroup = '';
+      for (let i = 0; i < appState.tovien.length; i++) {
+        const row = appState.tovien[i];
+        const info = getTovienRowInfo(row);
+        if (info.group) lastGroup = info.group;
+
+        if (info.empName && cleanKey(info.empName) === pClean) {
+          if (info.group || lastGroup) return info.group || lastGroup;
+        }
+        if (info.leaderName && cleanKey(info.leaderName) === pClean) {
+          if (info.group || lastGroup) return info.group || lastGroup;
+        }
+      }
+    }
+
+    let foundUser = appState.users && Array.isArray(appState.users) ? appState.users.find(u => {
+      const { name } = getUserNameAndGroup(u);
+      return cleanKey(name) === pClean;
+    }) : null;
+
+    if (!foundUser && appState.users && Array.isArray(appState.users)) {
+      foundUser = appState.users.find(u => {
+        const { name } = getUserNameAndGroup(u);
+        const uClean = cleanKey(name);
+        return uClean && (uClean.includes(pClean) || pClean.includes(uClean));
+      });
+    }
+
+    if (foundUser) {
+      const { group } = getUserNameAndGroup(foundUser);
+      if (group && group !== 'Chưa phân tổ') return group;
+    }
+
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      const hostTask = appState.tasks.find(t => {
         const a = getTaskAssignee(t);
-        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
-          a.split(',').forEach(n => { if (n.trim()) usersInGrp.add(n.trim()); });
+        return a && cleanKey(a).includes(pClean);
+      });
+      if (hostTask) {
+        const tg = getTaskGroup(hostTask);
+        if (tg && tg !== 'Khác') return tg;
+      }
+    }
+
+    return '';
+  }
+
+  function renderUserStatistics() {
+    const container = document.getElementById('stats-user-container');
+    if (!container) return;
+
+    const grpFilter = document.getElementById('stats-user-group-filter')?.value || '';
+    const grpClean = cleanKey(grpFilter);
+    const usrFilter = document.getElementById('stats-user-person-filter')?.value || '';
+    const usrClean = cleanKey(usrFilter);
+
+    const userStatsMap = {};
+
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        const { name, group } = getUserNameAndGroup(u);
+        if (name && !userStatsMap[name]) {
+          userStatsMap[name] = {
+            name: name,
+            group: group || 'Chưa phân tổ',
+            hostTasks: 0,
+            collabTasks: 0,
+            total: 0,
+            inProgress: 0,
+            done: 0,
+            overdue: 0
+          };
         }
       });
     }
-  } else {
-    if (appState.users && Array.isArray(appState.users)) {
-      appState.users.forEach(u => {
-        const { name } = getUserNameAndGroup(u);
-        if (name) usersInGrp.add(name);
-      });
-    }
-    if (appState.tasks && Array.isArray(appState.tasks)) {
-      appState.tasks.forEach(t => {
-        const a = getTaskAssignee(t);
-        const c = getTaskCollaborator(t);
-        if (a && a !== 'Chưa gán') a.split(',').forEach(n => { if (n.trim()) usersInGrp.add(n.trim()); });
-        if (c && String(c).trim()) c.split(',').forEach(n => { if (n.trim()) usersInGrp.add(n.trim()); });
-      });
-    }
-  }
 
-  usrSelect.innerHTML = '<option value="">Tất cả cá nhân</option>';
-  Array.from(usersInGrp).sort().forEach(u => {
-    usrSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
-  });
+    function findOrCreateUserStat(rawName, taskGroupFallback) {
+      const cleanN = cleanKey(rawName);
+      let matchedKey = Object.keys(userStatsMap).find(k => cleanKey(k) === cleanN);
 
-  if (currentUsr && Array.from(usersInGrp).includes(currentUsr)) {
-    usrSelect.value = currentUsr;
-  }
-
-  renderUserStatistics();
-}
-
-function getUserTeamName(personName) {
-  if (!personName) return '';
-  const pClean = cleanKey(personName);
-  if (!pClean) return '';
-
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    let lastGroup = '';
-    for (let i = 0; i < appState.tovien.length; i++) {
-      const row = appState.tovien[i];
-      const info = getTovienRowInfo(row);
-      if (info.group) lastGroup = info.group;
-
-      if (info.empName && cleanKey(info.empName) === pClean) {
-        if (info.group || lastGroup) return info.group || lastGroup;
-      }
-      if (info.leaderName && cleanKey(info.leaderName) === pClean) {
-        if (info.group || lastGroup) return info.group || lastGroup;
-      }
-    }
-  }
-
-  let foundUser = appState.users && Array.isArray(appState.users) ? appState.users.find(u => {
-    const { name } = getUserNameAndGroup(u);
-    return cleanKey(name) === pClean;
-  }) : null;
-
-  if (!foundUser && appState.users && Array.isArray(appState.users)) {
-    foundUser = appState.users.find(u => {
-      const { name } = getUserNameAndGroup(u);
-      const uClean = cleanKey(name);
-      return uClean && (uClean.includes(pClean) || pClean.includes(uClean));
-    });
-  }
-
-  if (foundUser) {
-    const { group } = getUserNameAndGroup(foundUser);
-    if (group && group !== 'Chưa phân tổ') return group;
-  }
-
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    const hostTask = appState.tasks.find(t => {
-      const a = getTaskAssignee(t);
-      return a && cleanKey(a).includes(pClean);
-    });
-    if (hostTask) {
-      const tg = getTaskGroup(hostTask);
-      if (tg && tg !== 'Khác') return tg;
-    }
-  }
-
-  return '';
-}
-
-function renderUserStatistics() {
-  const container = document.getElementById('stats-user-container');
-  if (!container) return;
-
-  const grpFilter = document.getElementById('stats-user-group-filter')?.value || '';
-  const grpClean = cleanKey(grpFilter);
-  const usrFilter = document.getElementById('stats-user-person-filter')?.value || '';
-  const usrClean = cleanKey(usrFilter);
-
-  const userStatsMap = {};
-
-  if (appState.users && Array.isArray(appState.users)) {
-    appState.users.forEach(u => {
-      const { name, group } = getUserNameAndGroup(u);
-      if (name && !userStatsMap[name]) {
-        userStatsMap[name] = {
-          name: name,
-          group: group || 'Chưa phân tổ',
+      if (!matchedKey) {
+        const userTeam = getUserTeamName(rawName) || taskGroupFallback || 'Khác';
+        matchedKey = rawName.trim();
+        userStatsMap[matchedKey] = {
+          name: matchedKey,
+          group: userTeam,
           hostTasks: 0,
           collabTasks: 0,
           total: 0,
@@ -1682,115 +1706,94 @@ function renderUserStatistics() {
           done: 0,
           overdue: 0
         };
+      } else {
+        const officialTeam = getUserTeamName(matchedKey);
+        if (officialTeam) userStatsMap[matchedKey].group = officialTeam;
       }
-    });
-  }
 
-  function findOrCreateUserStat(rawName, taskGroupFallback) {
-    const cleanN = cleanKey(rawName);
-    let matchedKey = Object.keys(userStatsMap).find(k => cleanKey(k) === cleanN);
-
-    if (!matchedKey) {
-      const userTeam = getUserTeamName(rawName) || taskGroupFallback || 'Khác';
-      matchedKey = rawName.trim();
-      userStatsMap[matchedKey] = {
-        name: matchedKey,
-        group: userTeam,
-        hostTasks: 0,
-        collabTasks: 0,
-        total: 0,
-        inProgress: 0,
-        done: 0,
-        overdue: 0
-      };
-    } else {
-      const officialTeam = getUserTeamName(matchedKey);
-      if (officialTeam) userStatsMap[matchedKey].group = officialTeam;
+      return userStatsMap[matchedKey];
     }
 
-    return userStatsMap[matchedKey];
-  }
+    const todayStr = new Date().toISOString().split('T')[0];
 
-  const todayStr = new Date().toISOString().split('T')[0];
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        const assigneeStr = getTaskAssignee(t);
+        const collabStr = getTaskCollaborator(t);
+        const tg = getTaskGroup(t);
+        const st = t['Trạng thái'] || '';
+        const endDate = t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '';
 
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
-      const assigneeStr = getTaskAssignee(t);
-      const collabStr = getTaskCollaborator(t);
-      const tg = getTaskGroup(t);
-      const st = t['Trạng thái'] || '';
-      const endDate = t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '';
+        const isDone = (st === 'Hoàn thành');
+        const isDoneOverdue = (st === 'Hoàn thành quá hạn');
+        const isOverdue = isDoneOverdue || (!isDone && endDate && endDate < todayStr);
 
-      const isDone = (st === 'Hoàn thành');
-      const isDoneOverdue = (st === 'Hoàn thành quá hạn');
-      const isOverdue = isDoneOverdue || (!isDone && endDate && endDate < todayStr);
+        if (assigneeStr && assigneeStr !== 'Chưa gán') {
+          assigneeStr.split(',').forEach(rawName => {
+            const uName = rawName.trim();
+            if (uName) {
+              const stat = findOrCreateUserStat(uName, tg);
+              stat.hostTasks++;
+              stat.total++;
+              if (isDone) stat.done++;
+              else if (isDoneOverdue) { stat.done++; stat.overdue++; }
+              else if (isOverdue) { stat.overdue++; stat.inProgress++; }
+              else stat.inProgress++;
+            }
+          });
+        }
 
-      if (assigneeStr && assigneeStr !== 'Chưa gán') {
-        assigneeStr.split(',').forEach(rawName => {
-          const uName = rawName.trim();
-          if (uName) {
-            const stat = findOrCreateUserStat(uName, tg);
-            stat.hostTasks++;
-            stat.total++;
-            if (isDone) stat.done++;
-            else if (isDoneOverdue) { stat.done++; stat.overdue++; }
-            else if (isOverdue) { stat.overdue++; stat.inProgress++; }
-            else stat.inProgress++;
-          }
-        });
-      }
-
-      if (collabStr && String(collabStr).trim()) {
-        collabStr.split(',').forEach(rawName => {
-          const uName = rawName.trim();
-          if (uName) {
-            const stat = findOrCreateUserStat(uName, tg);
-            stat.collabTasks++;
-            stat.total++;
-            if (isDone) stat.done++;
-            else if (isDoneOverdue) { stat.done++; stat.overdue++; }
-            else if (isOverdue) { stat.overdue++; stat.inProgress++; }
-            else stat.inProgress++;
-          }
-        });
-      }
-    });
-  }
-
-  let userList = Object.values(userStatsMap).filter(u => {
-    const n = String(u.name || '').trim();
-    return n !== '' && n !== '0' && n !== 'undefined' && n !== 'null';
-  });
-
-  // Re-verify official team for all users
-  userList.forEach(u => {
-    const officialTeam = getUserTeamName(u.name);
-    if (officialTeam) {
-      u.group = officialTeam;
+        if (collabStr && String(collabStr).trim()) {
+          collabStr.split(',').forEach(rawName => {
+            const uName = rawName.trim();
+            if (uName) {
+              const stat = findOrCreateUserStat(uName, tg);
+              stat.collabTasks++;
+              stat.total++;
+              if (isDone) stat.done++;
+              else if (isDoneOverdue) { stat.done++; stat.overdue++; }
+              else if (isOverdue) { stat.overdue++; stat.inProgress++; }
+              else stat.inProgress++;
+            }
+          });
+        }
+      });
     }
-  });
 
-  if (grpClean) {
-    userList = userList.filter(u => {
-      const ckG = cleanKey(u.group);
-      return ckG.includes(grpClean) || grpClean.includes(ckG);
+    let userList = Object.values(userStatsMap).filter(u => {
+      const n = String(u.name || '').trim();
+      return n !== '' && n !== '0' && n !== 'undefined' && n !== 'null';
     });
-  }
-  if (usrClean) {
-    userList = userList.filter(u => cleanKey(u.name) === usrClean || cleanKey(u.name).includes(usrClean));
-  }
 
-  userList.sort((a, b) => a.name.localeCompare(b.name));
+    // Re-verify official team for all users
+    userList.forEach(u => {
+      const officialTeam = getUserTeamName(u.name);
+      if (officialTeam) {
+        u.group = officialTeam;
+      }
+    });
 
-  let totalTasksSum = 0, totalInProgressSum = 0, totalDoneSum = 0, totalOverdueSum = 0;
-  userList.forEach(u => {
-    totalTasksSum += u.total;
-    totalInProgressSum += u.inProgress;
-    totalDoneSum += u.done;
-    totalOverdueSum += u.overdue;
-  });
+    if (grpClean) {
+      userList = userList.filter(u => {
+        const ckG = cleanKey(u.group);
+        return ckG.includes(grpClean) || grpClean.includes(ckG);
+      });
+    }
+    if (usrClean) {
+      userList = userList.filter(u => cleanKey(u.name) === usrClean || cleanKey(u.name).includes(usrClean));
+    }
 
-  let html = `
+    userList.sort((a, b) => a.name.localeCompare(b.name));
+
+    let totalTasksSum = 0, totalInProgressSum = 0, totalDoneSum = 0, totalOverdueSum = 0;
+    userList.forEach(u => {
+      totalTasksSum += u.total;
+      totalInProgressSum += u.inProgress;
+      totalDoneSum += u.done;
+      totalOverdueSum += u.overdue;
+    });
+
+    let html = `
     <div style="overflow-x:auto;">
       <table class="dark-table" style="width:100%; border-collapse:collapse; text-align:center; font-size:0.85rem;">
         <thead>
@@ -1811,29 +1814,29 @@ function renderUserStatistics() {
         <tbody>
   `;
 
-  if (userList.length === 0) {
-    html += `
+    if (userList.length === 0) {
+      html += `
       <tr>
         <td colspan="11" style="padding:20px; color:#94a3b8;">Không tìm thấy nhân viên nào phù hợp với bộ lọc.</td>
       </tr>
     `;
-  } else {
-    userList.forEach((u, idx) => {
-      const pct = u.total > 0 ? Math.round((u.done / u.total) * 100) : 0;
-      let gradeBadge = '';
-      if (u.total === 0) {
-        gradeBadge = `<span style="color:#94a3b8; font-size:0.78rem;">Chưa giao việc</span>`;
-      } else if (pct >= 100 && u.overdue === 0) {
-        gradeBadge = `<span class="badge-grade grade-a"><i class="fa-solid fa-star" style="margin-right:4px;"></i>Tốt (A)</span>`;
-      } else if (pct >= 100 && u.overdue > 0) {
-        gradeBadge = `<span class="badge-grade grade-b"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Hoàn thành (B)</span>`;
-      } else if (pct >= 50) {
-        gradeBadge = `<span class="badge-grade grade-c"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Hoàn thành (B)</span>`;
-      } else {
-        gradeBadge = `<span class="badge-grade grade-d"><i class="fa-solid fa-circle-exclamation" style="margin-right:4px;"></i>Chưa đạt (D)</span>`;
-      }
+    } else {
+      userList.forEach((u, idx) => {
+        const pct = u.total > 0 ? Math.round((u.done / u.total) * 100) : 0;
+        let gradeBadge = '';
+        if (u.total === 0) {
+          gradeBadge = `<span style="color:#94a3b8; font-size:0.78rem;">Chưa giao việc</span>`;
+        } else if (pct >= 100 && u.overdue === 0) {
+          gradeBadge = `<span class="badge-grade grade-a"><i class="fa-solid fa-star" style="margin-right:4px;"></i>Tốt (A)</span>`;
+        } else if (pct >= 100 && u.overdue > 0) {
+          gradeBadge = `<span class="badge-grade grade-b"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Hoàn thành (B)</span>`;
+        } else if (pct >= 50) {
+          gradeBadge = `<span class="badge-grade grade-c"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Hoàn thành (B)</span>`;
+        } else {
+          gradeBadge = `<span class="badge-grade grade-d"><i class="fa-solid fa-circle-exclamation" style="margin-right:4px;"></i>Chưa đạt (D)</span>`;
+        }
 
-      html += `
+        html += `
         <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
           <td style="padding:10px 14px; font-weight:700; color:#38bdf8;">${idx + 1}</td>
           <td style="padding:10px 14px; text-align:left; font-weight:700; color:#ffffff;">${escapeHtml(u.name)}</td>
@@ -1855,11 +1858,11 @@ function renderUserStatistics() {
           <td style="padding:10px 14px;">${gradeBadge}</td>
         </tr>
       `;
-    });
-  }
+      });
+    }
 
-  const grandPct = totalTasksSum > 0 ? Math.round((totalDoneSum / totalTasksSum) * 100) : 0;
-  html += `
+    const grandPct = totalTasksSum > 0 ? Math.round((totalDoneSum / totalTasksSum) * 100) : 0;
+    html += `
         </tbody>
         <tfoot>
           <tr style="background:rgba(0,200,151,0.1); font-weight:700; color:#ffffff; border-top:2px solid var(--card-border);">
@@ -1877,367 +1880,367 @@ function renderUserStatistics() {
     </div>
   `;
 
-  container.innerHTML = html;
-}
-
-function openTaskModal(taskId = null) {
-  try {
-    const form = document.getElementById('form-task');
-    if (form) form.reset();
-    const subContainer = document.getElementById('subtasks-container');
-    if (subContainer) subContainer.innerHTML = '';
-    
-    populateSelects();
-    
-    if (taskId) {
-      const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
-      if (task) {
-        if (document.getElementById('modal-task-title')) document.getElementById('modal-task-title').innerText = 'Chỉnh Sửa Công Việc #' + taskId;
-        if (document.getElementById('task-id')) document.getElementById('task-id').value = task.ID || task.id;
-        if (document.getElementById('task-title-input')) document.getElementById('task-title-input').value = task['Tiêu đề'] || '';
-        if (document.getElementById('task-desc-input')) document.getElementById('task-desc-input').value = task['Mô tả'] || '';
-        if (document.getElementById('task-priority-input')) document.getElementById('task-priority-input').value = task['Mức độ ưu tiên'] || 'Trung bình';
-        if (document.getElementById('task-status-input')) document.getElementById('task-status-input').value = task['Trạng thái'] || 'Đang thực hiện';
-        if (document.getElementById('task-start-input')) document.getElementById('task-start-input').value = task['Ngày bắt đầu'] || '';
-        if (document.getElementById('task-end-input')) document.getElementById('task-end-input').value = task['Ngày kết thúc'] || '';
-        if (document.getElementById('task-kehoach-input')) document.getElementById('task-kehoach-input').value = task['Kế hoạch'] !== undefined ? task['Kế hoạch'] : 1;
-        if (document.getElementById('task-thuchien-input')) document.getElementById('task-thuchien-input').value = task['Thực hiện'] !== undefined ? task['Thực hiện'] : 0;
-        
-        const grp = getTaskGroup(task);
-        const toSelect = document.getElementById('task-tochutri-input');
-        if (toSelect) toSelect.value = grp;
-        handleModalGroupChange(grp);
-
-        const chuTriSelect = document.getElementById('task-chutri-input');
-        const assigneeName = getTaskAssignee(task);
-        if (chuTriSelect) {
-          if (assigneeName && !Array.from(chuTriSelect.options).some(o => o.value === assigneeName)) {
-            chuTriSelect.innerHTML += `<option value="${escapeHtml(assigneeName)}">${escapeHtml(assigneeName)}</option>`;
-          }
-          chuTriSelect.value = assigneeName;
-        }
-
-        const phoiHopSelect = document.getElementById('task-phoihop-input');
-        const collabName = getTaskCollaborator(task);
-        if (phoiHopSelect) {
-          if (collabName && !Array.from(phoiHopSelect.options).some(o => o.value === collabName)) {
-            phoiHopSelect.innerHTML += `<option value="${escapeHtml(collabName)}">${escapeHtml(collabName)}</option>`;
-          }
-          phoiHopSelect.value = collabName;
-        }
-
-        if (document.getElementById('task-progress-input')) document.getElementById('task-progress-input').value = task['Tiến độ (%)'] || 0;
-        if (document.getElementById('progress-val-display')) document.getElementById('progress-val-display').innerText = task['Tiến độ (%)'] || 0;
-        if (document.getElementById('task-ghichu-input')) document.getElementById('task-ghichu-input').value = task['Ghi chú'] || '';
-        if (document.getElementById('task-attachment-input')) document.getElementById('task-attachment-input').value = task['Tệp đính kèm'] || '';
-
-        if (task.subtasks && Array.isArray(task.subtasks)) {
-          task.subtasks.forEach(st => addSubtaskRow(st.title, st.completed));
-        }
-      }
-    } else {
-      if (document.getElementById('modal-task-title')) document.getElementById('modal-task-title').innerText = 'Tạo Công Việc Mới';
-      if (document.getElementById('task-id')) document.getElementById('task-id').value = '';
-      const toSelect = document.getElementById('task-tochutri-input');
-      if (toSelect) toSelect.value = '';
-      handleModalGroupChange('');
-    }
-  } catch (err) {
-    console.error('Error in openTaskModal:', err);
-  } finally {
-    openModal('modal-task');
+    container.innerHTML = html;
   }
-}
 
-function addSubtaskRow(title = '', completed = false) {
-  const container = document.getElementById('subtasks-container');
-  const div = document.createElement('div');
-  div.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:8px;';
-  div.innerHTML = `
+  function openTaskModal(taskId = null) {
+    try {
+      const form = document.getElementById('form-task');
+      if (form) form.reset();
+      const subContainer = document.getElementById('subtasks-container');
+      if (subContainer) subContainer.innerHTML = '';
+
+      populateSelects();
+
+      if (taskId) {
+        const task = appState.tasks.find(t => String(t.ID || t.id) === String(taskId));
+        if (task) {
+          if (document.getElementById('modal-task-title')) document.getElementById('modal-task-title').innerText = 'Chỉnh Sửa Công Việc #' + taskId;
+          if (document.getElementById('task-id')) document.getElementById('task-id').value = task.ID || task.id;
+          if (document.getElementById('task-title-input')) document.getElementById('task-title-input').value = task['Tiêu đề'] || '';
+          if (document.getElementById('task-desc-input')) document.getElementById('task-desc-input').value = task['Mô tả'] || '';
+          if (document.getElementById('task-priority-input')) document.getElementById('task-priority-input').value = task['Mức độ ưu tiên'] || 'Trung bình';
+          if (document.getElementById('task-status-input')) document.getElementById('task-status-input').value = task['Trạng thái'] || 'Đang thực hiện';
+          if (document.getElementById('task-start-input')) document.getElementById('task-start-input').value = task['Ngày bắt đầu'] || '';
+          if (document.getElementById('task-end-input')) document.getElementById('task-end-input').value = task['Ngày kết thúc'] || '';
+          if (document.getElementById('task-kehoach-input')) document.getElementById('task-kehoach-input').value = task['Kế hoạch'] !== undefined ? task['Kế hoạch'] : 1;
+          if (document.getElementById('task-thuchien-input')) document.getElementById('task-thuchien-input').value = task['Thực hiện'] !== undefined ? task['Thực hiện'] : 0;
+
+          const grp = getTaskGroup(task);
+          const toSelect = document.getElementById('task-tochutri-input');
+          if (toSelect) toSelect.value = grp;
+          handleModalGroupChange(grp);
+
+          const chuTriSelect = document.getElementById('task-chutri-input');
+          const assigneeName = getTaskAssignee(task);
+          if (chuTriSelect) {
+            if (assigneeName && !Array.from(chuTriSelect.options).some(o => o.value === assigneeName)) {
+              chuTriSelect.innerHTML += `<option value="${escapeHtml(assigneeName)}">${escapeHtml(assigneeName)}</option>`;
+            }
+            chuTriSelect.value = assigneeName;
+          }
+
+          const phoiHopSelect = document.getElementById('task-phoihop-input');
+          const collabName = getTaskCollaborator(task);
+          if (phoiHopSelect) {
+            if (collabName && !Array.from(phoiHopSelect.options).some(o => o.value === collabName)) {
+              phoiHopSelect.innerHTML += `<option value="${escapeHtml(collabName)}">${escapeHtml(collabName)}</option>`;
+            }
+            phoiHopSelect.value = collabName;
+          }
+
+          if (document.getElementById('task-progress-input')) document.getElementById('task-progress-input').value = task['Tiến độ (%)'] || 0;
+          if (document.getElementById('progress-val-display')) document.getElementById('progress-val-display').innerText = task['Tiến độ (%)'] || 0;
+          if (document.getElementById('task-ghichu-input')) document.getElementById('task-ghichu-input').value = task['Ghi chú'] || '';
+          if (document.getElementById('task-attachment-input')) document.getElementById('task-attachment-input').value = task['Tệp đính kèm'] || '';
+
+          if (task.subtasks && Array.isArray(task.subtasks)) {
+            task.subtasks.forEach(st => addSubtaskRow(st.title, st.completed));
+          }
+        }
+      } else {
+        if (document.getElementById('modal-task-title')) document.getElementById('modal-task-title').innerText = 'Tạo Công Việc Mới';
+        if (document.getElementById('task-id')) document.getElementById('task-id').value = '';
+        const toSelect = document.getElementById('task-tochutri-input');
+        if (toSelect) toSelect.value = '';
+        handleModalGroupChange('');
+      }
+    } catch (err) {
+      console.error('Error in openTaskModal:', err);
+    } finally {
+      openModal('modal-task');
+    }
+  }
+
+  function addSubtaskRow(title = '', completed = false) {
+    const container = document.getElementById('subtasks-container');
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:8px;';
+    div.innerHTML = `
     <input type="checkbox" ${completed ? 'checked' : ''} onchange="recalculateSubtasksProgress()">
     <input type="text" class="dark-form-control" value="${escapeHtml(title)}" placeholder="Tên việc con..." oninput="recalculateSubtasksProgress()">
     <button type="button" class="btn-dark-sec btn-sm" style="color:#ef4444;" onclick="this.parentElement.remove(); recalculateSubtasksProgress();">&times;</button>
   `;
-  container.appendChild(div);
-}
-
-function recalculateSubtasksProgress() {
-  const items = document.querySelectorAll('#subtasks-container div');
-  if (items.length === 0) return;
-  let checkedCount = 0;
-  items.forEach(item => {
-    const cb = item.querySelector('input[type="checkbox"]');
-    if (cb && cb.checked) checkedCount++;
-  });
-  const calcProgress = Math.round((checkedCount / items.length) * 100);
-  document.getElementById('task-progress-input').value = calcProgress;
-  document.getElementById('progress-val-display').innerText = calcProgress;
-}
-
-function handleTaskFormSubmit(e) {
-  e.preventDefault();
-  const subtasks = [];
-  document.querySelectorAll('#subtasks-container div').forEach((item, idx) => {
-    const title = item.querySelector('input[type="text"]').value.trim();
-    const completed = item.querySelector('input[type="checkbox"]').checked;
-    if (title) subtasks.push({ id: idx + 1, title: title, completed: completed });
-  });
-
-  const taskId = document.getElementById('task-id')?.value || '';
-  const titleVal = document.getElementById('task-title-input')?.value || '';
-  const descVal = document.getElementById('task-desc-input')?.value || '';
-  const priorityVal = document.getElementById('task-priority-input')?.value || 'Trung bình';
-  const statusVal = document.getElementById('task-status-input')?.value || 'Đang thực hiện';
-  const startVal = document.getElementById('task-start-input')?.value || '';
-  const endVal = document.getElementById('task-end-input')?.value || '';
-  const kehoachVal = Number(document.getElementById('task-kehoach-input')?.value || 1);
-  const thuchienVal = Number(document.getElementById('task-thuchien-input')?.value || 0);
-
-  const toChuTriInput = document.getElementById('task-tochutri-input')?.value || '';
-  const chuTriName = document.getElementById('task-chutri-input')?.value || '';
-  const phoiHopName = document.getElementById('task-phoihop-input')?.value || '';
-
-  const chuTriUser = appState.users.find(u => (u['Tên'] || u.name) === chuTriName);
-  const phoiHopUser = appState.users.find(u => (u['Tên'] || u.name) === phoiHopName);
-  const finalToChuTri = toChuTriInput || (chuTriUser ? (chuTriUser['Tổ'] || chuTriUser.group) : '');
-
-  const newId = taskId || ('TSK-' + Math.floor(1000 + Math.random() * 9000));
-
-  const payload = {
-    id: newId,
-    'ID': newId,
-    'Tiêu đề': titleVal,
-    'Mô tả': descVal,
-    'Mức độ ưu tiên': priorityVal,
-    'Trạng thái': statusVal,
-    'Ngày bắt đầu': startVal,
-    'Ngày kết thúc': endVal,
-    'Kế hoạch': kehoachVal,
-    'Thực hiện': thuchienVal,
-    'Người chủ trì': chuTriName,
-    'Tổ chủ trì': finalToChuTri,
-    'Người phối hợp': phoiHopName,
-    'Tổ phối hợp': phoiHopUser ? (phoiHopUser['Tổ'] || phoiHopUser.group) : '',
-    'Người thực hiện': chuTriName,
-    'Người phụ trách': chuTriName,
-    'Tiến độ (%)': Number(document.getElementById('task-progress-input')?.value || 0),
-    'Ghi chú': document.getElementById('task-ghichu-input')?.value || '',
-    'Tệp đính kèm': document.getElementById('task-attachment-input')?.value || '',
-    subtasks: subtasks
-  };
-
-  const existingIdx = appState.tasks.findIndex(t => String(t.ID || t.id) === String(newId));
-  if (existingIdx >= 0) {
-    appState.tasks[existingIdx] = { ...appState.tasks[existingIdx], ...payload };
-  } else {
-    appState.tasks.unshift(payload);
+    container.appendChild(div);
   }
 
-  try {
-    localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks));
-  } catch (err) {}
+  function recalculateSubtasksProgress() {
+    const items = document.querySelectorAll('#subtasks-container div');
+    if (items.length === 0) return;
+    let checkedCount = 0;
+    items.forEach(item => {
+      const cb = item.querySelector('input[type="checkbox"]');
+      if (cb && cb.checked) checkedCount++;
+    });
+    const calcProgress = Math.round((checkedCount / items.length) * 100);
+    document.getElementById('task-progress-input').value = calcProgress;
+    document.getElementById('progress-val-display').innerText = calcProgress;
+  }
 
-  populateSelects();
-  renderActiveTab();
-  closeModal('modal-task');
-  showToast('Đã lưu công việc thành công!', 'success');
+  function handleTaskFormSubmit(e) {
+    e.preventDefault();
+    const subtasks = [];
+    document.querySelectorAll('#subtasks-container div').forEach((item, idx) => {
+      const title = item.querySelector('input[type="text"]').value.trim();
+      const completed = item.querySelector('input[type="checkbox"]').checked;
+      if (title) subtasks.push({ id: idx + 1, title: title, completed: completed });
+    });
 
-  callBackend('saveTask', payload);
-}
+    const taskId = document.getElementById('task-id')?.value || '';
+    const titleVal = document.getElementById('task-title-input')?.value || '';
+    const descVal = document.getElementById('task-desc-input')?.value || '';
+    const priorityVal = document.getElementById('task-priority-input')?.value || 'Trung bình';
+    const statusVal = document.getElementById('task-status-input')?.value || 'Đang thực hiện';
+    const startVal = document.getElementById('task-start-input')?.value || '';
+    const endVal = document.getElementById('task-end-input')?.value || '';
+    const kehoachVal = Number(document.getElementById('task-kehoach-input')?.value || 1);
+    const thuchienVal = Number(document.getElementById('task-thuchien-input')?.value || 0);
 
-function confirmDeleteTask(id) {
-  if (confirm('Bạn có chắc chắn muốn xóa công việc này?')) {
-    appState.tasks = appState.tasks.filter(t => String(t.ID || t.id) !== String(id));
-    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e){}
+    const toChuTriInput = document.getElementById('task-tochutri-input')?.value || '';
+    const chuTriName = document.getElementById('task-chutri-input')?.value || '';
+    const phoiHopName = document.getElementById('task-phoihop-input')?.value || '';
+
+    const chuTriUser = appState.users.find(u => (u['Tên'] || u.name) === chuTriName);
+    const phoiHopUser = appState.users.find(u => (u['Tên'] || u.name) === phoiHopName);
+    const finalToChuTri = toChuTriInput || (chuTriUser ? (chuTriUser['Tổ'] || chuTriUser.group) : '');
+
+    const newId = taskId || ('TSK-' + Math.floor(1000 + Math.random() * 9000));
+
+    const payload = {
+      id: newId,
+      'ID': newId,
+      'Tiêu đề': titleVal,
+      'Mô tả': descVal,
+      'Mức độ ưu tiên': priorityVal,
+      'Trạng thái': statusVal,
+      'Ngày bắt đầu': startVal,
+      'Ngày kết thúc': endVal,
+      'Kế hoạch': kehoachVal,
+      'Thực hiện': thuchienVal,
+      'Người chủ trì': chuTriName,
+      'Tổ chủ trì': finalToChuTri,
+      'Người phối hợp': phoiHopName,
+      'Tổ phối hợp': phoiHopUser ? (phoiHopUser['Tổ'] || phoiHopUser.group) : '',
+      'Người thực hiện': chuTriName,
+      'Người phụ trách': chuTriName,
+      'Tiến độ (%)': Number(document.getElementById('task-progress-input')?.value || 0),
+      'Ghi chú': document.getElementById('task-ghichu-input')?.value || '',
+      'Tệp đính kèm': document.getElementById('task-attachment-input')?.value || '',
+      subtasks: subtasks
+    };
+
+    const existingIdx = appState.tasks.findIndex(t => String(t.ID || t.id) === String(newId));
+    if (existingIdx >= 0) {
+      appState.tasks[existingIdx] = { ...appState.tasks[existingIdx], ...payload };
+    } else {
+      appState.tasks.unshift(payload);
+    }
+
+    try {
+      localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks));
+    } catch (err) { }
+
+    populateSelects();
     renderActiveTab();
-    showToast('Đã xóa công việc!', 'success');
-    callBackend('deleteTask', { id: id });
-  }
-}
+    closeModal('modal-task');
+    showToast('Đã lưu công việc thành công!', 'success');
 
-function openCvLuuYModal(id = null) {
-  document.getElementById('form-cvluuy').reset();
-  if (id) {
-    const item = appState.cvluuy.find(i => String(i.ID || i.id) === String(id));
-    if (item) {
-      document.getElementById('ly-id').value = item.ID || item.id;
-      document.getElementById('ly-task').value = item['Công việc'] || '';
-      document.getElementById('ly-desc').value = item['Mô tả'] || '';
-      document.getElementById('ly-group').value = item['Tổ'] || '';
-      document.getElementById('ly-status').value = item['Trạng thái'] || 'Cần lưu ý';
-      document.getElementById('ly-start').value = item['Ngày bắt đầu'] || '';
-      document.getElementById('ly-end').value = item['Ngày kết thúc'] || '';
-      document.getElementById('ly-note').value = item['Ghi chú'] || '';
+    callBackend('saveTask', payload);
+  }
+
+  function confirmDeleteTask(id) {
+    if (confirm('Bạn có chắc chắn muốn xóa công việc này?')) {
+      appState.tasks = appState.tasks.filter(t => String(t.ID || t.id) !== String(id));
+      try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch (e) { }
+      renderActiveTab();
+      showToast('Đã xóa công việc!', 'success');
+      callBackend('deleteTask', { id: id });
     }
-  } else {
-    document.getElementById('ly-id').value = '';
-  }
-  openModal('modal-cvluuy');
-}
-
-function handleCvLuuYSubmit(e) {
-  e.preventDefault();
-  const lyId = document.getElementById('ly-id')?.value || '';
-  const newId = lyId || ('LY-' + Math.floor(1000 + Math.random() * 9000));
-
-  const payload = {
-    id: newId,
-    'ID': newId,
-    'Công việc': document.getElementById('ly-task')?.value || '',
-    'Mô tả': document.getElementById('ly-desc')?.value || '',
-    'Tổ': document.getElementById('ly-group')?.value || '',
-    'Trạng thái': document.getElementById('ly-status')?.value || 'Cần lưu ý',
-    'Ngày bắt đầu': document.getElementById('ly-start')?.value || '',
-    'Ngày kết thúc': document.getElementById('ly-end')?.value || '',
-    'Ghi chú': document.getElementById('ly-note')?.value || ''
-  };
-
-  const existingIdx = appState.cvluuy.findIndex(i => String(i.ID || i.id) === String(newId));
-  if (existingIdx >= 0) {
-    appState.cvluuy[existingIdx] = { ...appState.cvluuy[existingIdx], ...payload };
-  } else {
-    appState.cvluuy.unshift(payload);
   }
 
-  try {
-    localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy));
-  } catch (err) {}
+  function openCvLuuYModal(id = null) {
+    document.getElementById('form-cvluuy').reset();
+    if (id) {
+      const item = appState.cvluuy.find(i => String(i.ID || i.id) === String(id));
+      if (item) {
+        document.getElementById('ly-id').value = item.ID || item.id;
+        document.getElementById('ly-task').value = item['Công việc'] || '';
+        document.getElementById('ly-desc').value = item['Mô tả'] || '';
+        document.getElementById('ly-group').value = item['Tổ'] || '';
+        document.getElementById('ly-status').value = item['Trạng thái'] || 'Cần lưu ý';
+        document.getElementById('ly-start').value = item['Ngày bắt đầu'] || '';
+        document.getElementById('ly-end').value = item['Ngày kết thúc'] || '';
+        document.getElementById('ly-note').value = item['Ghi chú'] || '';
+      }
+    } else {
+      document.getElementById('ly-id').value = '';
+    }
+    openModal('modal-cvluuy');
+  }
 
-  populateSelects();
-  renderActiveTab();
-  closeModal('modal-cvluuy');
-  showToast('Đã lưu lưu ý thành công!', 'success');
+  function handleCvLuuYSubmit(e) {
+    e.preventDefault();
+    const lyId = document.getElementById('ly-id')?.value || '';
+    const newId = lyId || ('LY-' + Math.floor(1000 + Math.random() * 9000));
 
-  callBackend('saveCvLuuY', payload);
-}
+    const payload = {
+      id: newId,
+      'ID': newId,
+      'Công việc': document.getElementById('ly-task')?.value || '',
+      'Mô tả': document.getElementById('ly-desc')?.value || '',
+      'Tổ': document.getElementById('ly-group')?.value || '',
+      'Trạng thái': document.getElementById('ly-status')?.value || 'Cần lưu ý',
+      'Ngày bắt đầu': document.getElementById('ly-start')?.value || '',
+      'Ngày kết thúc': document.getElementById('ly-end')?.value || '',
+      'Ghi chú': document.getElementById('ly-note')?.value || ''
+    };
 
-function confirmDeleteCvLuuY(id) {
-  if (confirm('Xóa mục này?')) {
-    appState.cvluuy = appState.cvluuy.filter(i => String(i.ID || i.id) !== String(id));
-    try { localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy)); } catch(e){}
+    const existingIdx = appState.cvluuy.findIndex(i => String(i.ID || i.id) === String(newId));
+    if (existingIdx >= 0) {
+      appState.cvluuy[existingIdx] = { ...appState.cvluuy[existingIdx], ...payload };
+    } else {
+      appState.cvluuy.unshift(payload);
+    }
+
+    try {
+      localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy));
+    } catch (err) { }
+
+    populateSelects();
     renderActiveTab();
-    showToast('Đã xóa lưu ý!', 'success');
-    callBackend('deleteCvLuuY', { id: id });
-  }
-}
+    closeModal('modal-cvluuy');
+    showToast('Đã lưu lưu ý thành công!', 'success');
 
-function openDocumentModal(id = null) {
-  document.getElementById('form-doc').reset();
-  if (id) {
-    const doc = appState.documents.find(d => String(d.ID || d.id) === String(id));
-    if (doc) {
-      document.getElementById('doc-id').value = doc.ID || doc.id;
-      document.getElementById('doc-code').value = doc['Số hồ sơ'] || '';
-      document.getElementById('doc-title').value = doc['Tên hồ sơ'] || '';
-      document.getElementById('doc-category').value = doc['Danh mục'] || '';
-      document.getElementById('doc-dept').value = doc['Phòng ban'] || '';
-      document.getElementById('doc-vendor').value = doc['Nhà cung cấp'] || '';
-      document.getElementById('doc-status').value = doc['Tình trạng'] || 'Đang hiệu lực';
-      document.getElementById('doc-val-hd').value = doc['Giá trị HĐ'] || 0;
-      document.getElementById('doc-val-th').value = doc['Giá trị thực hiện'] || 0;
-      document.getElementById('doc-file-url').value = doc['File URL'] || '';
+    callBackend('saveCvLuuY', payload);
+  }
+
+  function confirmDeleteCvLuuY(id) {
+    if (confirm('Xóa mục này?')) {
+      appState.cvluuy = appState.cvluuy.filter(i => String(i.ID || i.id) !== String(id));
+      try { localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy)); } catch (e) { }
+      renderActiveTab();
+      showToast('Đã xóa lưu ý!', 'success');
+      callBackend('deleteCvLuuY', { id: id });
     }
-  } else {
-    document.getElementById('doc-id').value = '';
   }
-  openModal('modal-doc');
-}
 
-function handleDocSubmit(e) {
-  e.preventDefault();
-  const payload = {
-    id: document.getElementById('doc-id').value,
-    'Số hồ sơ': document.getElementById('doc-code').value,
-    'Tên hồ sơ': document.getElementById('doc-title').value,
-    'Danh mục': document.getElementById('doc-category').value,
-    'Phòng ban': document.getElementById('doc-dept').value,
-    'Nhà cung cấp': document.getElementById('doc-vendor').value,
-    'Tình trạng': document.getElementById('doc-status').value,
-    'Giá trị HĐ': document.getElementById('doc-val-hd').value,
-    'Giá trị thực hiện': document.getElementById('doc-val-th').value,
-    'File URL': document.getElementById('doc-file-url').value
-  };
-  closeModal('modal-doc');
-  callBackend('saveDocument', payload, () => showToast('Đã lưu hồ sơ!', 'success'));
-}
-
-function confirmDeleteDoc(id) {
-  if (confirm('Xóa hồ sơ này?')) {
-    callBackend('deleteDocument', { id: id }, () => showToast('Đã xóa hồ sơ!', 'success'));
-  }
-}
-
-function openUserModal(id = null) {
-  document.getElementById('form-user').reset();
-  if (id) {
-    const usr = appState.users.find(u => String(u.ID || u.id) === String(id));
-    if (usr) {
-      document.getElementById('usr-id').value = usr.ID || usr.id;
-      document.getElementById('usr-name').value = usr['Tên'] || '';
-      document.getElementById('usr-group').value = usr['Tổ'] || '';
+  function openDocumentModal(id = null) {
+    document.getElementById('form-doc').reset();
+    if (id) {
+      const doc = appState.documents.find(d => String(d.ID || d.id) === String(id));
+      if (doc) {
+        document.getElementById('doc-id').value = doc.ID || doc.id;
+        document.getElementById('doc-code').value = doc['Số hồ sơ'] || '';
+        document.getElementById('doc-title').value = doc['Tên hồ sơ'] || '';
+        document.getElementById('doc-category').value = doc['Danh mục'] || '';
+        document.getElementById('doc-dept').value = doc['Phòng ban'] || '';
+        document.getElementById('doc-vendor').value = doc['Nhà cung cấp'] || '';
+        document.getElementById('doc-status').value = doc['Tình trạng'] || 'Đang hiệu lực';
+        document.getElementById('doc-val-hd').value = doc['Giá trị HĐ'] || 0;
+        document.getElementById('doc-val-th').value = doc['Giá trị thực hiện'] || 0;
+        document.getElementById('doc-file-url').value = doc['File URL'] || '';
+      }
+    } else {
+      document.getElementById('doc-id').value = '';
     }
-  } else {
-    document.getElementById('usr-id').value = '';
+    openModal('modal-doc');
   }
-  openModal('modal-user');
-}
 
-function handleUserSubmit(e) {
-  e.preventDefault();
-  const payload = {
-    id: document.getElementById('usr-id').value,
-    'Tên': document.getElementById('usr-name').value,
-    'Tổ': document.getElementById('usr-group').value
-  };
-  closeModal('modal-user');
-  callBackend('saveUser', payload, () => showToast('Đã lưu người dùng!', 'success'));
-}
-
-function confirmDeleteUser(id) {
-  if (confirm('Xóa người dùng này?')) {
-    callBackend('deleteUser', { id: id }, () => showToast('Đã xóa người dùng!', 'success'));
+  function handleDocSubmit(e) {
+    e.preventDefault();
+    const payload = {
+      id: document.getElementById('doc-id').value,
+      'Số hồ sơ': document.getElementById('doc-code').value,
+      'Tên hồ sơ': document.getElementById('doc-title').value,
+      'Danh mục': document.getElementById('doc-category').value,
+      'Phòng ban': document.getElementById('doc-dept').value,
+      'Nhà cung cấp': document.getElementById('doc-vendor').value,
+      'Tình trạng': document.getElementById('doc-status').value,
+      'Giá trị HĐ': document.getElementById('doc-val-hd').value,
+      'Giá trị thực hiện': document.getElementById('doc-val-th').value,
+      'File URL': document.getElementById('doc-file-url').value
+    };
+    closeModal('modal-doc');
+    callBackend('saveDocument', payload, () => showToast('Đã lưu hồ sơ!', 'success'));
   }
-}
 
-function openModal(id) {
-  const el = document.getElementById(id);
-  if (el) el.classList.add('active');
-}
+  function confirmDeleteDoc(id) {
+    if (confirm('Xóa hồ sơ này?')) {
+      callBackend('deleteDocument', { id: id }, () => showToast('Đã xóa hồ sơ!', 'success'));
+    }
+  }
 
-function closeModal(id) {
-  const el = document.getElementById(id);
-  if (el) el.classList.remove('active');
-}
+  function openUserModal(id = null) {
+    document.getElementById('form-user').reset();
+    if (id) {
+      const usr = appState.users.find(u => String(u.ID || u.id) === String(id));
+      if (usr) {
+        document.getElementById('usr-id').value = usr.ID || usr.id;
+        document.getElementById('usr-name').value = usr['Tên'] || '';
+        document.getElementById('usr-group').value = usr['Tổ'] || '';
+      }
+    } else {
+      document.getElementById('usr-id').value = '';
+    }
+    openModal('modal-user');
+  }
 
-function openSettingsModal() { openModal('modal-settings'); }
+  function handleUserSubmit(e) {
+    e.preventDefault();
+    const payload = {
+      id: document.getElementById('usr-id').value,
+      'Tên': document.getElementById('usr-name').value,
+      'Tổ': document.getElementById('usr-group').value
+    };
+    closeModal('modal-user');
+    callBackend('saveUser', payload, () => showToast('Đã lưu người dùng!', 'success'));
+  }
 
-function saveSettings() {
-  const url = document.getElementById('gas-api-url-input').value.trim();
-  localStorage.setItem('GAS_WEB_APP_URL', url);
-  appState.apiUrl = url;
-  closeModal('modal-settings');
-  showToast('Đã lưu cấu hình API thành công!', 'success');
-  appState.loadData(true);
-}
+  function confirmDeleteUser(id) {
+    if (confirm('Xóa người dùng này?')) {
+      callBackend('deleteUser', { id: id }, () => showToast('Đã xóa người dùng!', 'success'));
+    }
+  }
 
-function formatDateVN(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
-}
+  function openModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+  }
 
-function showToast(message, type = 'info') {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-  
-  const toast = document.createElement('div');
-  const bg = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#0284c7';
-  
-  toast.style.cssText = `
+  function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active');
+  }
+
+  function openSettingsModal() { openModal('modal-settings'); }
+
+  function saveSettings() {
+    const url = document.getElementById('gas-api-url-input').value.trim();
+    localStorage.setItem('GAS_WEB_APP_URL', url);
+    appState.apiUrl = url;
+    closeModal('modal-settings');
+    showToast('Đã lưu cấu hình API thành công!', 'success');
+    appState.loadData(true);
+  }
+
+  function formatDateVN(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    const bg = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#0284c7';
+
+    toast.style.cssText = `
     background: ${bg};
     color: #ffffff;
     padding: 10px 18px;
@@ -2250,312 +2253,349 @@ function showToast(message, type = 'info') {
     gap: 8px;
     transition: all 0.3s ease;
   `;
-  
-  const icon = type === 'success' ? 'circle-check' : type === 'error' ? 'circle-exclamation' : 'circle-info';
-  toast.innerHTML = `<i class="fa-solid fa-circle-${icon}"></i> ${escapeHtml(message)}`;
-  
-  container.appendChild(toast);
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    setTimeout(() => toast.remove(), 300);
-  }, 3500);
-}
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+    const icon = type === 'success' ? 'circle-check' : type === 'error' ? 'circle-exclamation' : 'circle-info';
+    toast.innerHTML = `<i class="fa-solid fa-circle-${icon}"></i> ${escapeHtml(message)}`;
 
-function getTovienRowInfo(row) {
-  let group = '';
-  let leaderName = '';
-  let leaderCode = '';
-  let empName = '';
-  let empCode = '';
-
-  if (!row || typeof row !== 'object') return { group, leaderName, leaderCode, empName, empCode };
-
-  for (let k in row) {
-    const ck = cleanKey(k);
-    const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
-    if (!val) continue;
-
-    if (ck.includes('manvtotruong') || ck.includes('matotruong')) {
-      leaderCode = val;
-    } else if (ck.includes('tentotruong') || ck === 'totruong') {
-      leaderName = val;
-    } else if (ck === 'manv' || ck === 'manhanvien') {
-      empCode = val;
-    } else if (ck === 'tennv' || ck === 'tennhanvien' || ck === 'hovaten') {
-      empName = val;
-    } else if (ck === 'tohatang' || ck === 'tento' || ck === 'to' || ck === 'tochutri') {
-      if (!group) group = val;
-    }
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 3500);
   }
 
-  if (!group) {
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function getTovienRowInfo(row) {
+    let group = '';
+    let leaderName = '';
+    let leaderCode = '';
+    let empName = '';
+    let empCode = '';
+
+    if (!row || typeof row !== 'object') return { group, leaderName, leaderCode, empName, empCode };
+
     for (let k in row) {
       const ck = cleanKey(k);
       const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
-      if (val && (ck.includes('to') || ck.includes('donvi')) && !ck.includes('truong') && !ck.includes('vien') && !ck.includes('nv')) {
-        group = val;
-        break;
-      }
-    }
-  }
+      if (!val) continue;
 
-  if (!empName) {
-    for (let k in row) {
-      const ck = cleanKey(k);
-      const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
-      if (val && (ck.includes('ten') || ck.includes('nhanvien') || ck.includes('nv')) && !ck.includes('totruong') && !ck.includes('to')) {
+      if (ck.includes('manvtotruong') || ck.includes('matotruong')) {
+        leaderCode = val;
+      } else if (ck.includes('tentotruong') || ck === 'totruong') {
+        leaderName = val;
+      } else if (ck === 'manv' || ck === 'manhanvien') {
+        empCode = val;
+      } else if (ck === 'tennv' || ck === 'tennhanvien' || ck === 'hovaten') {
         empName = val;
-        break;
+      } else if (ck === 'tohatang' || ck === 'tento' || ck === 'to' || ck === 'tochutri') {
+        if (!group) group = val;
       }
     }
+
+    if (!group) {
+      for (let k in row) {
+        const ck = cleanKey(k);
+        const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
+        if (val && (ck.includes('to') || ck.includes('donvi')) && !ck.includes('truong') && !ck.includes('vien') && !ck.includes('nv')) {
+          group = val;
+          break;
+        }
+      }
+    }
+
+    if (!empName) {
+      for (let k in row) {
+        const ck = cleanKey(k);
+        const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
+        if (val && (ck.includes('ten') || ck.includes('nhanvien') || ck.includes('nv')) && !ck.includes('totruong') && !ck.includes('to')) {
+          empName = val;
+          break;
+        }
+      }
+    }
+
+    return { group, leaderName, leaderCode, empName, empCode };
   }
 
-  return { group, leaderName, leaderCode, empName, empCode };
-}
+  function getToTruongTasks() {
+    if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec) && appState.totruonggiaoviec.length > 0) {
+      return appState.totruonggiaoviec.map(t => {
+        const title = t['Tiêu đề'] || t['Tiêu đề công việc'] || '';
+        const desc = t['Mô tả'] || t['Mô tả công việc'] || '';
+        const chuTri = t['Tên NV (A)'] || t['Tên NV'] || t['Người chủ trì'] || t['Người thực hiện'] || '';
+        const toChuTri = t['Tổ'] || t['Tổ chủ trì'] || t['Tổ hạ tầng'] || '';
+        const phoiHop = t['Tên người phối hợp (R)'] || t['Tên người phối hợp'] || t['Người phối hợp'] || '';
+        const leaderName = t['Tên tổ trưởng'] || '';
+        const leaderCode = t['Mã NV tổ trưởng'] || '';
 
-/* ==============================================================================
- * TỔ TRƯỞNG GIAO VIỆC ENGINE
- * ============================================================================== */
-function populateToTruongFilters() {
-  const gSelect = document.getElementById('totruong-group-select');
-  if (!gSelect) return;
-
-  const currentGrp = gSelect.value;
-  const groups = new Set();
-
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    let lastGroup = '';
-    appState.tovien.forEach(row => {
-      const info = getTovienRowInfo(row);
-      if (info.group) lastGroup = info.group;
-      if (lastGroup) groups.add(lastGroup);
-    });
+        return {
+          ...t,
+          'Tiêu đề công việc': title,
+          'Tiêu đề': title,
+          'Mô tả công việc': desc,
+          'Mô tả': desc,
+          'Người chủ trì': chuTri,
+          'Tên NV (A)': chuTri,
+          'Tổ chủ trì': toChuTri,
+          'Tổ': toChuTri,
+          'Người phối hợp': phoiHop,
+          'Tên người phối hợp (R)': phoiHop,
+          'Tên tổ trưởng': leaderName,
+          'Mã NV tổ trưởng': leaderCode,
+          'Hạn hoàn thành': t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '',
+          'Ngày kết thúc': t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '',
+          'Tiến độ (%)': t['Tiến độ'] !== undefined ? t['Tiến độ'] : (t['Tiến độ (%)'] || 0)
+        };
+      });
+    }
+    return appState.tasks;
   }
 
-  if (appState.users && Array.isArray(appState.users)) {
-    appState.users.forEach(u => {
-      const { group } = getUserNameAndGroup(u);
-      if (group) groups.add(group);
-    });
-  }
+  /* ==============================================================================
+   * TỔ TRƯỞNG GIAO VIỆC ENGINE
+   * ============================================================================== */
+  function populateToTruongFilters() {
+    const gSelect = document.getElementById('totruong-group-select');
+    if (!gSelect) return;
 
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
-      const tg = getTaskGroup(t);
-      if (tg) groups.add(tg);
-    });
-  }
+    const currentGrp = gSelect.value;
+    const groups = new Set();
 
-  gSelect.innerHTML = '<option value="">Tất cả tổ giao việc</option>';
-  Array.from(groups).sort().forEach(g => {
-    gSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
-  });
-
-  if (currentGrp && Array.from(groups).includes(currentGrp)) {
-    gSelect.value = currentGrp;
-  }
-
-  onToTruongGroupChange();
-}
-
-function onToTruongGroupChange() {
-  const gSelect = document.getElementById('totruong-group-select');
-  const uSelect = document.getElementById('totruong-user-select');
-  if (!gSelect || !uSelect) return;
-
-  const selGroup = gSelect.value;
-  const selGrpClean = cleanKey(selGroup);
-  const currentUsr = uSelect.value;
-  const teamUsers = new Set();
-  let leaderInfo = null;
-
-  if (selGrpClean) {
     if (appState.tovien && Array.isArray(appState.tovien)) {
       let lastGroup = '';
       appState.tovien.forEach(row => {
         const info = getTovienRowInfo(row);
-        if (info.group) {
-          lastGroup = info.group;
-        } else if (lastGroup) {
-          info.group = lastGroup;
-        }
+        if (info.group) lastGroup = info.group;
+        if (lastGroup) groups.add(lastGroup);
+      });
+    }
 
-        const ckG = cleanKey(info.group);
-        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG))) {
-          if (info.empName) teamUsers.add(info.empName);
-          if (info.leaderName) {
-            teamUsers.add(info.leaderName);
-            if (!leaderInfo) {
-              leaderInfo = { name: info.leaderName, code: info.leaderCode };
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        const { group } = getUserNameAndGroup(u);
+        if (group) groups.add(group);
+      });
+    }
+
+    const toTruongTasks = getToTruongTasks();
+    if (toTruongTasks && Array.isArray(toTruongTasks)) {
+      toTruongTasks.forEach(t => {
+        const tg = getTaskGroup(t);
+        if (tg) groups.add(tg);
+      });
+    }
+
+    gSelect.innerHTML = '<option value="">Tất cả tổ giao việc</option>';
+    Array.from(groups).sort().forEach(g => {
+      gSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+    });
+
+    if (currentGrp && Array.from(groups).includes(currentGrp)) {
+      gSelect.value = currentGrp;
+    }
+
+    onToTruongGroupChange();
+  }
+
+  function onToTruongGroupChange() {
+    const gSelect = document.getElementById('totruong-group-select');
+    const uSelect = document.getElementById('totruong-user-select');
+    if (!gSelect || !uSelect) return;
+
+    const selGroup = gSelect.value;
+    const selGrpClean = cleanKey(selGroup);
+    const currentUsr = uSelect.value;
+    const teamUsers = new Set();
+    let leaderInfo = null;
+
+    if (selGrpClean) {
+      if (appState.tovien && Array.isArray(appState.tovien)) {
+        let lastGroup = '';
+        appState.tovien.forEach(row => {
+          const info = getTovienRowInfo(row);
+          if (info.group) {
+            lastGroup = info.group;
+          } else if (lastGroup) {
+            info.group = lastGroup;
+          }
+
+          const ckG = cleanKey(info.group);
+          if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG))) {
+            if (info.empName) teamUsers.add(info.empName);
+            if (info.leaderName) {
+              teamUsers.add(info.leaderName);
+              if (!leaderInfo) {
+                leaderInfo = { name: info.leaderName, code: info.leaderCode };
+              }
             }
           }
-        }
-      });
-    }
+        });
+      }
 
-    if (appState.users && Array.isArray(appState.users)) {
-      appState.users.forEach(u => {
-        const { name, group } = getUserNameAndGroup(u);
-        const ckG = cleanKey(group);
-        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
-          teamUsers.add(name);
-        }
-      });
-    }
+      if (appState.users && Array.isArray(appState.users)) {
+        appState.users.forEach(u => {
+          const { name, group } = getUserNameAndGroup(u);
+          const ckG = cleanKey(group);
+          if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) && name) {
+            teamUsers.add(name);
+          }
+        });
+      }
 
-    if (appState.tasks && Array.isArray(appState.tasks)) {
-      appState.tasks.forEach(t => {
-        const tg = getTaskGroup(t);
-        const ckTg = cleanKey(tg);
-        const a = getTaskAssignee(t);
-        if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
-          a.split(',').forEach(n => { if (n.trim()) teamUsers.add(n.trim()); });
-        }
-      });
-    }
-  } else {
-    if (appState.tovien && Array.isArray(appState.tovien)) {
-      appState.tovien.forEach(row => {
-        const info = getTovienRowInfo(row);
-        if (info.empName) teamUsers.add(info.empName);
-        if (info.leaderName) teamUsers.add(info.leaderName);
-      });
-    }
-    if (appState.users && Array.isArray(appState.users)) {
-      appState.users.forEach(u => {
-        const { name } = getUserNameAndGroup(u);
-        if (name) teamUsers.add(name);
-      });
-    }
-  }
-
-  const leaderBanner = document.getElementById('totruong-leader-info-banner');
-  if (leaderBanner) {
-    if (selGroup && leaderInfo) {
-      leaderBanner.style.display = 'inline-flex';
-      leaderBanner.innerHTML = `<i class="fa-solid fa-user-tie" style="color:#00c897; margin-right:6px;"></i> <strong>Tổ trưởng:</strong>&nbsp;<span style="color:#38bdf8; font-weight:700;">${escapeHtml(leaderInfo.name)}</span> ${leaderInfo.code ? `<span style="color:#94a3b8; font-weight:normal; margin-left:4px;">(${escapeHtml(leaderInfo.code)})</span>` : ''} <span style="margin:0 10px; opacity:0.3;">|</span> <i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
-    } else if (selGroup) {
-      leaderBanner.style.display = 'inline-flex';
-      leaderBanner.innerHTML = `<i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
+      const toTruongTasks = getToTruongTasks();
+      if (toTruongTasks && Array.isArray(toTruongTasks)) {
+        toTruongTasks.forEach(t => {
+          const tg = getTaskGroup(t);
+          const ckTg = cleanKey(tg);
+          const a = getTaskAssignee(t);
+          if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg)) && a && a !== 'Chưa gán') {
+            a.split(',').forEach(n => { if (n.trim()) teamUsers.add(n.trim()); });
+          }
+        });
+      }
     } else {
-      leaderBanner.style.display = 'none';
-    }
-  }
-
-  uSelect.innerHTML = '<option value="">Tất cả nhân viên trong tổ</option>';
-  Array.from(teamUsers).sort().forEach(u => {
-    uSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
-  });
-
-  if (currentUsr && Array.from(teamUsers).includes(currentUsr)) {
-    uSelect.value = currentUsr;
-  }
-
-  renderToTruongTaskList();
-}
-
-function renderToTruongTaskList() {
-  const tbody = document.getElementById('totruong-task-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  const selGroup = document.getElementById('totruong-group-select')?.value || '';
-  const selUser = document.getElementById('totruong-user-select')?.value || '';
-  const searchQuery = (document.getElementById('totruong-search-input')?.value || '').trim().toLowerCase();
-
-  const grpClean = cleanKey(selGroup);
-  const usrClean = cleanKey(selUser);
-
-  const currentTeamUsers = new Set();
-  if (grpClean) {
-    if (appState.tovien && Array.isArray(appState.tovien)) {
-      appState.tovien.forEach(row => {
-        const info = getTovienRowInfo(row);
-        const ckG = cleanKey(info.group);
-        if (ckG && (ckG.includes(grpClean) || selGrpClean.includes(ckG))) {
-          if (info.empName) currentTeamUsers.add(cleanKey(info.empName));
-          if (info.leaderName) currentTeamUsers.add(cleanKey(info.leaderName));
-        }
-      });
-    }
-  }
-
-  let filtered = appState.tasks.filter(t => {
-    const chuTri = getTaskAssignee(t);
-    const phoiHop = getTaskCollaborator(t);
-    const toChuTri = getTaskGroup(t);
-    const toPhoiHop = getTaskCollaboratorGroup(t);
-
-    if (searchQuery) {
-      const titleMatch = (t['Tiêu đề công việc'] || t['Tiêu đề'] || '').toLowerCase().includes(searchQuery);
-      const descMatch = (t['Mô tả công việc'] || t['Mô tả'] || '').toLowerCase().includes(searchQuery);
-      const chuTriMatch = chuTri.toLowerCase().includes(searchQuery);
-      const phoiHopMatch = phoiHop.toLowerCase().includes(searchQuery);
-      if (!titleMatch && !descMatch && !chuTriMatch && !phoiHopMatch) return false;
+      if (appState.tovien && Array.isArray(appState.tovien)) {
+        appState.tovien.forEach(row => {
+          const info = getTovienRowInfo(row);
+          if (info.empName) teamUsers.add(info.empName);
+          if (info.leaderName) teamUsers.add(info.leaderName);
+        });
+      }
+      if (appState.users && Array.isArray(appState.users)) {
+        appState.users.forEach(u => {
+          const { name } = getUserNameAndGroup(u);
+          if (name) teamUsers.add(name);
+        });
+      }
     }
 
+    const leaderBanner = document.getElementById('totruong-leader-info-banner');
+    if (leaderBanner) {
+      if (selGroup && leaderInfo) {
+        leaderBanner.style.display = 'inline-flex';
+        leaderBanner.innerHTML = `<i class="fa-solid fa-user-tie" style="color:#00c897; margin-right:6px;"></i> <strong>Tổ trưởng:</strong>&nbsp;<span style="color:#38bdf8; font-weight:700;">${escapeHtml(leaderInfo.name)}</span> ${leaderInfo.code ? `<span style="color:#94a3b8; font-weight:normal; margin-left:4px;">(${escapeHtml(leaderInfo.code)})</span>` : ''} <span style="margin:0 10px; opacity:0.3;">|</span> <i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
+      } else if (selGroup) {
+        leaderBanner.style.display = 'inline-flex';
+        leaderBanner.innerHTML = `<i class="fa-solid fa-users" style="color:#a78bfa; margin-right:6px;"></i> <strong>Tổng nhân viên trong tổ:</strong>&nbsp;<span style="color:#ffffff; font-weight:700;">${teamUsers.size}</span>`;
+      } else {
+        leaderBanner.style.display = 'none';
+      }
+    }
+
+    uSelect.innerHTML = '<option value="">Tất cả nhân viên trong tổ</option>';
+    Array.from(teamUsers).sort().forEach(u => {
+      uSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
+    });
+
+    if (currentUsr && Array.from(teamUsers).includes(currentUsr)) {
+      uSelect.value = currentUsr;
+    }
+
+    renderToTruongTaskList();
+  }
+
+  function renderToTruongTaskList() {
+    const tbody = document.getElementById('totruong-task-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const selGroup = document.getElementById('totruong-group-select')?.value || '';
+    const selUser = document.getElementById('totruong-user-select')?.value || '';
+    const searchQuery = (document.getElementById('totruong-search-input')?.value || '').trim().toLowerCase();
+
+    const grpClean = cleanKey(selGroup);
+    const usrClean = cleanKey(selUser);
+
+    const currentTeamUsers = new Set();
     if (grpClean) {
-      const matchHostGroup = cleanKey(toChuTri).includes(grpClean) || grpClean.includes(cleanKey(toChuTri));
-      const matchCollabGroup = cleanKey(toPhoiHop).includes(grpClean) || grpClean.includes(cleanKey(toPhoiHop));
-      const matchMember = currentTeamUsers.has(cleanKey(chuTri));
-      if (!matchHostGroup && !matchCollabGroup && !matchMember) return false;
+      if (appState.tovien && Array.isArray(appState.tovien)) {
+        appState.tovien.forEach(row => {
+          const info = getTovienRowInfo(row);
+          const ckG = cleanKey(info.group);
+          if (ckG && (ckG.includes(grpClean) || selGrpClean.includes(ckG))) {
+            if (info.empName) currentTeamUsers.add(cleanKey(info.empName));
+            if (info.leaderName) currentTeamUsers.add(cleanKey(info.leaderName));
+          }
+        });
+      }
     }
 
-    if (usrClean) {
-      const matchChuTri = cleanKey(chuTri).includes(usrClean) || usrClean.includes(cleanKey(chuTri));
-      const matchPhoiHop = cleanKey(phoiHop).includes(usrClean) || usrClean.includes(cleanKey(phoiHop));
-      if (!matchChuTri && !matchPhoiHop) return false;
-    }
+    const toTruongTasks = getToTruongTasks();
+    let filtered = toTruongTasks.filter(t => {
+      const chuTri = getTaskAssignee(t);
+      const phoiHop = getTaskCollaborator(t);
+      const toChuTri = getTaskGroup(t);
+      const toPhoiHop = getTaskCollaboratorGroup(t);
 
-    return true;
-  });
+      if (searchQuery) {
+        const titleMatch = (t['Tiêu đề công việc'] || t['Tiêu đề'] || '').toLowerCase().includes(searchQuery);
+        const descMatch = (t['Mô tả công việc'] || t['Mô tả'] || '').toLowerCase().includes(searchQuery);
+        const chuTriMatch = chuTri.toLowerCase().includes(searchQuery);
+        const phoiHopMatch = phoiHop.toLowerCase().includes(searchQuery);
+        if (!titleMatch && !descMatch && !chuTriMatch && !phoiHopMatch) return false;
+      }
 
-  if (filtered.length === 0) {
-    tbody.innerHTML = `
+      if (grpClean) {
+        const matchHostGroup = cleanKey(toChuTri).includes(grpClean) || grpClean.includes(cleanKey(toChuTri));
+        const matchCollabGroup = cleanKey(toPhoiHop).includes(grpClean) || grpClean.includes(cleanKey(toPhoiHop));
+        const matchMember = currentTeamUsers.has(cleanKey(chuTri));
+        if (!matchHostGroup && !matchCollabGroup && !matchMember) return false;
+      }
+
+      if (usrClean) {
+        const matchChuTri = cleanKey(chuTri).includes(usrClean) || usrClean.includes(cleanKey(chuTri));
+        const matchPhoiHop = cleanKey(phoiHop).includes(usrClean) || usrClean.includes(cleanKey(phoiHop));
+        if (!matchChuTri && !matchPhoiHop) return false;
+      }
+
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
       <tr>
         <td colspan="16" style="text-align:center; padding:30px; color:var(--text-muted);">Không tìm thấy công việc nào phù hợp với bộ lọc Tổ trưởng.</td>
       </tr>
     `;
-    return;
-  }
-
-  filtered.forEach((t, idx) => {
-    const taskId = t.ID || t.id;
-    const status = t['Trạng thái'] || 'Đang thực hiện';
-
-    let statusBadge = '';
-    if (status === 'Hoàn thành quá hạn') {
-      statusBadge = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
-    } else if (status === 'Quá hạn') {
-      statusBadge = `<span class="tag-status-overdue">Quá hạn</span>`;
-    } else if (status === 'Hoàn thành') {
-      statusBadge = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
-    } else {
-      statusBadge = `<span style="color:#94a3b8; font-size:0.78rem;">${escapeHtml(status)}</span>`;
+      return;
     }
 
-    const progress = Number(t['Tiến độ (%)'] || 0);
-    const keHoach = t['Kế hoạch'] !== undefined && t['Kế hoạch'] !== '' ? t['Kế hoạch'] : 1;
-    const thucHien = t['Thực hiện'] !== undefined && t['Thực hiện'] !== '' ? t['Thực hiện'] : 0;
-    const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
-    const ghiChu = t['Ghi chú'] || '';
-    const ngayLamXong = t['Ngày làm xong'] || '';
-    const chuTriName = getTaskAssignee(t);
-    const toChuTriName = getTaskGroup(t);
-    const phoiHopName = getTaskCollaborator(t);
+    filtered.forEach((t, idx) => {
+      const taskId = t.ID || t.id;
+      const status = t['Trạng thái'] || 'Đang thực hiện';
 
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
+      let statusBadge = '';
+      if (status === 'Hoàn thành quá hạn') {
+        statusBadge = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
+      } else if (status === 'Quá hạn') {
+        statusBadge = `<span class="tag-status-overdue">Quá hạn</span>`;
+      } else if (status === 'Hoàn thành') {
+        statusBadge = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
+      } else {
+        statusBadge = `<span style="color:#94a3b8; font-size:0.78rem;">${escapeHtml(status)}</span>`;
+      }
+
+      const progress = Number(t['Tiến độ (%)'] || 0);
+      const keHoach = t['Kế hoạch'] !== undefined && t['Kế hoạch'] !== '' ? t['Kế hoạch'] : 1;
+      const thucHien = t['Thực hiện'] !== undefined && t['Thực hiện'] !== '' ? t['Thực hiện'] : 0;
+      const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
+      const ghiChu = t['Ghi chú'] || '';
+      const ngayLamXong = t['Ngày làm xong'] || '';
+      const chuTriName = getTaskAssignee(t);
+      const toChuTriName = getTaskGroup(t);
+      const phoiHopName = getTaskCollaborator(t);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
       <td style="text-align:center; font-weight:700; color:#38bdf8;">${idx + 1}</td>
       <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề công việc'] || t['Tiêu đề'] || '')}</strong></td>
       <td class="col-desc-cell">${escapeHtml(t['Mô tả công việc'] || t['Mô tả'] || '')}</td>
@@ -2591,29 +2631,29 @@ function renderToTruongTaskList() {
         </div>
       </td>
     `;
-    tbody.appendChild(tr);
-  });
+      tbody.appendChild(tr);
+    });
 
-  setTimeout(() => {
-    document.querySelectorAll('#totruong-task-tbody .inline-note-textarea').forEach(autoResizeTextarea);
-  }, 50);
-}
-
-function openTaskModalForTeamLeader() {
-  const selGroup = document.getElementById('totruong-group-select')?.value || '';
-  const selUser = document.getElementById('totruong-user-select')?.value || '';
-
-  openTaskModal();
-
-  if (selGroup) {
-    const toInput = document.getElementById('task-tochutri-input');
-    if (toInput) toInput.value = selGroup;
-    onTaskGroupInputChange();
+    setTimeout(() => {
+      document.querySelectorAll('#totruong-task-tbody .inline-note-textarea').forEach(autoResizeTextarea);
+    }, 50);
   }
 
-  if (selUser) {
-    const userInput = document.getElementById('task-chutri-input');
-    if (userInput) userInput.value = selUser;
+  function openTaskModalForTeamLeader() {
+    const selGroup = document.getElementById('totruong-group-select')?.value || '';
+    const selUser = document.getElementById('totruong-user-select')?.value || '';
+
+    openTaskModal();
+
+    if (selGroup) {
+      const toInput = document.getElementById('task-tochutri-input');
+      if (toInput) toInput.value = selGroup;
+      onTaskGroupInputChange();
+    }
+
+    if (selUser) {
+      const userInput = document.getElementById('task-chutri-input');
+      if (userInput) userInput.value = selUser;
+    }
   }
-}
 </script>

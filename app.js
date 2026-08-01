@@ -8,6 +8,7 @@ const appState = {
   tasks: [],
   users: [],
   tovien: [],
+  totruonggiaoviec: [],
   cvluuy: [],
   documents: [],
   currentTab: 'tongquan',
@@ -289,6 +290,7 @@ function onDataLoaded(response, showNotification = false) {
     if (response.tasks && response.tasks.length > 0) appState.tasks = response.tasks;
     if (response.users && response.users.length > 0) appState.users = response.users;
     if (response.tovien && response.tovien.length > 0) appState.tovien = response.tovien;
+    if (response.totruonggiaoviec && response.totruonggiaoviec.length > 0) appState.totruonggiaoviec = response.totruonggiaoviec;
     if (response.cvluuy && response.cvluuy.length > 0) appState.cvluuy = response.cvluuy;
     if (response.documents && response.documents.length > 0) appState.documents = response.documents;
     
@@ -311,6 +313,7 @@ function onDataLoaded(response, showNotification = false) {
       localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks));
       localStorage.setItem('TTHT_USERS_CACHE', JSON.stringify(appState.users));
       localStorage.setItem('TTHT_TOVIEN_CACHE', JSON.stringify(appState.tovien));
+      localStorage.setItem('TTHT_TOTRUONGGIAOVIEC_CACHE', JSON.stringify(appState.totruonggiaoviec));
       localStorage.setItem('TTHT_CVLUUY_CACHE', JSON.stringify(appState.cvluuy));
       localStorage.setItem('TTHT_DOCUMENTS_CACHE', JSON.stringify(appState.documents));
     } catch(e) {}
@@ -2327,6 +2330,40 @@ function getTovienRowInfo(row) {
   return { group, leaderName, leaderCode, empName, empCode };
 }
 
+function getToTruongTasks() {
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec) && appState.totruonggiaoviec.length > 0) {
+    return appState.totruonggiaoviec.map(t => {
+      const title = t['Tiêu đề'] || t['Tiêu đề công việc'] || '';
+      const desc = t['Mô tả'] || t['Mô tả công việc'] || '';
+      const chuTri = t['Tên NV (A)'] || t['Tên NV'] || t['Người chủ trì'] || t['Người thực hiện'] || '';
+      const toChuTri = t['Tổ'] || t['Tổ chủ trì'] || t['Tổ hạ tầng'] || '';
+      const phoiHop = t['Tên người phối hợp (R)'] || t['Tên người phối hợp'] || t['Người phối hợp'] || '';
+      const leaderName = t['Tên tổ trưởng'] || '';
+      const leaderCode = t['Mã NV tổ trưởng'] || '';
+
+      return {
+        ...t,
+        'Tiêu đề công việc': title,
+        'Tiêu đề': title,
+        'Mô tả công việc': desc,
+        'Mô tả': desc,
+        'Người chủ trì': chuTri,
+        'Tên NV (A)': chuTri,
+        'Tổ chủ trì': toChuTri,
+        'Tổ': toChuTri,
+        'Người phối hợp': phoiHop,
+        'Tên người phối hợp (R)': phoiHop,
+        'Tên tổ trưởng': leaderName,
+        'Mã NV tổ trưởng': leaderCode,
+        'Hạn hoàn thành': t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '',
+        'Ngày kết thúc': t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '',
+        'Tiến độ (%)': t['Tiến độ'] !== undefined ? t['Tiến độ'] : (t['Tiến độ (%)'] || 0)
+      };
+    });
+  }
+  return appState.tasks;
+}
+
 /* ==============================================================================
  * TỔ TRƯỞNG GIAO VIỆC ENGINE
  * ============================================================================== */
@@ -2353,8 +2390,9 @@ function populateToTruongFilters() {
     });
   }
 
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
+  const toTruongTasks = getToTruongTasks();
+  if (toTruongTasks && Array.isArray(toTruongTasks)) {
+    toTruongTasks.forEach(t => {
       const tg = getTaskGroup(t);
       if (tg) groups.add(tg);
     });
@@ -2417,8 +2455,9 @@ function onToTruongGroupChange() {
       });
     }
 
-    if (appState.tasks && Array.isArray(appState.tasks)) {
-      appState.tasks.forEach(t => {
+    const toTruongTasks = getToTruongTasks();
+    if (toTruongTasks && Array.isArray(toTruongTasks)) {
+      toTruongTasks.forEach(t => {
         const tg = getTaskGroup(t);
         const ckTg = cleanKey(tg);
         const a = getTaskAssignee(t);
@@ -2494,7 +2533,8 @@ function renderToTruongTaskList() {
     }
   }
 
-  let filtered = appState.tasks.filter(t => {
+  const toTruongTasks = getToTruongTasks();
+  let filtered = toTruongTasks.filter(t => {
     const chuTri = getTaskAssignee(t);
     const phoiHop = getTaskCollaborator(t);
     const toChuTri = getTaskGroup(t);
