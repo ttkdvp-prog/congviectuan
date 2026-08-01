@@ -2500,11 +2500,7 @@ function filterToTruongByLeader(leaderName) {
   const uSelect = document.getElementById('totruong-user-select');
   if (!uSelect) return;
 
-  if (cleanKey(uSelect.value) === cleanKey(leaderName)) {
-    uSelect.value = '';
-  } else {
-    uSelect.value = leaderName;
-  }
+  uSelect.value = leaderName;
   onToTruongGroupChange();
 }
 
@@ -2592,6 +2588,15 @@ function onToTruongGroupChange() {
     }
   }
 
+  // Default to the first Leader (Tổ trưởng) if no user is selected for this group
+  let activeUser = currentUsr;
+  if (selGroup && !activeUser && leadersMap.size > 0) {
+    const firstLeader = leadersMap.values().next().value;
+    if (firstLeader && firstLeader.name) {
+      activeUser = firstLeader.name;
+    }
+  }
+
   const leaderBanner = document.getElementById('totruong-leader-info-banner');
   if (leaderBanner) {
     if (selGroup) {
@@ -2602,12 +2607,12 @@ function onToTruongGroupChange() {
         const sub = getSubLeaderInfo(l.name);
         const roleTitle = sub ? sub.title : 'Tổ trưởng';
         const roleColor = sub ? '#38bdf8' : '#00c897';
-        const isSelected = cleanKey(currentUsr) === cleanKey(l.name);
+        const isSelected = cleanKey(activeUser) === cleanKey(l.name);
 
         leaderPills.push(`
           <span class="leader-badge-pill ${isSelected ? 'active-pill' : ''}" 
                 onclick="filterToTruongByLeader('${escapeHtml(l.name)}')" 
-                style="cursor:pointer; padding:5px 12px; border-radius:20px; background:${isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255,255,255,0.06)'}; border:1px solid ${roleColor}; color:${roleColor}; font-weight:600; font-size:0.85rem; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s; user-select:none;"
+                style="cursor:pointer; padding:5px 12px; border-radius:20px; background:${isSelected ? (sub ? 'rgba(56, 189, 248, 0.35)' : 'rgba(0, 200, 151, 0.35)') : 'rgba(255,255,255,0.06)'}; border:${isSelected ? `2px solid ${roleColor}` : `1px solid ${roleColor}`}; color:${roleColor}; font-weight:700; font-size:0.85rem; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s; user-select:none;"
                 title="Bấm để xem các công việc do ${roleTitle} ${escapeHtml(l.name)} giao">
             <i class="fa-solid fa-user-tie"></i> <strong>${roleTitle}:</strong>&nbsp;${escapeHtml(l.name)} ${l.code ? `<span style="font-weight:normal; opacity:0.8;">(${escapeHtml(l.code)})</span>` : ''}
           </span>
@@ -2635,8 +2640,8 @@ function onToTruongGroupChange() {
     uSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
   });
 
-  if (currentUsr && Array.from(teamUsers).includes(currentUsr)) {
-    uSelect.value = currentUsr;
+  if (activeUser && Array.from(teamUsers).includes(activeUser)) {
+    uSelect.value = activeUser;
   }
 
   renderToTruongTaskList();
