@@ -566,24 +566,74 @@ function populateSelects() {
 
 function handleModalGroupChange(selectedGroup) {
   const chuTriInput = document.getElementById('task-chutri-input');
+  const phoiHopInput = document.getElementById('task-phoihop-input');
   if (!chuTriInput) return;
 
-  // Immediately populate from cache first for responsiveness
-  populateDropdownFromCache(selectedGroup);
+  if (!selectedGroup) {
+    // No group selected: show all users from cache
+    populateDropdownFromCache('');
+    return;
+  }
 
-  // Then fetch fresh data from backend for real-time sync
-  if (selectedGroup) {
-    fetchFreshTeamMembers(selectedGroup);
+  // Show loading indicator
+  if (chuTriInput) chuTriInput.placeholder = '⏳ Đang tải nhân viên...';
+  if (phoiHopInput) phoiHopInput.placeholder = '⏳ Đang tải nhân viên...';
+
+  // Fetch fresh data from Google Sheets
+  const fetchUrl = appState.apiUrl;
+  
+  if (appState.isGAS) {
+    try {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          applyFreshTeamMembers(res, selectedGroup);
+          if (chuTriInput) chuTriInput.placeholder = 'Tất cả nhân viên trong tổ...';
+          if (phoiHopInput) phoiHopInput.placeholder = 'Tất cả nhân viên trong tổ...';
+        })
+        .withFailureHandler(function(err) {
+          console.warn('[handleModalGroupChange] GAS failed, using cache:', err);
+          populateDropdownFromCache(selectedGroup);
+          if (chuTriInput) chuTriInput.placeholder = 'Tất cả nhân viên trong tổ...';
+          if (phoiHopInput) phoiHopInput.placeholder = 'Tất cả nhân viên trong tổ...';
+        })
+        .getTeamMembers(selectedGroup);
+    } catch(e) {
+      populateDropdownFromCache(selectedGroup);
+      if (chuTriInput) chuTriInput.placeholder = 'Tất cả nhân viên trong tổ...';
+      if (phoiHopInput) phoiHopInput.placeholder = 'Tất cả nhân viên trong tổ...';
+    }
+  } else if (fetchUrl) {
+    const url = fetchUrl + '?action=getTeamMembers&group=' + encodeURIComponent(selectedGroup) + '&t=' + new Date().getTime();
+    fetch(url)
+      .then(res => res.json())
+      .then(res => {
+        if (res && res.success && res.members && res.members.length > 0) {
+          applyFreshTeamMembers(res, selectedGroup);
+        } else {
+          console.warn('[handleModalGroupChange] Empty response, using cache. Response:', JSON.stringify(res).substring(0, 300));
+          populateDropdownFromCache(selectedGroup);
+        }
+        if (chuTriInput) chuTriInput.placeholder = 'Tất cả nhân viên trong tổ...';
+        if (phoiHopInput) phoiHopInput.placeholder = 'Tất cả nhân viên trong tổ...';
+      })
+      .catch(err => {
+        console.warn('[handleModalGroupChange] Fetch failed, using cache:', err);
+        populateDropdownFromCache(selectedGroup);
+        if (chuTriInput) chuTriInput.placeholder = 'Tất cả nhân viên trong tổ...';
+        if (phoiHopInput) phoiHopInput.placeholder = 'Tất cả nhân viên trong tổ...';
+      });
+  } else {
+    // No API URL: use cache only
+    populateDropdownFromCache(selectedGroup);
   }
 }
 
-// Populate dropdown from cached appState data (instant, offline-capable)
+// Populate dropdown from cached appState data (fallback when API unavailable)
 function populateDropdownFromCache(selectedGroup) {
   const filteredUsers = new Set();
   const selGrpClean = cleanKey(selectedGroup);
 
   if (selGrpClean) {
-    // Pull employees from tovien
     if (appState.tovien && Array.isArray(appState.tovien)) {
       let lastGroup = '';
       appState.tovien.forEach(row => {
@@ -599,7 +649,6 @@ function populateDropdownFromCache(selectedGroup) {
       });
     }
 
-    // Pull from users data
     if (appState.users && Array.isArray(appState.users)) {
       appState.users.forEach(u => {
         const { name, group } = getUserNameAndGroup(u);
@@ -633,46 +682,16 @@ function populateDropdownFromCache(selectedGroup) {
   appState.dropdownData.phoihop = sortedUsers;
 }
 
-// Fetch fresh team members from Google Sheets (real-time sync)
-function fetchFreshTeamMembers(groupName) {
-  const fetchUrl = appState.apiUrl;
-  
-  if (appState.isGAS) {
-    try {
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res && res.success && res.members && res.members.length > 0) {
-            applyFreshTeamMembers(res, groupName);
-          }
-        })
-        .withFailureHandler(function(err) {
-          console.warn('[fetchFreshTeamMembers] GAS call failed:', err);
-        })
-        .getTeamMembers(groupName);
-    } catch(e) {
-      console.warn('[fetchFreshTeamMembers] Error:', e);
-    }
-  } else if (fetchUrl) {
-    const url = fetchUrl + '?action=getTeamMembers&group=' + encodeURIComponent(groupName) + '&t=' + new Date().getTime();
-    fetch(url)
-      .then(res => res.json())
-      .then(res => {
-        if (res && res.success && res.members && res.members.length > 0) {
-          applyFreshTeamMembers(res, groupName);
-        }
-      })
-      .catch(err => console.warn('[fetchFreshTeamMembers] Fetch failed:', err));
-  }
-}
-
 // Apply fresh team members from backend response to dropdowns
 function applyFreshTeamMembers(res, groupName) {
   const freshUsers = new Set();
   
-  // Add all members
-  res.members.forEach(m => {
-    if (m.name) freshUsers.add(m.name);
-  });
+  // Add all members from fresh response
+  if (res.members) {
+    res.members.forEach(m => {
+      if (m.name) freshUsers.add(m.name);
+    });
+  }
   
   // Add leader
   if (res.leader && res.leader.name) {
@@ -683,23 +702,20 @@ function applyFreshTeamMembers(res, groupName) {
   
   if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
   
-  // Only update if the user is still on the same group
-  const currentGroupInput = document.getElementById('task-tochutri-input')?.value || '';
-  if (cleanKey(currentGroupInput) === cleanKey(groupName)) {
-    appState.dropdownData.chutri = sortedUsers;
-    appState.dropdownData.phoihop = sortedUsers;
-    
-    console.log('[fetchFreshTeamMembers] ✅ Updated dropdowns with', sortedUsers.length, 'fresh members for', groupName);
-    
-    // If a dropdown is currently open, refresh it
-    const chuTriDropdown = document.getElementById('dropdown-chutri');
-    const phoiHopDropdown = document.getElementById('dropdown-phoihop');
-    if (chuTriDropdown && chuTriDropdown.style.display !== 'none') {
-      filterCustomDropdown('chutri', document.getElementById('task-chutri-input')?.value || '');
-    }
-    if (phoiHopDropdown && phoiHopDropdown.style.display !== 'none') {
-      filterCustomDropdown('phoihop', document.getElementById('task-phoihop-input')?.value || '');
-    }
+  // Update dropdown data with ONLY fresh data (no cache mixing)
+  appState.dropdownData.chutri = sortedUsers;
+  appState.dropdownData.phoihop = sortedUsers;
+  
+  console.log('[applyFreshTeamMembers] ✅ Updated dropdowns with', sortedUsers.length, 'fresh members for', groupName);
+  
+  // Refresh any open dropdown immediately
+  const chuTriDropdown = document.getElementById('dropdown-chutri');
+  const phoiHopDropdown = document.getElementById('dropdown-phoihop');
+  if (chuTriDropdown) {
+    filterCustomDropdown('chutri', document.getElementById('task-chutri-input')?.value || '');
+  }
+  if (phoiHopDropdown) {
+    filterCustomDropdown('phoihop', document.getElementById('task-phoihop-input')?.value || '');
   }
 }
 
