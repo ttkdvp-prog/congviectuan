@@ -2459,49 +2459,52 @@ function isLeaderUser(userName) {
 }
 
 function getToTruongTasks() {
-  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec) && appState.totruonggiaoviec.length > 0) {
-    return appState.totruonggiaoviec.map(t => {
-      const title = t['Tiêu đề'] || t['Tiêu đề công việc'] || '';
-      const desc = t['Mô tả'] || t['Mô tả công việc'] || '';
+  const source = (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec) && appState.totruonggiaoviec.length > 0)
+    ? appState.totruonggiaoviec
+    : appState.tasks;
 
-      const leaderName = getTaskLeaderName(t);
-      const leaderCode = getTaskLeaderCode(t);
+  if (!source || !Array.isArray(source)) return [];
 
-      const empRName = getTaskEmpRName(t);
-      const empRCode = getTaskEmpRCode(t);
+  return source.map(t => {
+    const title = t['Tiêu đề'] || t['Tiêu đề công việc'] || '';
+    const desc = t['Mô tả'] || t['Mô tả công việc'] || '';
 
-      const empCName = getTaskEmpCName(t);
-      const empCCode = getTaskEmpCCode(t);
+    const leaderName = getTaskLeaderName(t) || getTaskAssignee(t);
+    const leaderCode = getTaskLeaderCode(t);
 
-      const toChuTri = getToTruongTaskGroup(t);
+    const empRName = getTaskEmpRName(t) || (getTaskAssignee(t) !== leaderName ? getTaskAssignee(t) : '');
+    const empRCode = getTaskEmpRCode(t);
 
-      return {
-        ...t,
-        'Tiêu đề công việc': title,
-        'Tiêu đề': title,
-        'Mô tả công việc': desc,
-        'Mô tả': desc,
-        'Tên NV (A)': leaderName,
-        'Mã NV (A)': leaderCode,
-        'Tên người giao việc': leaderName,
-        'Tên tổ trưởng': leaderName,
-        'Mã người giao việc': leaderCode,
-        'Mã NV tổ trưởng': leaderCode,
-        'Tên NV (R)': empRName,
-        'Mã NV (R)': empRCode,
-        'Tên NV (C)': empCName,
-        'Mã NV (C)': empCCode,
-        'Người chủ trì': empRName,
-        'Người phối hợp': empCName,
-        'Tổ chủ trì': toChuTri,
-        'Tổ': toChuTri,
-        'Hạn hoàn thành': t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '',
-        'Ngày kết thúc': t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '',
-        'Tiến độ (%)': t['Tiến độ'] !== undefined ? t['Tiến độ'] : (t['Tiến độ (%)'] || 0)
-      };
-    });
-  }
-  return [];
+    const empCName = getTaskEmpCName(t) || getTaskCollaborator(t);
+    const empCCode = getTaskEmpCCode(t);
+
+    const toChuTri = getToTruongTaskGroup(t);
+
+    return {
+      ...t,
+      'Tiêu đề công việc': title,
+      'Tiêu đề': title,
+      'Mô tả công việc': desc,
+      'Mô tả': desc,
+      'Tên NV (A)': leaderName,
+      'Mã NV (A)': leaderCode,
+      'Tên người giao việc': leaderName,
+      'Tên tổ trưởng': leaderName,
+      'Mã người giao việc': leaderCode,
+      'Mã NV tổ trưởng': leaderCode,
+      'Tên NV (R)': empRName,
+      'Mã NV (R)': empRCode,
+      'Tên NV (C)': empCName,
+      'Mã NV (C)': empCCode,
+      'Người chủ trì': empRName || leaderName,
+      'Người phối hợp': empCName,
+      'Tổ chủ trì': toChuTri,
+      'Tổ': toChuTri,
+      'Hạn hoàn thành': t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '',
+      'Ngày kết thúc': t['Ngày kết thúc'] || t['Hạn hoàn thành'] || '',
+      'Tiến độ (%)': t['Tiến độ'] !== undefined ? t['Tiến độ'] : (t['Tiến độ (%)'] || 0)
+    };
+  });
 }
 
 /* ==============================================================================
