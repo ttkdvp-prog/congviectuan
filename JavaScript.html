@@ -2081,52 +2081,112 @@ function handleTaskFormSubmit(e) {
   const chuTriName = document.getElementById('task-chutri-input')?.value || '';
   const phoiHopName = document.getElementById('task-phoihop-input')?.value || '';
 
-  const chuTriUser = appState.users.find(u => (u['Tên'] || u.name) === chuTriName);
-  const phoiHopUser = appState.users.find(u => (u['Tên'] || u.name) === phoiHopName);
-  const finalToChuTri = toChuTriInput || (chuTriUser ? (chuTriUser['Tổ'] || chuTriUser.group) : '');
+  const isToTruongTab = appState.currentTab === 'totruong';
 
-  const newId = taskId || ('TSK-' + Math.floor(1000 + Math.random() * 9000));
+  if (isToTruongTab) {
+    // === SAVE TO totruonggiaoviec sheet ===
+    const newId = taskId || ('TT-' + Math.floor(1000 + Math.random() * 9000));
 
-  const payload = {
-    id: newId,
-    'ID': newId,
-    'Tiêu đề': titleVal,
-    'Mô tả': descVal,
-    'Mức độ ưu tiên': priorityVal,
-    'Trạng thái': statusVal,
-    'Ngày bắt đầu': startVal,
-    'Ngày kết thúc': endVal,
-    'Kế hoạch': kehoachVal,
-    'Thực hiện': thuchienVal,
-    'Người chủ trì': chuTriName,
-    'Tổ chủ trì': finalToChuTri,
-    'Người phối hợp': phoiHopName,
-    'Tổ phối hợp': phoiHopUser ? (phoiHopUser['Tổ'] || phoiHopUser.group) : '',
-    'Người thực hiện': chuTriName,
-    'Người phụ trách': chuTriName,
-    'Tiến độ (%)': Number(document.getElementById('task-progress-input')?.value || 0),
-    'Ghi chú': document.getElementById('task-ghichu-input')?.value || '',
-    'Tệp đính kèm': document.getElementById('task-attachment-input')?.value || '',
-    subtasks: subtasks
-  };
+    // Find leader info from tovien
+    let leaderName = '', leaderCode = '';
+    if (toChuTriInput && appState.tovien) {
+      const grpClean = cleanKey(toChuTriInput);
+      appState.tovien.forEach(row => {
+        const info = getTovienRowInfo(row);
+        const ckG = cleanKey(info.group);
+        if (ckG && (ckG.includes(grpClean) || grpClean.includes(ckG)) && info.leaderName) {
+          leaderName = info.leaderName;
+          leaderCode = info.leaderCode || '';
+        }
+      });
+    }
 
-  const existingIdx = appState.tasks.findIndex(t => String(t.ID || t.id) === String(newId));
-  if (existingIdx >= 0) {
-    appState.tasks[existingIdx] = { ...appState.tasks[existingIdx], ...payload };
+    const payload = {
+      id: newId,
+      'ID': newId,
+      'Tiêu đề': titleVal,
+      'Mô tả': descVal,
+      'Trạng thái': statusVal,
+      'Tổ': toChuTriInput,
+      'Tên NV (A)': leaderName,
+      'Mã NV (A)': leaderCode,
+      'Tên NV (R)': chuTriName,
+      'Mã NV (R)': '',
+      'Tên NV (C)': phoiHopName,
+      'Mã NV (C)': '',
+      'Ngày bắt đầu': startVal,
+      'Ngày kết thúc': endVal,
+      'Kế hoạch': kehoachVal,
+      'Thực hiện': thuchienVal,
+      'Tiến độ (%)': Number(document.getElementById('task-progress-input')?.value || 0),
+      'Ghi chú': document.getElementById('task-ghichu-input')?.value || '',
+      'Tệp đính kèm': document.getElementById('task-attachment-input')?.value || ''
+    };
+
+    // Update local state (totruonggiaoviec)
+    const existingIdx = appState.totruonggiaoviec.findIndex(t => String(t.ID || t.id) === String(newId));
+    if (existingIdx >= 0) {
+      appState.totruonggiaoviec[existingIdx] = { ...appState.totruonggiaoviec[existingIdx], ...payload };
+    } else {
+      appState.totruonggiaoviec.unshift(payload);
+    }
+
+    try { localStorage.setItem('TTHT_TOTRUONGGIAOVIEC_CACHE', JSON.stringify(appState.totruonggiaoviec)); } catch(e) {}
+
+    populateSelects();
+    renderActiveTab();
+    closeModal('modal-task');
+    showToast('Đã lưu công việc tổ trưởng thành công!', 'success');
+
+    callBackend('saveToTruongTask', payload);
+
   } else {
-    appState.tasks.unshift(payload);
+    // === SAVE TO congviec sheet (original behavior) ===
+    const chuTriUser = appState.users.find(u => (u['Tên'] || u.name) === chuTriName);
+    const phoiHopUser = appState.users.find(u => (u['Tên'] || u.name) === phoiHopName);
+    const finalToChuTri = toChuTriInput || (chuTriUser ? (chuTriUser['Tổ'] || chuTriUser.group) : '');
+
+    const newId = taskId || ('TSK-' + Math.floor(1000 + Math.random() * 9000));
+
+    const payload = {
+      id: newId,
+      'ID': newId,
+      'Tiêu đề': titleVal,
+      'Mô tả': descVal,
+      'Mức độ ưu tiên': priorityVal,
+      'Trạng thái': statusVal,
+      'Ngày bắt đầu': startVal,
+      'Ngày kết thúc': endVal,
+      'Kế hoạch': kehoachVal,
+      'Thực hiện': thuchienVal,
+      'Người chủ trì': chuTriName,
+      'Tổ chủ trì': finalToChuTri,
+      'Người phối hợp': phoiHopName,
+      'Tổ phối hợp': phoiHopUser ? (phoiHopUser['Tổ'] || phoiHopUser.group) : '',
+      'Người thực hiện': chuTriName,
+      'Người phụ trách': chuTriName,
+      'Tiến độ (%)': Number(document.getElementById('task-progress-input')?.value || 0),
+      'Ghi chú': document.getElementById('task-ghichu-input')?.value || '',
+      'Tệp đính kèm': document.getElementById('task-attachment-input')?.value || '',
+      subtasks: subtasks
+    };
+
+    const existingIdx = appState.tasks.findIndex(t => String(t.ID || t.id) === String(newId));
+    if (existingIdx >= 0) {
+      appState.tasks[existingIdx] = { ...appState.tasks[existingIdx], ...payload };
+    } else {
+      appState.tasks.unshift(payload);
+    }
+
+    try { localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks)); } catch(e) {}
+
+    populateSelects();
+    renderActiveTab();
+    closeModal('modal-task');
+    showToast('Đã lưu công việc thành công!', 'success');
+
+    callBackend('saveTask', payload);
   }
-
-  try {
-    localStorage.setItem('TTHT_TASKS_CACHE', JSON.stringify(appState.tasks));
-  } catch (err) {}
-
-  populateSelects();
-  renderActiveTab();
-  closeModal('modal-task');
-  showToast('Đã lưu công việc thành công!', 'success');
-
-  callBackend('saveTask', payload);
 }
 
 function confirmDeleteTask(id) {
@@ -2982,7 +3042,7 @@ function renderToTruongTaskList() {
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(t['Ngày kết thúc'] || t['Hạn hoàn thành'])}</td>
       <td>
-        <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleInlineTaskChange('${taskId}', 'ngayLamXong', this.value, this)">
+        <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleToTruongInlineChange('${taskId}', 'ngayLamXong', this.value, this)">
       </td>
       <td class="progress-col-cell">
         <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
@@ -2994,11 +3054,11 @@ function renderToTruongTaskList() {
       </td>
       <td><span class="number-pill">${keHoach}</span></td>
       <td>
-        <input type="number" class="inline-note-input" style="width:50px; text-align:center; padding:3px;" value="${thucHien}" onchange="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)" oninput="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)">
+        <input type="number" class="inline-note-input" style="width:50px; text-align:center; padding:3px;" value="${thucHien}" onchange="handleToTruongInlineChange('${taskId}', 'thucHien', this.value, this)" oninput="handleToTruongInlineChange('${taskId}', 'thucHien', this.value, this)">
       </td>
       <td class="ty-le-col-cell"><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
       <td class="col-note-cell">
-        <textarea class="inline-note-textarea" placeholder="Nhập ghi chú..." oninput="autoResizeTextarea(this); handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)" onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)">${escapeHtml(ghiChu)}</textarea>
+        <textarea class="inline-note-textarea" placeholder="Nhập ghi chú..." oninput="autoResizeTextarea(this); handleToTruongInlineChange('${taskId}', 'ghiChu', this.value, this)" onchange="handleToTruongInlineChange('${taskId}', 'ghiChu', this.value, this)">${escapeHtml(ghiChu)}</textarea>
       </td>
       <td style="text-align:center;">
         <div style="display:flex; gap:4px; justify-content:center;">
@@ -3024,12 +3084,144 @@ function openTaskModalForTeamLeader() {
   if (selGroup) {
     const toInput = document.getElementById('task-tochutri-input');
     if (toInput) toInput.value = selGroup;
-    onTaskGroupInputChange();
+    handleModalGroupChange(selGroup);
   }
 
   if (selUser) {
     const userInput = document.getElementById('task-chutri-input');
     if (userInput) userInput.value = selUser;
+  }
+}
+
+// Inline change handler for totruonggiaoviec tab - saves to totruonggiaoviec sheet ONLY
+function handleToTruongInlineChange(taskId, field, value, element) {
+  // Find task in totruonggiaoviec data
+  const toTruongTasks = getToTruongTasks();
+  const task = toTruongTasks.find(t => String(t.ID || t.id) === String(taskId));
+  
+  // Also find in raw appState.totruonggiaoviec 
+  const rawTask = appState.totruonggiaoviec ? appState.totruonggiaoviec.find(t => String(t.ID || t.id) === String(taskId)) : null;
+  
+  if (!task && !rawTask) {
+    console.warn('[handleToTruongInlineChange] Task not found in totruonggiaoviec:', taskId);
+    return;
+  }
+
+  const payload = { id: taskId };
+
+  if (field === 'ghiChu') {
+    if (rawTask) rawTask['Ghi chú'] = value;
+    payload.ghiChu = value;
+    try { localStorage.setItem('TTHT_TOTRUONGGIAOVIEC_CACHE', JSON.stringify(appState.totruonggiaoviec)); } catch(e) {}
+
+    if (noteDebounceTimers['tt_' + taskId]) clearTimeout(noteDebounceTimers['tt_' + taskId]);
+    noteDebounceTimers['tt_' + taskId] = setTimeout(() => {
+      callBackendSilent('updateToTruongTaskInline', payload);
+    }, 500);
+    return;
+  }
+
+  if (field === 'ngayLamXong') {
+    if (rawTask) rawTask['Ngày làm xong'] = value;
+    payload.ngayLamXong = value;
+
+    if (value) {
+      if (rawTask) {
+        rawTask['Tiến độ (%)'] = 100;
+        const endDate = rawTask['Ngày kết thúc'] || rawTask['Hạn hoàn thành'] || '';
+        rawTask['Trạng thái'] = (endDate && value > endDate) ? 'Hoàn thành quá hạn' : 'Hoàn thành';
+      }
+    } else {
+      if (rawTask) {
+        const kh = Number(rawTask['Kế hoạch'] || 1);
+        const th = Number(rawTask['Thực hiện'] || 0);
+        rawTask['Tiến độ (%)'] = kh > 0 ? Math.min(100, Math.round((th / kh) * 100)) : 0;
+        const endDate = rawTask['Ngày kết thúc'] || rawTask['Hạn hoàn thành'] || '';
+        const todayStr = new Date().toISOString().split('T')[0];
+        rawTask['Trạng thái'] = (endDate && todayStr > endDate && rawTask['Tiến độ (%)'] < 100) ? 'Quá hạn' : 'Đang thực hiện';
+      }
+    }
+
+    if (rawTask) {
+      payload.progress = rawTask['Tiến độ (%)'];
+      payload.status = rawTask['Trạng thái'];
+    }
+
+    try { localStorage.setItem('TTHT_TOTRUONGGIAOVIEC_CACHE', JSON.stringify(appState.totruonggiaoviec)); } catch(e) {}
+
+    // Update UI inline
+    if (element) {
+      const tr = element.closest('tr');
+      if (tr) {
+        const progressCell = tr.querySelector('.progress-col-cell');
+        const pct = rawTask ? rawTask['Tiến độ (%)'] : 0;
+        if (progressCell) {
+          progressCell.innerHTML = `
+            <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
+              <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+                <div style="width:${pct}%; height:100%; background:var(--emerald-primary);"></div>
+              </div>
+              <span style="font-size:0.75rem; color:#94a3b8;">${pct}%</span>
+            </div>
+          `;
+        }
+        const statusCell = tr.querySelector('.status-col-cell');
+        const st = rawTask ? rawTask['Trạng thái'] : '';
+        if (statusCell) {
+          if (st === 'Hoàn thành quá hạn') {
+            statusCell.innerHTML = `<span style="color:#f59e0b; font-weight:600; background:rgba(245, 158, 11, 0.15); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
+          } else if (st === 'Hoàn thành') {
+            statusCell.innerHTML = `<span style="color:#10b981; font-weight:600;">Hoàn thành</span>`;
+          } else if (st === 'Quá hạn') {
+            statusCell.innerHTML = `<span class="tag-status-overdue">Quá hạn</span>`;
+          } else {
+            statusCell.innerHTML = `<span style="color:#38bdf8; font-weight:600;">${st}</span>`;
+          }
+        }
+      }
+    }
+
+    callBackendSilent('updateToTruongTaskInline', payload);
+    return;
+  }
+
+  if (field === 'thucHien') {
+    const thVal = Number(value || 0);
+    if (rawTask) {
+      rawTask['Thực hiện'] = thVal;
+      const kh = Number(rawTask['Kế hoạch'] || 1);
+      const pct = kh > 0 ? Math.min(100, Math.round((thVal / kh) * 100)) : 0;
+      rawTask['Tiến độ (%)'] = pct;
+    }
+    payload.thucHien = thVal;
+
+    try { localStorage.setItem('TTHT_TOTRUONGGIAOVIEC_CACHE', JSON.stringify(appState.totruonggiaoviec)); } catch(e) {}
+
+    if (element) {
+      const tr = element.closest('tr');
+      if (tr) {
+        const progressCell = tr.querySelector('.progress-col-cell');
+        const pct = rawTask ? rawTask['Tiến độ (%)'] : 0;
+        if (progressCell) {
+          progressCell.innerHTML = `
+            <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
+              <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+                <div style="width:${pct}%; height:100%; background:var(--emerald-primary);"></div>
+              </div>
+              <span style="font-size:0.75rem; color:#94a3b8;">${pct}%</span>
+            </div>
+          `;
+        }
+        const tyLeCell = tr.querySelector('.ty-le-col-cell');
+        if (tyLeCell && rawTask) {
+          const kh = Number(rawTask['Kế hoạch'] || 1);
+          tyLeCell.innerHTML = `<strong style="color:var(--emerald-primary);">${kh > 0 ? Math.round((thVal / kh) * 100) : 0}%</strong>`;
+        }
+      }
+    }
+
+    callBackendSilent('updateToTruongTaskInline', payload);
+    return;
   }
 }
 

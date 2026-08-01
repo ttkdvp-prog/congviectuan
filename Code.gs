@@ -50,6 +50,8 @@ function doPost(e) {
     else if (action === 'saveDocument') result = saveDocument(payload);
     else if (action === 'deleteDocument') result = deleteDocument(payload);
     else if (action === 'getToTruongSheetData') result = getToTruongSheetData();
+    else if (action === 'saveToTruongTask') result = saveToTruongTask(payload);
+    else if (action === 'updateToTruongTaskInline') result = updateToTruongTaskInline(payload);
 
     return createJsonResponse(result);
   } catch (err) {
@@ -294,6 +296,128 @@ function updateTaskInline(payload) {
     }
     
     if (targetRow === -1) return { success: false, message: 'Task ID not found' };
+    
+    if (payload.ngayLamXong !== undefined) {
+      let colIdx = findHeaderIndex(headers, 'Ngày làm xong');
+      if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.ngayLamXong);
+    }
+    if (payload.thucHien !== undefined) {
+      let colIdx = findHeaderIndex(headers, 'Thực hiện');
+      if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.thucHien);
+      
+      let khCol = findHeaderIndex(headers, 'Kế hoạch');
+      let tyLeCol = findHeaderIndex(headers, 'Tỷ lệ');
+      if (khCol !== -1 && tyLeCol !== -1) {
+        let kh = Number(sheet.getRange(targetRow, khCol + 1).getValue() || 1);
+        let pct = kh > 0 ? Math.round((Number(payload.thucHien) / kh) * 100) : 0;
+        sheet.getRange(targetRow, tyLeCol + 1).setValue(pct + '%');
+      }
+    }
+    if (payload.progress !== undefined) {
+      let colIdx = findHeaderIndex(headers, 'Tiến độ (%)');
+      if (colIdx === -1) colIdx = findHeaderIndex(headers, 'Tiến độ');
+      if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.progress);
+    }
+    if (payload.status !== undefined) {
+      let colIdx = findHeaderIndex(headers, 'Trạng thái');
+      if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.status);
+    }
+    if (payload.ghiChu !== undefined) {
+      let colIdx = findHeaderIndex(headers, 'Ghi chú');
+      if (colIdx !== -1) sheet.getRange(targetRow, colIdx + 1).setValue(payload.ghiChu);
+    }
+    
+    SpreadsheetApp.flush();
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// Save/update task in the totruonggiaoviec sheet (separate from congviec)
+function saveToTruongTask(payload) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
+    let sheet = getSheetFlexible(ss, SHEETS.TOTRUONGGIAOVIEC);
+    if (!sheet) sheet = ss.insertSheet(SHEETS.TOTRUONGGIAOVIEC);
+    
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h).trim());
+    
+    const isEdit = payload.id !== undefined && payload.id !== null && payload.id !== '';
+    let targetRow = -1;
+    if (isEdit) {
+      const idIdx = findHeaderIndex(headers, 'ID');
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][idIdx]) === String(payload.id)) {
+          targetRow = i + 1;
+          break;
+        }
+      }
+    }
+
+    if (targetRow === -1) {
+      targetRow = data.length + 1;
+      if (!payload.id) payload.id = 'TT-' + Math.floor(1000 + Math.random() * 9000);
+    }
+
+    const rowValues = headers.map(h => {
+      const cleanH = String(h).trim().toLowerCase();
+      if (cleanH === 'id') return payload.id;
+      if (cleanH === 'tiêu đề') return payload['Tiêu đề'] || '';
+      if (cleanH === 'mô tả') return payload['Mô tả'] || '';
+      if (cleanH === 'trạng thái') return payload['Trạng thái'] || 'Đang thực hiện';
+      if (cleanH.includes('mã nv (a)')) return payload['Mã NV (A)'] || '';
+      if (cleanH.includes('tên nv (a)')) return payload['Tên NV (A)'] || '';
+      if (cleanH === 'tổ') return payload['Tổ'] || '';
+      if (cleanH.includes('mã nv (r)')) return payload['Mã NV (R)'] || '';
+      if (cleanH.includes('tên nv (r)')) return payload['Tên NV (R)'] || '';
+      if (cleanH.includes('mã nv (c)')) return payload['Mã NV (C)'] || '';
+      if (cleanH.includes('tên nv (c)')) return payload['Tên NV (C)'] || '';
+      if (cleanH === 'ngày bắt đầu') return payload['Ngày bắt đầu'] || '';
+      if (cleanH === 'ngày kết thúc' || cleanH === 'hạn hoàn thành') return payload['Ngày kết thúc'] || '';
+      if (cleanH.includes('tiến độ')) return payload['Tiến độ (%)'] || 0;
+      if (cleanH.includes('ngày làm xong')) return payload['Ngày làm xong'] || '';
+      if (cleanH === 'kế hoạch') return payload['Kế hoạch'] !== undefined ? Number(payload['Kế hoạch']) : 1;
+      if (cleanH === 'thực hiện') return payload['Thực hiện'] !== undefined ? Number(payload['Thực hiện']) : 0;
+      if (cleanH === 'tỷ lệ') {
+        const kh = payload['Kế hoạch'] !== undefined ? Number(payload['Kế hoạch']) : 1;
+        const th = payload['Thực hiện'] !== undefined ? Number(payload['Thực hiện']) : 0;
+        return kh > 0 ? Math.round((th / kh) * 100) + '%' : '0%';
+      }
+      if (cleanH === 'ghi chú') return payload['Ghi chú'] || '';
+      if (cleanH.includes('đính kèm')) return payload['Tệp đính kèm'] || '';
+      return payload[h] || '';
+    });
+
+    sheet.getRange(targetRow, 1, 1, headers.length).setValues([rowValues]);
+    SpreadsheetApp.flush();
+    return { success: true, id: payload.id };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// Inline update for totruonggiaoviec sheet
+function updateToTruongTaskInline(payload) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = getSheetFlexible(ss, SHEETS.TOTRUONGGIAOVIEC);
+    if (!sheet) return { success: false, message: 'Sheet totruonggiaoviec not found' };
+
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h).trim());
+    const idColIdx = findHeaderIndex(headers, 'ID');
+    
+    let targetRow = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idColIdx]) === String(payload.id)) {
+        targetRow = i + 1;
+        break;
+      }
+    }
+    
+    if (targetRow === -1) return { success: false, message: 'Task ID not found in totruonggiaoviec' };
     
     if (payload.ngayLamXong !== undefined) {
       let colIdx = findHeaderIndex(headers, 'Ngày làm xong');
