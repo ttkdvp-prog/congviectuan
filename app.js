@@ -2618,7 +2618,7 @@ function getToTruongTasks() {
   const hasTTGV = appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec) && appState.totruonggiaoviec.length > 0;
   const source = hasTTGV ? appState.totruonggiaoviec : appState.tasks;
 
-  // Show visible debug banner on the page
+  // Show/hide debug banner on the page
   let debugBanner = document.getElementById('totruong-debug-banner');
   if (!debugBanner) {
     debugBanner = document.createElement('div');
@@ -2629,17 +2629,13 @@ function getToTruongTasks() {
   }
   
   if (hasTTGV) {
-    debugBanner.style.background = 'rgba(16, 185, 129, 0.15)';
-    debugBanner.style.color = '#10b981';
-    debugBanner.innerHTML = `✅ Dữ liệu từ sheet <strong>totruonggiaoviec</strong> — ${appState.totruonggiaoviec.length} bản ghi`;
-    // Log first record keys for verification
-    if (appState.totruonggiaoviec[0]) {
-      console.log('[getToTruongTasks] ✅ Using totruonggiaoviec. Keys:', JSON.stringify(Object.keys(appState.totruonggiaoviec[0])));
-    }
+    // Data loaded successfully - hide banner
+    debugBanner.style.display = 'none';
   } else {
+    debugBanner.style.display = 'block';
     debugBanner.style.background = 'rgba(239, 68, 68, 0.15)';
     debugBanner.style.color = '#ef4444';
-    debugBanner.innerHTML = `⚠️ totruonggiaoviec TRỐNG (${appState.totruonggiaoviec ? appState.totruonggiaoviec.length : 'null'} bản ghi) — Đang dùng fallback từ congviec (${appState.tasks ? appState.tasks.length : 0} bản ghi). isGAS=${appState.isGAS}, apiUrl=${appState.apiUrl ? 'CÓ' : 'KHÔNG'}. <button onclick="loadToTruongBackup(); this.textContent='Đang tải...'" style="background:#ef4444;color:white;border:none;padding:2px 10px;border-radius:4px;cursor:pointer;margin-left:8px;">Tải lại</button>`;
+    debugBanner.innerHTML = `⚠️ totruonggiaoviec TRỐNG — Đang tải dữ liệu... <button onclick="appState._toTruongBackupTriggered=false; loadToTruongBackup(); this.textContent='Đang tải...'" style="background:#ef4444;color:white;border:none;padding:2px 10px;border-radius:4px;cursor:pointer;margin-left:8px;">Tải lại</button>`;
     
     // Auto-trigger backup load if not already loading
     if (!appState._toTruongBackupTriggered) {
