@@ -83,7 +83,7 @@
         <div class="header-right">
           <div class="header-search">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" id="global-search-input" placeholder="Tìm kiếm công việc..." oninput="handleGlobalFilter()">
+            <input type="text" id="global-search-input" placeholder="Tìm kiếm công việc..." oninput="handleGlobalFilterDebounced()">
           </div>
 
           <select class="header-select" id="global-group-select" onchange="onGlobalGroupChange()" onfocus="ensureSelectsPopulated()">
@@ -280,7 +280,7 @@
 
               <div class="cvluuy-search-box" style="flex: 1; min-width: 220px;">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="totruong-search-input" placeholder="Tìm kiếm tên việc, người làm..." oninput="renderToTruongTaskList()">
+                <input type="text" id="totruong-search-input" placeholder="Tìm kiếm tên việc, người làm..." oninput="renderToTruongTaskListDebounced()">
               </div>
             </div>
 
@@ -401,7 +401,7 @@
           <div class="cvluuy-filter-bar">
             <div class="cvluuy-search-box">
               <i class="fa-solid fa-magnifying-glass"></i>
-              <input type="text" id="cvluuy-search-input" placeholder="Tìm kiếm công việc lưu ý..." oninput="renderCvLuuYTable()">
+              <input type="text" id="cvluuy-search-input" placeholder="Tìm kiếm công việc lưu ý..." oninput="renderCvLuuYTableDebounced()">
             </div>
             <select class="select-dark" id="cvluuy-group-select" onchange="renderCvLuuYTable()">
               <option value="">Tất cả tổ</option>

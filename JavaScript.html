@@ -35,57 +35,108 @@ function autoResizeTextarea(el) {
   el.style.height = Math.max(38, el.scrollHeight) + 'px';
 }
 
+const cleanKeyCache = new Map();
 function cleanKey(str) {
   if (!str) return '';
-  return String(str)
+  const sStr = String(str);
+  let cached = cleanKeyCache.get(sStr);
+  if (cached !== undefined) return cached;
+  cached = sStr
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
     .replace(/[^a-z0-9]/g, '')
     .trim();
+  if (cleanKeyCache.size > 3000) cleanKeyCache.clear();
+  cleanKeyCache.set(sStr, cached);
+  return cached;
+}
+
+function clearTaskCaches() {
+  cleanKeyCache.clear();
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      delete t._cachedAssignee;
+      delete t._cachedCollab;
+      delete t._cachedGroup;
+      delete t._cachedCollabGroup;
+    });
+  }
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+    appState.totruonggiaoviec.forEach(t => {
+      delete t._cachedAssignee;
+      delete t._cachedCollab;
+      delete t._cachedGroup;
+      delete t._cachedCollabGroup;
+    });
+  }
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => delete u._cachedInfo);
+  }
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    appState.tovien.forEach(r => delete r._cachedInfo);
+  }
 }
 
 function getTaskAssignee(task) {
   if (!task) return 'Chưa gán';
+  if (task._cachedAssignee !== undefined) return task._cachedAssignee;
+  let res = 'Chưa gán';
   for (let k in task) {
+    if (k.startsWith('_')) continue;
     const ck = cleanKey(k);
     if (ck === 'nguoichutri' || ck === 'nguoiphutrach' || ck === 'nguoithuchien' || ck === 'assignee') {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
+        res = String(task[k]).trim();
+        break;
       }
     }
   }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck.includes('chutri') || ck.includes('phutrach') || ck.includes('thuchien')) {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
+  if (res === 'Chưa gán') {
+    for (let k in task) {
+      if (k.startsWith('_')) continue;
+      const ck = cleanKey(k);
+      if (ck.includes('chutri') || ck.includes('phutrach') || ck.includes('thuchien')) {
+        if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+          res = String(task[k]).trim();
+          break;
+        }
       }
     }
   }
-  return 'Chưa gán';
+  task._cachedAssignee = res;
+  return res;
 }
 
 function getTaskCollaborator(task) {
   if (!task) return '';
+  if (task._cachedCollab !== undefined) return task._cachedCollab;
+  let res = '';
   for (let k in task) {
+    if (k.startsWith('_')) continue;
     const ck = cleanKey(k);
     if (ck === 'nguoiphoihop') {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
+        res = String(task[k]).trim();
+        break;
       }
     }
   }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck.includes('phoihop') && !ck.includes('to')) {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
+  if (!res) {
+    for (let k in task) {
+      if (k.startsWith('_')) continue;
+      const ck = cleanKey(k);
+      if (ck.includes('phoihop') && !ck.includes('to')) {
+        if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+          res = String(task[k]).trim();
+          break;
+        }
       }
     }
   }
-  return '';
+  task._cachedCollab = res;
+  return res;
 }
 
 function formatUniqueGroups(groupStr) {
@@ -97,9 +148,11 @@ function formatUniqueGroups(groupStr) {
 
 function getTaskGroup(task) {
   if (!task) return '';
+  if (task._cachedGroup !== undefined) return task._cachedGroup;
   
   let rawGroup = '';
   for (let k in task) {
+    if (k.startsWith('_')) continue;
     const ck = cleanKey(k);
     if (ck === 'tochutri' || ck === 'to' || ck === 'tentocutri' || ck === 'tengroup') {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
@@ -115,17 +168,14 @@ function getTaskGroup(task) {
       const names = assignee.split(',').map(n => n.trim()).filter(Boolean);
       const groups = new Set();
       names.forEach(name => {
-        const usr = appState.users.find(u => {
-          const uName = u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u.name;
-          return cleanKey(uName) === cleanKey(name);
-        });
-        if (usr) {
-          for (let k in usr) {
-            const ck = cleanKey(k);
-            if (ck === 'to' || ck === 'tochutri' || ck === 'tento') {
-              if (usr[k] && String(usr[k]).trim()) groups.add(String(usr[k]).trim());
+        const cleanN = cleanKey(name);
+        if (appState.users && Array.isArray(appState.users)) {
+          appState.users.forEach(u => {
+            const { name: uName, group: uGrp } = getUserNameAndGroup(u);
+            if (uName && uGrp && cleanKey(uName) === cleanN) {
+              groups.add(uGrp);
             }
-          }
+          });
         }
       });
       if (groups.size > 0) rawGroup = Array.from(groups).join(', ');
@@ -134,6 +184,7 @@ function getTaskGroup(task) {
 
   if (!rawGroup) {
     for (let k in task) {
+      if (k.startsWith('_')) continue;
       const ck = cleanKey(k);
       if (ck.includes('chutri') && ck.includes('to')) {
         if (task[k] && String(task[k]).trim()) {
@@ -144,26 +195,39 @@ function getTaskGroup(task) {
     }
   }
 
-  return formatUniqueGroups(rawGroup);
+  const res = formatUniqueGroups(rawGroup);
+  task._cachedGroup = res;
+  return res;
 }
 
 function getTaskCollaboratorGroup(task) {
   if (!task) return '';
+  if (task._cachedCollabGroup !== undefined) return task._cachedCollabGroup;
+  let res = '';
   for (let k in task) {
+    if (k.startsWith('_')) continue;
     const ck = cleanKey(k);
     if (ck === 'tophoihop') {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
+        res = String(task[k]).trim();
+        break;
       }
     }
   }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck.includes('phoihop') && ck.includes('to')) {
-      if (task[k] && String(task[k]).trim()) return String(task[k]).trim();
+  if (!res) {
+    for (let k in task) {
+      if (k.startsWith('_')) continue;
+      const ck = cleanKey(k);
+      if (ck.includes('phoihop') && ck.includes('to')) {
+        if (task[k] && String(task[k]).trim()) {
+          res = String(task[k]).trim();
+          break;
+        }
+      }
     }
   }
-  return '';
+  task._cachedCollabGroup = res;
+  return res;
 }
 
 function ensureSelectsPopulated() {
@@ -193,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const uSelect = document.getElementById('global-user-select');
   const gSelect = document.getElementById('global-group-select');
 
-  if (sInput) sInput.addEventListener('input', handleGlobalFilter);
+  if (sInput) sInput.addEventListener('input', handleGlobalFilterDebounced);
   if (uSelect) uSelect.addEventListener('change', handleGlobalFilter);
   if (gSelect) gSelect.addEventListener('change', onGlobalGroupChange);
 
@@ -294,6 +358,7 @@ function onDataLoaded(response, showNotification = false) {
   console.log('[onDataLoaded] Response keys:', response ? Object.keys(response) : 'null');
   console.log('[onDataLoaded] totruonggiaoviec in response:', response?.totruonggiaoviec ? response.totruonggiaoviec.length + ' records' : 'MISSING');
   if (response && response.success) {
+    clearTaskCaches();
     if (response.tasks && response.tasks.length > 0) appState.tasks = response.tasks;
     if (response.users && response.users.length > 0) appState.users = response.users;
     if (response.tovien && response.tovien.length > 0) appState.tovien = response.tovien;
@@ -417,11 +482,14 @@ function onDataError(error) {
 }
 
 function getUserNameAndGroup(u) {
+  if (!u || typeof u !== 'object') return { name: '', group: '' };
+  if (u._cachedInfo) return u._cachedInfo;
+
   let name = '';
   let group = '';
-  if (!u || typeof u !== 'object') return { name, group };
 
   for (let k in u) {
+    if (k.startsWith('_')) continue;
     const ck = cleanKey(k);
     if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'tennguoidung' || ck === 'name' || ck === 'nguoithuchien') {
       if (u[k] && String(u[k]).trim()) {
@@ -432,6 +500,7 @@ function getUserNameAndGroup(u) {
   }
   if (!name) {
     for (let k in u) {
+      if (k.startsWith('_')) continue;
       const ck = cleanKey(k);
       if ((ck.includes('ten') || ck.includes('user')) && !ck.includes('to') && !ck.includes('file')) {
         if (u[k] && String(u[k]).trim()) {
@@ -443,6 +512,7 @@ function getUserNameAndGroup(u) {
   }
 
   for (let k in u) {
+    if (k.startsWith('_')) continue;
     const ck = cleanKey(k);
     if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck === 'nhom' || ck === 'donvi') {
       if (u[k] && String(u[k]).trim()) {
@@ -453,6 +523,7 @@ function getUserNameAndGroup(u) {
   }
   if (!group) {
     for (let k in u) {
+      if (k.startsWith('_')) continue;
       const ck = cleanKey(k);
       if ((ck.includes('to') || ck.includes('group') || ck.includes('donvi')) && !ck.includes('tiendo') && !ck.includes('taptin') && !ck.includes('tep')) {
         if (u[k] && String(u[k]).trim() && isNaN(u[k])) {
@@ -463,7 +534,9 @@ function getUserNameAndGroup(u) {
     }
   }
 
-  return { name, group };
+  const res = { name, group };
+  u._cachedInfo = res;
+  return res;
 }
 
 function populateSelects() {
@@ -523,37 +596,41 @@ function populateSelects() {
 
   if (groupSelect) {
     const curVal = groupSelect.value;
-    groupSelect.innerHTML = '<option value="">Tất cả tổ chủ trì</option>';
+    const opts = ['<option value="">Tất cả tổ chủ trì</option>'];
     Array.from(hostGroups).sort().forEach(g => {
-      if (g) groupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+      if (g) opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
     });
+    groupSelect.innerHTML = opts.join('');
     if (curVal) groupSelect.value = curVal;
   }
 
   if (cvluuyGroupSelect) {
     const curVal = cvluuyGroupSelect.value;
-    cvluuyGroupSelect.innerHTML = '<option value="">Tất cả tổ</option>';
+    const opts = ['<option value="">Tất cả tổ</option>'];
     Array.from(allGroups).sort().forEach(g => {
-      if (g) cvluuyGroupSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+      if (g) opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
     });
+    cvluuyGroupSelect.innerHTML = opts.join('');
     if (curVal) cvluuyGroupSelect.value = curVal;
   }
 
   if (kanbanAssigneeSelect) {
     const curVal = kanbanAssigneeSelect.value;
-    kanbanAssigneeSelect.innerHTML = '<option value="">Tất cả người phụ trách</option>';
+    const opts = ['<option value="">Tất cả người phụ trách</option>'];
     Array.from(assignees).sort().forEach(a => {
-      if (a) kanbanAssigneeSelect.innerHTML += `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`;
+      if (a) opts.push(`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`);
     });
+    kanbanAssigneeSelect.innerHTML = opts.join('');
     if (curVal) kanbanAssigneeSelect.value = curVal;
   }
 
   if (taskToChuTriSelect) {
     const curVal = taskToChuTriSelect.value;
-    taskToChuTriSelect.innerHTML = '<option value="">-- Tất cả tổ --</option>';
+    const opts = ['<option value="">-- Tất cả tổ --</option>'];
     Array.from(hostGroups).sort().forEach(g => {
-      if (g) taskToChuTriSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+      if (g) opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
     });
+    taskToChuTriSelect.innerHTML = opts.join('');
     if (curVal) taskToChuTriSelect.value = curVal;
   }
 
@@ -760,10 +837,11 @@ function updateGlobalUserSelectOptions() {
     }
   });
 
-  userSelect.innerHTML = '<option value="">Tất cả người phụ trách</option>';
+  const opts = ['<option value="">Tất cả người phụ trách</option>'];
   Array.from(usersInGroup).sort().forEach(name => {
-    userSelect.innerHTML += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+    opts.push(`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`);
   });
+  userSelect.innerHTML = opts.join('');
 
   if (currentSelectedUser && Array.from(usersInGroup).some(u => u.toLowerCase() === currentSelectedUser.toLowerCase())) {
     userSelect.value = currentSelectedUser;
@@ -803,6 +881,24 @@ function switchSidebarTab(tabName) {
   if (titleDisplay) titleDisplay.innerText = titles[tabName] || 'TTHT Tasks';
 
   renderActiveTab();
+}
+
+let _globalFilterTimer = null;
+function handleGlobalFilterDebounced() {
+  if (_globalFilterTimer) clearTimeout(_globalFilterTimer);
+  _globalFilterTimer = setTimeout(() => handleGlobalFilter(), 150);
+}
+
+let _toTruongFilterTimer = null;
+function renderToTruongTaskListDebounced() {
+  if (_toTruongFilterTimer) clearTimeout(_toTruongFilterTimer);
+  _toTruongFilterTimer = setTimeout(() => renderToTruongTaskList(), 150);
+}
+
+let _cvLuuYFilterTimer = null;
+function renderCvLuuYTableDebounced() {
+  if (_cvLuuYFilterTimer) clearTimeout(_cvLuuYFilterTimer);
+  _cvLuuYFilterTimer = setTimeout(() => renderCvLuuYTable(), 150);
 }
 
 function handleGlobalFilter() {
@@ -1113,6 +1209,7 @@ function renderTaskListTable() {
     return;
   }
   
+  const rowsHtml = [];
   filtered.forEach((t, index) => {
     const taskId = t.ID || t.id;
     let status = t['Trạng thái'] || 'Đang thực hiện';
@@ -1153,44 +1250,46 @@ function renderTaskListTable() {
     const toChuTriName = getTaskGroup(t);
     const phoiHopName = getTaskCollaborator(t);
 
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index + 1}.</span><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
-      <td class="col-desc-cell">${escapeHtml(t['Mô tả'] || '')}</td>
-      <td class="status-col-cell">${statusBadge}</td>
-      <td>${formatNameList(chuTriName)}</td>
-      <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
-      <td>${formatNameList(phoiHopName)}</td>
-      <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
-      <td>${formatDateVN(t['Ngày kết thúc'])}</td>
-      <td>
-        <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleInlineTaskChange('${taskId}', 'ngayLamXong', this.value, this)">
-      </td>
-      <td class="progress-col-cell">
-        <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
-          <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
-            <div style="width:${progress}%; height:100%; background:var(--emerald-primary);"></div>
+    rowsHtml.push(`
+      <tr>
+        <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index + 1}.</span><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
+        <td class="col-desc-cell">${escapeHtml(t['Mô tả'] || '')}</td>
+        <td class="status-col-cell">${statusBadge}</td>
+        <td>${formatNameList(chuTriName)}</td>
+        <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
+        <td>${formatNameList(phoiHopName)}</td>
+        <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
+        <td>${formatDateVN(t['Ngày kết thúc'])}</td>
+        <td>
+          <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleInlineTaskChange('${taskId}', 'ngayLamXong', this.value, this)">
+        </td>
+        <td class="progress-col-cell">
+          <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
+            <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+              <div style="width:${progress}%; height:100%; background:var(--emerald-primary);"></div>
+            </div>
+            <span style="font-size:0.75rem; color:#94a3b8;">${progress}%</span>
           </div>
-          <span style="font-size:0.75rem; color:#94a3b8;">${progress}%</span>
-        </div>
-      </td>
-      <td><span class="number-pill">${keHoach}</span></td>
-      <td>
-        <input type="number" class="inline-note-input" style="width:50px; text-align:center; padding:3px;" value="${thucHien}" onchange="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)" oninput="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)">
-      </td>
-      <td class="ty-le-col-cell"><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
-      <td class="col-note-cell">
-        <textarea class="inline-note-textarea" placeholder="Nhập ghi chú..." oninput="autoResizeTextarea(this); handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)" onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)">${escapeHtml(ghiChu)}</textarea>
-      </td>
-      <td style="text-align:center;">
-        <div style="display:flex; gap:4px; justify-content:center;">
-          <button class="btn-action-edit" title="Sửa công việc" onclick="openTaskModal('${taskId}')"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn-action-delete" title="Xóa công việc" onclick="confirmDeleteTask('${taskId}')"><i class="fa-solid fa-trash"></i></button>
-        </div>
-      </td>
-    `;
-    tbody.appendChild(tr);
+        </td>
+        <td><span class="number-pill">${keHoach}</span></td>
+        <td>
+          <input type="number" class="inline-note-input" style="width:50px; text-align:center; padding:3px;" value="${thucHien}" onchange="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)" oninput="handleInlineTaskChange('${taskId}', 'thucHien', this.value, this)">
+        </td>
+        <td class="ty-le-col-cell"><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
+        <td class="col-note-cell">
+          <textarea class="inline-note-textarea" placeholder="Nhập ghi chú..." oninput="autoResizeTextarea(this); handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)" onchange="handleInlineTaskChange('${taskId}', 'ghiChu', this.value, this)">${escapeHtml(ghiChu)}</textarea>
+        </td>
+        <td style="text-align:center;">
+          <div style="display:flex; gap:4px; justify-content:center;">
+            <button class="btn-action-edit" title="Sửa công việc" onclick="openTaskModal('${taskId}')"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn-action-delete" title="Xóa công việc" onclick="confirmDeleteTask('${taskId}')"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>
+    `);
   });
+
+  tbody.innerHTML = rowsHtml.join('');
 
   setTimeout(() => {
     document.querySelectorAll('.inline-note-textarea').forEach(autoResizeTextarea);
@@ -2493,15 +2592,17 @@ function escapeHtml(str) {
 }
 
 function getTovienRowInfo(row) {
+  if (!row || typeof row !== 'object') return { group: '', leaderName: '', leaderCode: '', empName: '', empCode: '' };
+  if (row._cachedInfo) return row._cachedInfo;
+
   let group = '';
   let leaderName = '';
   let leaderCode = '';
   let empName = '';
   let empCode = '';
 
-  if (!row || typeof row !== 'object') return { group, leaderName, leaderCode, empName, empCode };
-
   for (let k in row) {
+    if (k.startsWith('_')) continue;
     const ck = cleanKey(k);
     const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
     if (!val) continue;
@@ -2521,6 +2622,7 @@ function getTovienRowInfo(row) {
 
   if (!group) {
     for (let k in row) {
+      if (k.startsWith('_')) continue;
       const ck = cleanKey(k);
       const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
       if (val && (ck.includes('to') || ck.includes('donvi')) && !ck.includes('truong') && !ck.includes('vien') && !ck.includes('nv')) {
@@ -2532,6 +2634,7 @@ function getTovienRowInfo(row) {
 
   if (!empName) {
     for (let k in row) {
+      if (k.startsWith('_')) continue;
       const ck = cleanKey(k);
       const val = row[k] !== undefined && row[k] !== null ? String(row[k]).trim() : '';
       if (val && (ck.includes('ten') || ck.includes('nhanvien') || ck.includes('nv')) && !ck.includes('totruong') && !ck.includes('to')) {
@@ -2541,7 +2644,9 @@ function getTovienRowInfo(row) {
     }
   }
 
-  return { group, leaderName, leaderCode, empName, empCode };
+  const res = { group, leaderName, leaderCode, empName, empCode };
+  row._cachedInfo = res;
+  return res;
 }
 
 function getExactValueByKeyPattern(obj, targetKeys) {
@@ -2806,10 +2911,11 @@ function populateToTruongFilters() {
     });
   }
 
-  gSelect.innerHTML = '<option value="">Tất cả tổ giao việc</option>';
+  const opts = ['<option value="">Tất cả tổ giao việc</option>'];
   Array.from(groups).sort().forEach(g => {
-    gSelect.innerHTML += `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`;
+    opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
   });
+  gSelect.innerHTML = opts.join('');
 
   if (currentGrp && Array.from(groups).includes(currentGrp)) {
     gSelect.value = currentGrp;
@@ -2971,10 +3077,11 @@ function onToTruongGroupChange() {
     }
   }
 
-  uSelect.innerHTML = '<option value="">Tất cả nhân viên trong tổ</option>';
+  const uOpts = ['<option value="">Tất cả nhân viên trong tổ</option>'];
   Array.from(teamUsers).sort().forEach(u => {
-    uSelect.innerHTML += `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`;
+    uOpts.push(`<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`);
   });
+  uSelect.innerHTML = uOpts.join('');
 
   if (currentUsr && Array.from(teamUsers).includes(currentUsr)) {
     uSelect.value = currentUsr;
@@ -3104,6 +3211,7 @@ function renderToTruongTaskList() {
     return;
   }
 
+  const rowsHtml = [];
   filtered.forEach((t, idx) => {
     const taskId = t.ID || t.id;
     let status = t['Trạng thái'] || 'Đang thực hiện';
@@ -3145,44 +3253,46 @@ function renderToTruongTaskList() {
     const empCName = t['Tên NV (C)'] || '';
     const empCCode = t['Mã NV (C)'] || '';
 
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td style="text-align:center; font-weight:700; color:#38bdf8;">${idx + 1}</td>
-      <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề công việc'] || t['Tiêu đề'] || '')}</strong></td>
-      <td class="col-desc-cell">${escapeHtml(t['Mô tả công việc'] || t['Mô tả'] || '')}</td>
-      <td class="status-col-cell">${statusBadge}</td>
-      <td>${formatEmpNameWithCode(empRName, empRCode)}</td>
-      <td>${formatPhoiHopWithCode(empCName, empCCode)}</td>
-      <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
-      <td>${formatDateVN(t['Ngày kết thúc'] || t['Hạn hoàn thành'])}</td>
-      <td>
-        <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleToTruongInlineChange('${taskId}', 'ngayLamXong', this.value, this)">
-      </td>
-      <td class="progress-col-cell">
-        <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
-          <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
-            <div style="width:${progress}%; height:100%; background:var(--emerald-primary);"></div>
+    rowsHtml.push(`
+      <tr>
+        <td style="text-align:center; font-weight:700; color:#38bdf8;">${idx + 1}</td>
+        <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề công việc'] || t['Tiêu đề'] || '')}</strong></td>
+        <td class="col-desc-cell">${escapeHtml(t['Mô tả công việc'] || t['Mô tả'] || '')}</td>
+        <td class="status-col-cell">${statusBadge}</td>
+        <td>${formatEmpNameWithCode(empRName, empRCode)}</td>
+        <td>${formatPhoiHopWithCode(empCName, empCCode)}</td>
+        <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
+        <td>${formatDateVN(t['Ngày kết thúc'] || t['Hạn hoàn thành'])}</td>
+        <td>
+          <input type="date" class="inline-date-picker" value="${ngayLamXong}" onchange="handleToTruongInlineChange('${taskId}', 'ngayLamXong', this.value, this)">
+        </td>
+        <td class="progress-col-cell">
+          <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
+            <div style="width:45px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+              <div style="width:${progress}%; height:100%; background:var(--emerald-primary);"></div>
+            </div>
+            <span style="font-size:0.75rem; color:#94a3b8;">${progress}%</span>
           </div>
-          <span style="font-size:0.75rem; color:#94a3b8;">${progress}%</span>
-        </div>
-      </td>
-      <td><span class="number-pill">${keHoach}</span></td>
-      <td>
-        <input type="number" class="inline-note-input" style="width:50px; text-align:center; padding:3px;" value="${thucHien}" onchange="handleToTruongInlineChange('${taskId}', 'thucHien', this.value, this)" oninput="handleToTruongInlineChange('${taskId}', 'thucHien', this.value, this)">
-      </td>
-      <td class="ty-le-col-cell"><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
-      <td class="col-note-cell">
-        <textarea class="inline-note-textarea" placeholder="Nhập ghi chú..." oninput="autoResizeTextarea(this); handleToTruongInlineChange('${taskId}', 'ghiChu', this.value, this)" onchange="handleToTruongInlineChange('${taskId}', 'ghiChu', this.value, this)">${escapeHtml(ghiChu)}</textarea>
-      </td>
-      <td style="text-align:center;">
-        <div style="display:flex; gap:4px; justify-content:center;">
-          <button class="btn-action-edit" title="Sửa công việc" onclick="openTaskModal('${taskId}')"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn-action-delete" title="Xóa công việc" onclick="confirmDeleteTask('${taskId}')"><i class="fa-solid fa-trash"></i></button>
-        </div>
-      </td>
-    `;
-    tbody.appendChild(tr);
+        </td>
+        <td><span class="number-pill">${keHoach}</span></td>
+        <td>
+          <input type="number" class="inline-note-input" style="width:50px; text-align:center; padding:3px;" value="${thucHien}" onchange="handleToTruongInlineChange('${taskId}', 'thucHien', this.value, this)" oninput="handleToTruongInlineChange('${taskId}', 'thucHien', this.value, this)">
+        </td>
+        <td class="ty-le-col-cell"><strong style="color:var(--emerald-primary);">${tyLe}</strong></td>
+        <td class="col-note-cell">
+          <textarea class="inline-note-textarea" placeholder="Nhập ghi chú..." oninput="autoResizeTextarea(this); handleToTruongInlineChange('${taskId}', 'ghiChu', this.value, this)" onchange="handleToTruongInlineChange('${taskId}', 'ghiChu', this.value, this)">${escapeHtml(ghiChu)}</textarea>
+        </td>
+        <td style="text-align:center;">
+          <div style="display:flex; gap:4px; justify-content:center;">
+            <button class="btn-action-edit" title="Sửa công việc" onclick="openTaskModal('${taskId}')"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn-action-delete" title="Xóa công việc" onclick="confirmDeleteTask('${taskId}')"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>
+    `);
   });
+
+  tbody.innerHTML = rowsHtml.join('');
 
   setTimeout(() => {
     document.querySelectorAll('#totruong-task-tbody .inline-note-textarea').forEach(autoResizeTextarea);
