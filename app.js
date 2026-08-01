@@ -2630,11 +2630,9 @@ function renderToTruongTaskList() {
     }
 
     if (usrClean) {
-      const taskLeader = t['Tên tổ trưởng'] || '';
+      const taskLeader = t['Tên tổ trưởng'] || t['Mã NV tổ trưởng'] || '';
       const matchLeader = cleanKey(taskLeader).includes(usrClean) || usrClean.includes(cleanKey(taskLeader));
-      const matchChuTri = cleanKey(chuTri).includes(usrClean) || usrClean.includes(cleanKey(chuTri));
-      const matchPhoiHop = cleanKey(phoiHop).includes(usrClean) || usrClean.includes(cleanKey(phoiHop));
-      if (!matchLeader && !matchChuTri && !matchPhoiHop) return false;
+      if (!matchLeader) return false;
     }
 
     return true;
@@ -2674,17 +2672,6 @@ function renderToTruongTaskList() {
     const toChuTriName = getTaskGroup(t);
     const phoiHopName = getTaskCollaborator(t);
 
-    let leaderName = t['Tên tổ trưởng'] || '';
-    let leaderCode = t['Mã NV tổ trưởng'] || '';
-
-    if (!leaderName && selUser) {
-      leaderName = selUser;
-      const sub = getSubLeaderInfo(selUser);
-      if (sub) leaderCode = sub.code;
-    }
-
-    const leaderDisplay = getLeaderDisplayHtml(leaderName, leaderCode);
-
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="text-align:center; font-weight:700; color:#38bdf8;">${idx + 1}</td>
@@ -2692,7 +2679,6 @@ function renderToTruongTaskList() {
       <td class="col-desc-cell">${escapeHtml(t['Mô tả công việc'] || t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
       <td>${formatNameList(chuTriName)}</td>
-      <td>${leaderDisplay}</td>
       <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
       <td>${formatNameList(phoiHopName)}</td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
