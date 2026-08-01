@@ -28,6 +28,9 @@ function doGet(e) {
     const groupName = e.parameter.group || '';
     return createJsonResponse(getTeamMembers(groupName));
   }
+  if (action === 'refreshTovien') {
+    return createJsonResponse({ success: true, tovien: getSheetDataAsObjects(SHEETS.TOVIEN) });
+  }
   return HtmlService.createTemplateFromFile('index')
     .evaluate()
     .setTitle('TTHT Tasks - Quản Lý Công Việc & Hồ Sơ')
