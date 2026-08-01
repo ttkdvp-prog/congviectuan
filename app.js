@@ -3108,11 +3108,11 @@ function renderToTruongTaskList() {
     let status = t['Trạng thái'] || 'Đang thực hiện';
 
     // Auto-detect overdue: if NGÀY LÀM XONG is empty and today > HẠN HOÀN THÀNH → Quá hạn
-    const ngayLamXong = t['Ngày làm xong'] || t['Ngày hoàn thành'] || '';
-    const hanHoanThanh = t['Hạn hoàn thành'] || t['Ngày kết thúc'] || '';
-    if (!ngayLamXong && hanHoanThanh && status !== 'Hoàn thành' && status !== 'Hoàn thành quá hạn') {
+    const _nlx = t['Ngày làm xong'] || t['Ngày hoàn thành'] || '';
+    const _hht = t['Hạn hoàn thành'] || t['Ngày kết thúc'] || '';
+    if (!_nlx && _hht && status !== 'Hoàn thành' && status !== 'Hoàn thành quá hạn') {
       try {
-        const deadline = new Date(hanHoanThanh);
+        const deadline = new Date(_hht);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         deadline.setHours(0, 0, 0, 0);
