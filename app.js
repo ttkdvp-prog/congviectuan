@@ -1614,13 +1614,18 @@ function getUserTeamName(personName) {
   if (!pClean) return '';
 
   if (appState.tovien && Array.isArray(appState.tovien)) {
-    const foundInTovien = appState.tovien.find(row => {
-      const nv = row['Tên NV'] || row['Tên nhân viên'] || row['Họ và tên'] || row['Tên tổ trưởng'];
-      return nv && cleanKey(nv) === pClean;
-    });
-    if (foundInTovien) {
-      const grp = foundInTovien['Tổ hạ tầng'] || foundInTovien['Tổ'] || foundInTovien['Tên tổ'];
-      if (grp && String(grp).trim()) return String(grp).trim();
+    let lastGroup = '';
+    for (let i = 0; i < appState.tovien.length; i++) {
+      const row = appState.tovien[i];
+      const info = getTovienRowInfo(row);
+      if (info.group) lastGroup = info.group;
+
+      if (info.empName && cleanKey(info.empName) === pClean) {
+        if (info.group || lastGroup) return info.group || lastGroup;
+      }
+      if (info.leaderName && cleanKey(info.leaderName) === pClean) {
+        if (info.group || lastGroup) return info.group || lastGroup;
+      }
     }
   }
 
@@ -2333,9 +2338,11 @@ function populateToTruongFilters() {
   const groups = new Set();
 
   if (appState.tovien && Array.isArray(appState.tovien)) {
+    let lastGroup = '';
     appState.tovien.forEach(row => {
       const info = getTovienRowInfo(row);
-      if (info.group) groups.add(info.group);
+      if (info.group) lastGroup = info.group;
+      if (lastGroup) groups.add(lastGroup);
     });
   }
 
@@ -2378,8 +2385,15 @@ function onToTruongGroupChange() {
 
   if (selGrpClean) {
     if (appState.tovien && Array.isArray(appState.tovien)) {
+      let lastGroup = '';
       appState.tovien.forEach(row => {
         const info = getTovienRowInfo(row);
+        if (info.group) {
+          lastGroup = info.group;
+        } else if (lastGroup) {
+          info.group = lastGroup;
+        }
+
         const ckG = cleanKey(info.group);
         if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG))) {
           if (info.empName) teamUsers.add(info.empName);

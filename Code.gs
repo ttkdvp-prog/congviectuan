@@ -138,7 +138,8 @@ function getSheetDataAsObjects(sheetName) {
   
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (row[0] === "" || row[0] === null || row[0] === undefined) continue;
+    const isRowEmpty = row.every(cell => cell === "" || cell === null || cell === undefined);
+    if (isRowEmpty) continue;
     const obj = {};
     headers.forEach((h, idx) => {
       let val = row[idx];
