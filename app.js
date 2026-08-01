@@ -2334,90 +2334,55 @@ function getTovienRowInfo(row) {
   return { group, leaderName, leaderCode, empName, empCode };
 }
 
-function getToTruongTaskGroup(task) {
-  if (!task || typeof task !== 'object') return '';
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'to' || ck === 'tochutri' || ck === 'tohatang' || ck === 'tento') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
+function getExactValueByKeyPattern(obj, targetKeys) {
+  if (!obj || typeof obj !== 'object') return '';
+  const targets = Array.isArray(targetKeys) ? targetKeys : [targetKeys];
+  for (let tKey of targets) {
+    const cleanT = cleanKey(tKey);
+    for (let k in obj) {
+      if (cleanKey(k) === cleanT) {
+        if (obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== '') {
+          return String(obj[k]).trim();
+        }
       }
     }
   }
+  return '';
+}
+
+function getToTruongTaskGroup(task) {
+  if (!task || typeof task !== 'object') return '';
+  const exact = getExactValueByKeyPattern(task, ['Tổ', 'Tổ chủ trì', 'Tổ hạ tầng', 'to', 'tochutri', 'tohatang']);
+  if (exact) return exact;
   return task['Tổ'] || getTaskGroup(task) || '';
 }
 
 function getTaskEmpName(task) {
   if (!task || typeof task !== 'object') return '';
-  if (task['Tên NV (A)'] !== undefined && task['Tên NV (A)'] !== null && String(task['Tên NV (A)']).trim() !== '') {
-    return String(task['Tên NV (A)']).trim();
-  }
-  if (task['Tên NV'] !== undefined && task['Tên NV'] !== null && String(task['Tên NV']).trim() !== '') {
-    return String(task['Tên NV']).trim();
-  }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'tennva' || ck === 'tennv') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
-      }
-    }
-  }
-  return task['Người chủ trì'] || task['Người thực hiện'] || getTaskAssignee(task) || '';
+  const exact = getExactValueByKeyPattern(task, ['Tên NV (A)', 'Tên NV', 'tennva', 'tennv']);
+  if (exact) return exact;
+  return task['Tên NV (A)'] || task['Tên NV'] || '';
 }
 
 function getTaskEmpCode(task) {
   if (!task || typeof task !== 'object') return '';
-  if (task['Mã NV (A)'] !== undefined && task['Mã NV (A)'] !== null && String(task['Mã NV (A)']).trim() !== '') {
-    return String(task['Mã NV (A)']).trim();
-  }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'manva' || ck === 'manv') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
-      }
-    }
-  }
-  return '';
+  const exact = getExactValueByKeyPattern(task, ['Mã NV (A)', 'Mã NV', 'manva', 'manv']);
+  if (exact) return exact;
+  return task['Mã NV (A)'] || task['Mã NV'] || '';
 }
 
 function getTaskPhoiHopName(task) {
   if (!task || typeof task !== 'object') return '';
-  if (task['tên người phối hợp (R)'] !== undefined && task['tên người phối hợp (R)'] !== null && String(task['tên người phối hợp (R)']).trim() !== '') {
-    return String(task['tên người phối hợp (R)']).trim();
-  }
-  if (task['Tên người phối hợp (R)'] !== undefined && task['Tên người phối hợp (R)'] !== null && String(task['Tên người phối hợp (R)']).trim() !== '') {
-    return String(task['Tên người phối hợp (R)']).trim();
-  }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'tennguoiphoihopr' || ck === 'tennguoiphoihop') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
-      }
-    }
-  }
-  return task['Người phối hợp'] || getTaskCollaborator(task) || '';
+  const exact = getExactValueByKeyPattern(task, ['tên người phối hợp (R)', 'Tên người phối hợp (R)', 'tennguoiphoihopr']);
+  if (exact) return exact;
+  return task['tên người phối hợp (R)'] || task['Tên người phối hợp (R)'] || '';
 }
 
 function getTaskPhoiHopCode(task) {
   if (!task || typeof task !== 'object') return '';
-  if (task['mã NV người phối hợp (R)'] !== undefined && task['mã NV người phối hợp (R)'] !== null && String(task['mã NV người phối hợp (R)']).trim() !== '') {
-    return String(task['mã NV người phối hợp (R)']).trim();
-  }
-  if (task['Mã NV người phối hợp (R)'] !== undefined && task['Mã NV người phối hợp (R)'] !== null && String(task['Mã NV người phối hợp (R)']).trim() !== '') {
-    return String(task['Mã NV người phối hợp (R)']).trim();
-  }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'manguoiphoihopr' || ck === 'manvnguoiphoihopr' || ck === 'manguoiphoihop') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
-      }
-    }
-  }
-  return '';
+  const exact = getExactValueByKeyPattern(task, ['mã NV người phối hợp (R)', 'Mã NV người phối hợp (R)', 'manguoiphoihopr', 'manvnguoiphoihopr']);
+  if (exact) return exact;
+  return task['mã NV người phối hợp (R)'] || task['Mã NV người phối hợp (R)'] || '';
 }
 
 function formatEmpNameWithCode(name, code) {
@@ -2452,40 +2417,16 @@ function formatPhoiHopWithCode(name, code) {
 
 function getTaskLeaderName(task) {
   if (!task || typeof task !== 'object') return '';
-  if (task['Tên người giao việc'] !== undefined && task['Tên người giao việc'] !== null && String(task['Tên người giao việc']).trim() !== '') {
-    return String(task['Tên người giao việc']).trim();
-  }
-  if (task['Tên tổ trưởng'] !== undefined && task['Tên tổ trưởng'] !== null && String(task['Tên tổ trưởng']).trim() !== '') {
-    return String(task['Tên tổ trưởng']).trim();
-  }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'tennguoigiaoviec' || ck === 'tentotruong' || ck === 'totruong' || ck === 'nguoigiaoviec') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
-      }
-    }
-  }
-  return '';
+  const exact = getExactValueByKeyPattern(task, ['Tên người giao việc', 'Tên tổ trưởng', 'tennguoigiaoviec', 'tentotruong']);
+  if (exact) return exact;
+  return task['Tên người giao việc'] || task['Tên tổ trưởng'] || '';
 }
 
 function getTaskLeaderCode(task) {
   if (!task || typeof task !== 'object') return '';
-  if (task['Mã người giao việc'] !== undefined && task['Mã người giao việc'] !== null && String(task['Mã người giao việc']).trim() !== '') {
-    return String(task['Mã người giao việc']).trim();
-  }
-  if (task['Mã NV tổ trưởng'] !== undefined && task['Mã NV tổ trưởng'] !== null && String(task['Mã NV tổ trưởng']).trim() !== '') {
-    return String(task['Mã NV tổ trưởng']).trim();
-  }
-  for (let k in task) {
-    const ck = cleanKey(k);
-    if (ck === 'manguoigiaoviec' || ck === 'manvtotruong' || ck === 'matotruong') {
-      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
-        return String(task[k]).trim();
-      }
-    }
-  }
-  return '';
+  const exact = getExactValueByKeyPattern(task, ['Mã người giao việc', 'Mã NV tổ trưởng', 'manguoigiaoviec', 'manvtotruong']);
+  if (exact) return exact;
+  return task['Mã người giao việc'] || task['Mã NV tổ trưởng'] || '';
 }
 
 function isLeaderUser(userName) {
@@ -2517,9 +2458,11 @@ function getToTruongTasks() {
     return appState.totruonggiaoviec.map(t => {
       const title = t['Tiêu đề'] || t['Tiêu đề công việc'] || '';
       const desc = t['Mô tả'] || t['Mô tả công việc'] || '';
-      const chuTri = t['Tên NV (A)'] || t['Tên NV'] || t['Người chủ trì'] || t['Người thực hiện'] || '';
-      const toChuTri = t['Tổ'] || t['Tổ chủ trì'] || t['Tổ hạ tầng'] || '';
-      const phoiHop = t['Tên người phối hợp (R)'] || t['Tên người phối hợp'] || t['Người phối hợp'] || '';
+      const chuTri = getTaskEmpName(t);
+      const chuTriCode = getTaskEmpCode(t);
+      const toChuTri = getToTruongTaskGroup(t);
+      const phoiHop = getTaskPhoiHopName(t);
+      const phoiHopCode = getTaskPhoiHopCode(t);
       const leaderName = getTaskLeaderName(t);
       const leaderCode = getTaskLeaderCode(t);
 
