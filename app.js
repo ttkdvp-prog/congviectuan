@@ -2347,6 +2347,88 @@ function getToTruongTaskGroup(task) {
   return task['Tổ'] || getTaskGroup(task) || '';
 }
 
+function getTaskEmpName(task) {
+  if (!task || typeof task !== 'object') return '';
+  for (let k in task) {
+    const ck = cleanKey(k);
+    if (ck === 'tennva' || ck === 'tennv' || ck === 'nguoichutri' || ck === 'nguoithuchien') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  return task['Tên NV (A)'] || task['Tên NV'] || getTaskAssignee(task) || '';
+}
+
+function getTaskEmpCode(task) {
+  if (!task || typeof task !== 'object') return '';
+  for (let k in task) {
+    const ck = cleanKey(k);
+    if (ck === 'manva' || ck === 'manv') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  return task['Mã NV (A)'] || task['Mã NV'] || '';
+}
+
+function getTaskPhoiHopName(task) {
+  if (!task || typeof task !== 'object') return '';
+  for (let k in task) {
+    const ck = cleanKey(k);
+    if (ck === 'tennguoiphoihopr' || ck === 'tennguoiphoihop' || ck === 'nguoiphoihop') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  return task['tên người phối hợp (R)'] || task['Tên người phối hợp (R)'] || getTaskCollaborator(task) || '';
+}
+
+function getTaskPhoiHopCode(task) {
+  if (!task || typeof task !== 'object') return '';
+  for (let k in task) {
+    const ck = cleanKey(k);
+    if (ck === 'manguoiphoihopr' || ck === 'manvnguoiphoihopr' || ck === 'manguoiphoihop') {
+      if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
+        return String(task[k]).trim();
+      }
+    }
+  }
+  return task['mã NV người phối hợp (R)'] || task['Mã NV người phối hợp (R)'] || '';
+}
+
+function formatEmpNameWithCode(name, code) {
+  if (!name || name === 'Chưa gán') {
+    return '<span style="color:var(--text-muted); font-size:0.8rem;">-</span>';
+  }
+  const cleanName = escapeHtml(String(name).trim());
+  const cleanCode = code ? escapeHtml(String(code).trim()) : '';
+
+  return `
+    <div style="line-height:1.25;">
+      <div style="font-weight:600; color:#e2e8f0; font-size:0.84rem;">${cleanName}</div>
+      ${cleanCode ? `<div style="font-size:0.73rem; color:#94a3b8; font-weight:400; margin-top:2px;">${cleanCode}</div>` : ''}
+    </div>
+  `;
+}
+
+function formatPhoiHopWithCode(name, code) {
+  if (!name || name === '-' || name === 'Chưa có') {
+    return '<span style="color:var(--text-muted); font-size:0.8rem;">-</span>';
+  }
+  const cleanName = escapeHtml(String(name).trim());
+  const cleanCode = code ? escapeHtml(String(code).trim()) : '';
+
+  return `
+    <div style="line-height:1.25;">
+      <div style="font-weight:600; color:#cbd5e1; font-size:0.84rem;">${cleanName}</div>
+      ${cleanCode ? `<div style="font-size:0.73rem; color:#94a3b8; font-weight:400; margin-top:2px;">${cleanCode}</div>` : ''}
+    </div>
+  `;
+}
+
 function getTaskLeaderName(task) {
   if (!task || typeof task !== 'object') return '';
   for (let k in task) {
@@ -2810,9 +2892,11 @@ function renderToTruongTaskList() {
     const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
     const ghiChu = t['Ghi chú'] || '';
     const ngayLamXong = t['Ngày làm xong'] || '';
-    const chuTriName = getTaskAssignee(t);
-    const toChuTriName = getTaskGroup(t);
-    const phoiHopName = getTaskCollaborator(t);
+    const empName = getTaskEmpName(t);
+    const empCode = getTaskEmpCode(t);
+    const phoiHopName = getTaskPhoiHopName(t);
+    const phoiHopCode = getTaskPhoiHopCode(t);
+    const toChuTriName = getToTruongTaskGroup(t);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2820,9 +2904,9 @@ function renderToTruongTaskList() {
       <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề công việc'] || t['Tiêu đề'] || '')}</strong></td>
       <td class="col-desc-cell">${escapeHtml(t['Mô tả công việc'] || t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
-      <td>${formatNameList(chuTriName)}</td>
+      <td>${formatEmpNameWithCode(empName, empCode)}</td>
       <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
-      <td>${formatNameList(phoiHopName)}</td>
+      <td>${formatPhoiHopWithCode(phoiHopName, phoiHopCode)}</td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(t['Ngày kết thúc'] || t['Hạn hoàn thành'])}</td>
       <td>
