@@ -2359,6 +2359,8 @@
     }
     return appState.tasks;
   }
+
+  function getSubLeaderInfo(personName) {
     if (!personName) return null;
     const ck = cleanKey(personName);
     if (!ck) return null;
