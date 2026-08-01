@@ -2358,32 +2358,46 @@ function getToTruongTaskGroup(task) {
   return task['Tổ'] || getTaskGroup(task) || '';
 }
 
-function getTaskEmpName(task) {
+function getTaskLeaderName(task) {
   if (!task || typeof task !== 'object') return '';
-  const exact = getExactValueByKeyPattern(task, ['Tên NV (A)', 'Tên NV', 'tennva', 'tennv']);
+  const exact = getExactValueByKeyPattern(task, ['Tên NV (A)', 'Tên người giao việc', 'Tên tổ trưởng', 'tennva', 'tennguoigiaoviec', 'tentotruong']);
   if (exact) return exact;
-  return task['Tên NV (A)'] || task['Tên NV'] || '';
+  return task['Tên NV (A)'] || task['Tên người giao việc'] || task['Tên tổ trưởng'] || '';
 }
 
-function getTaskEmpCode(task) {
+function getTaskLeaderCode(task) {
   if (!task || typeof task !== 'object') return '';
-  const exact = getExactValueByKeyPattern(task, ['Mã NV (A)', 'Mã NV', 'manva', 'manv']);
+  const exact = getExactValueByKeyPattern(task, ['Mã NV (A)', 'Mã người giao việc', 'Mã NV tổ trưởng', 'manva', 'manguoigiaoviec', 'manvtotruong']);
   if (exact) return exact;
-  return task['Mã NV (A)'] || task['Mã NV'] || '';
+  return task['Mã NV (A)'] || task['Mã người giao việc'] || task['Mã NV tổ trưởng'] || '';
 }
 
-function getTaskPhoiHopName(task) {
+function getTaskEmpRName(task) {
   if (!task || typeof task !== 'object') return '';
-  const exact = getExactValueByKeyPattern(task, ['tên người phối hợp (R)', 'Tên người phối hợp (R)', 'tennguoiphoihopr']);
+  const exact = getExactValueByKeyPattern(task, ['Tên NV (R)', 'Tên NV', 'tennvr', 'tennv']);
   if (exact) return exact;
-  return task['tên người phối hợp (R)'] || task['Tên người phối hợp (R)'] || '';
+  return task['Tên NV (R)'] || task['Tên NV'] || '';
 }
 
-function getTaskPhoiHopCode(task) {
+function getTaskEmpRCode(task) {
   if (!task || typeof task !== 'object') return '';
-  const exact = getExactValueByKeyPattern(task, ['mã NV người phối hợp (R)', 'Mã NV người phối hợp (R)', 'manguoiphoihopr', 'manvnguoiphoihopr']);
+  const exact = getExactValueByKeyPattern(task, ['Mã NV (R)', 'Mã NV', 'manvr', 'manv']);
   if (exact) return exact;
-  return task['mã NV người phối hợp (R)'] || task['Mã NV người phối hợp (R)'] || '';
+  return task['Mã NV (R)'] || task['Mã NV'] || '';
+}
+
+function getTaskEmpCName(task) {
+  if (!task || typeof task !== 'object') return '';
+  const exact = getExactValueByKeyPattern(task, ['Tên NV (C)', 'tên người phối hợp (R)', 'Tên người phối hợp (R)', 'tennvc', 'tennguoiphoihopr']);
+  if (exact) return exact;
+  return task['Tên NV (C)'] || task['tên người phối hợp (R)'] || task['Tên người phối hợp (R)'] || '';
+}
+
+function getTaskEmpCCode(task) {
+  if (!task || typeof task !== 'object') return '';
+  const exact = getExactValueByKeyPattern(task, ['Mã NV (C)', 'mã NV người phối hợp (R)', 'Mã NV người phối hợp (R)', 'manvc', 'manguoiphoihopr']);
+  if (exact) return exact;
+  return task['Mã NV (C)'] || task['mã NV người phối hợp (R)'] || task['Mã NV người phối hợp (R)'] || '';
 }
 
 function formatEmpNameWithCode(name, code) {
@@ -2414,20 +2428,6 @@ function formatPhoiHopWithCode(name, code) {
       ${cleanCode ? `<div style="font-size:0.73rem; color:#94a3b8; font-weight:400; margin-top:2px;">${cleanCode}</div>` : ''}
     </div>
   `;
-}
-
-function getTaskLeaderName(task) {
-  if (!task || typeof task !== 'object') return '';
-  const exact = getExactValueByKeyPattern(task, ['Tên người giao việc', 'Tên tổ trưởng', 'tennguoigiaoviec', 'tentotruong']);
-  if (exact) return exact;
-  return task['Tên người giao việc'] || task['Tên tổ trưởng'] || '';
-}
-
-function getTaskLeaderCode(task) {
-  if (!task || typeof task !== 'object') return '';
-  const exact = getExactValueByKeyPattern(task, ['Mã người giao việc', 'Mã NV tổ trưởng', 'manguoigiaoviec', 'manvtotruong']);
-  if (exact) return exact;
-  return task['Mã người giao việc'] || task['Mã NV tổ trưởng'] || '';
 }
 
 function isLeaderUser(userName) {
@@ -2617,15 +2617,14 @@ function onToTruongGroupChange() {
         const tg = t['Tổ'] || getTaskGroup(t);
         const ckTg = cleanKey(tg);
         if (ckTg && (ckTg.includes(selGrpClean) || selGrpClean.includes(ckTg))) {
-          const lName = t['Tên tổ trưởng'] || '';
-          const lCode = t['Mã NV tổ trưởng'] || '';
+          const lName = getTaskLeaderName(t);
+          const lCode = getTaskLeaderCode(t);
           if (lName) {
-            teamUsers.add(lName);
             leadersMap.set(cleanKey(lName), { name: lName, code: lCode });
           }
-          const a = getTaskAssignee(t);
-          if (a && a !== 'Chưa gán') {
-            a.split(',').forEach(n => { if (n.trim()) teamUsers.add(n.trim()); });
+          const empR = getTaskEmpRName(t);
+          if (empR) {
+            empR.split(',').forEach(n => { if (n.trim()) teamUsers.add(n.trim()); });
           }
         }
       });
@@ -2844,11 +2843,10 @@ function renderToTruongTaskList() {
     const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
     const ghiChu = t['Ghi chú'] || '';
     const ngayLamXong = t['Ngày làm xong'] || '';
-    const empName = getTaskEmpName(t);
-    const empCode = getTaskEmpCode(t);
-    const phoiHopName = getTaskPhoiHopName(t);
-    const phoiHopCode = getTaskPhoiHopCode(t);
-    const toChuTriName = getToTruongTaskGroup(t);
+    const empRName = getTaskEmpRName(t);
+    const empRCode = getTaskEmpRCode(t);
+    const empCName = getTaskEmpCName(t);
+    const empCCode = getTaskEmpCCode(t);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2856,8 +2854,8 @@ function renderToTruongTaskList() {
       <td class="col-title-cell"><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề công việc'] || t['Tiêu đề'] || '')}</strong></td>
       <td class="col-desc-cell">${escapeHtml(t['Mô tả công việc'] || t['Mô tả'] || '')}</td>
       <td class="status-col-cell">${statusBadge}</td>
-      <td>${formatEmpNameWithCode(empName, empCode)}</td>
-      <td>${formatPhoiHopWithCode(phoiHopName, phoiHopCode)}</td>
+      <td>${formatEmpNameWithCode(empRName, empRCode)}</td>
+      <td>${formatPhoiHopWithCode(empCName, empCCode)}</td>
       <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
       <td>${formatDateVN(t['Ngày kết thúc'] || t['Hạn hoàn thành'])}</td>
       <td>
