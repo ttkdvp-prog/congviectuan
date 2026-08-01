@@ -973,8 +973,17 @@ function renderRecentTasks(tasks) {
   }
   let html = '';
   tasks.slice(0, 8).forEach((t, idx) => {
-    const status = t['Trạng thái'] || '';
+    let status = t['Trạng thái'] || '';
     
+    // Auto-detect overdue
+    const _nx = t['Ngày làm xong'] || t['Ngày hoàn thành'] || '';
+    const _hh = t['Hạn hoàn thành'] || t['Ngày kết thúc'] || '';
+    if (!_nx && _hh && status !== 'Hoàn thành' && status !== 'Hoàn thành quá hạn') {
+      try {
+        const _d = new Date(_hh); const _t = new Date(); _t.setHours(0,0,0,0); _d.setHours(0,0,0,0);
+        if (!isNaN(_d.getTime()) && _t > _d) status = 'Quá hạn';
+      } catch(e) {}
+    }
     let statusHtml = `<span style="font-size:0.75rem; color:#94a3b8;">${status}</span>`;
     if (status === 'Hoàn thành quá hạn') {
       statusHtml = `<span style="color:#f59e0b; font-weight:600; font-size:0.75rem;">Hoàn thành quá hạn</span>`;
@@ -1105,7 +1114,22 @@ function renderTaskListTable() {
   
   filtered.forEach((t, index) => {
     const taskId = t.ID || t.id;
-    const status = t['Trạng thái'] || 'Đang thực hiện';
+    let status = t['Trạng thái'] || 'Đang thực hiện';
+    
+    // Auto-detect overdue: if NGÀY LÀM XONG is empty and today > HẠN HOÀN THÀNH → Quá hạn
+    const _ngayXong = t['Ngày làm xong'] || t['Ngày hoàn thành'] || '';
+    const _hanHT = t['Hạn hoàn thành'] || t['Ngày kết thúc'] || '';
+    if (!_ngayXong && _hanHT && status !== 'Hoàn thành' && status !== 'Hoàn thành quá hạn') {
+      try {
+        const _dl = new Date(_hanHT);
+        const _td = new Date();
+        _td.setHours(0, 0, 0, 0);
+        _dl.setHours(0, 0, 0, 0);
+        if (!isNaN(_dl.getTime()) && _td > _dl) {
+          status = 'Quá hạn';
+        }
+      } catch(e) {}
+    }
     
     let statusBadge = '';
     if (status === 'Hoàn thành quá hạn') {
@@ -3081,7 +3105,22 @@ function renderToTruongTaskList() {
 
   filtered.forEach((t, idx) => {
     const taskId = t.ID || t.id;
-    const status = t['Trạng thái'] || 'Đang thực hiện';
+    let status = t['Trạng thái'] || 'Đang thực hiện';
+
+    // Auto-detect overdue: if NGÀY LÀM XONG is empty and today > HẠN HOÀN THÀNH → Quá hạn
+    const ngayLamXong = t['Ngày làm xong'] || t['Ngày hoàn thành'] || '';
+    const hanHoanThanh = t['Hạn hoàn thành'] || t['Ngày kết thúc'] || '';
+    if (!ngayLamXong && hanHoanThanh && status !== 'Hoàn thành' && status !== 'Hoàn thành quá hạn') {
+      try {
+        const deadline = new Date(hanHoanThanh);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        deadline.setHours(0, 0, 0, 0);
+        if (!isNaN(deadline.getTime()) && today > deadline) {
+          status = 'Quá hạn';
+        }
+      } catch(e) {}
+    }
 
     let statusBadge = '';
     if (status === 'Hoàn thành quá hạn') {
