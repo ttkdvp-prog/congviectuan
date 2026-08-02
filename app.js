@@ -972,7 +972,12 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     const trimmed = String(name).trim();
     if (!trimmed) return;
     if (isBanLanhDao(group, trimmed)) return;
-    userSet.add(trimmed);
+
+    const grpClean = cleanKey(group || '');
+    const isMatchGroup = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
+    if (isMatchGroup) {
+      userSet.add(trimmed);
+    }
   };
 
   // 1. Collect from appState.users (Sheet User / Nguoidung)
@@ -990,7 +995,18 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     });
   }
 
-  // 2. Collect from appState.tasks (Sheet congviec) where task group matches selected group
+  // 2. Collect from appState.tovien (Sheet ToVien)
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    let currentGroup = '';
+    appState.tovien.forEach(row => {
+      const info = getTovienRowInfo(row);
+      if (info.group) currentGroup = info.group;
+      addIfValid(info.empName, currentGroup);
+      addIfValid(info.leaderName, currentGroup);
+    });
+  }
+
+  // 3. Collect from appState.tasks (Sheet congviec) where task group matches selected group
   if (appState.tasks && Array.isArray(appState.tasks)) {
     appState.tasks.forEach(t => {
       const taskGroupClean = cleanKey(getTaskGroup(t) || t['Tổ chủ trì (AR)'] || '');
@@ -1012,7 +1028,7 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     });
   }
 
-  // 3. Collect from appState.totruonggiaoviec (Tab Tổ trưởng giao việc) matching selected group
+  // 4. Collect from appState.totruonggiaoviec (Tab Tổ trưởng giao việc) matching selected group
   if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
     appState.totruonggiaoviec.forEach(t => {
       const tgClean = cleanKey(getToTruongTaskGroup(t) || t['Tổ chủ trì (AR)'] || '');
