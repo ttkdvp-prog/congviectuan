@@ -710,78 +710,91 @@ function populateSelects() {
 
   updateGlobalUserSelectOptions();
 }
+function getUserCode(u) {
+  if (!u || typeof u !== 'object') return '';
+  if (u['Mã NV'] && String(u['Mã NV']).trim()) return String(u['Mã NV']).trim();
+  if (u['Mã LĐ'] && String(u['Mã LĐ']).trim()) return String(u['Mã LĐ']).trim();
+  if (u['Ma NV'] && String(u['Ma NV']).trim()) return String(u['Ma NV']).trim();
+  if (u['Ma LD'] && String(u['Ma LD']).trim()) return String(u['Ma LD']).trim();
+  if (u.manv && String(u.manv).trim()) return String(u.manv).trim();
+  if (u.empCode && String(u.empCode).trim()) return String(u.empCode).trim();
+  if (u.code && String(u.code).trim()) return String(u.code).trim();
+  if (u.ID && String(u.ID).trim() && String(u.ID).toUpperCase().startsWith('VNPT')) return String(u.ID).trim();
+  if (u.id && String(u.id).trim() && String(u.id).toUpperCase().startsWith('VNPT')) return String(u.id).trim();
 
-function isTeamName(name) {
-  if (!name) return false;
-  const str = String(name).trim();
-  const lower = str.toLowerCase();
-  if (lower.startsWith('tổ ') || lower.startsWith('tổ_') || lower === 'tổ' || lower.includes('tổ hạ tầng') || lower.includes('tổ tổng hợp') || lower.includes('tổ khách hàng') || lower.includes('tổ kỹ thuật')) {
-    return true;
+  for (let k in u) {
+    if (k.startsWith('_')) continue;
+    const ck = cleanKey(k);
+    if (ck === 'manv' || ck === 'manhanvien' || ck === 'mald' || ck === 'malanhdao' || ck === 'empcode' || ck === 'code' || ck === 'ma') {
+      if (u[k] && String(u[k]).trim()) return String(u[k]).trim();
+    }
   }
-  return false;
+  return '';
 }
 
 function handleModalGroupChange(selectedGroup) {
-  // Filter locally from appState.tovien & appState.users — INSTANT, no API call
+  // Filter locally from appState.users (Sheet User ONLY per user directive)
   const filteredUsers = new Set();
   const selGrpClean = cleanKey(selectedGroup);
 
-  if (selGrpClean && appState.tovien && Array.isArray(appState.tovien)) {
-    let lastGroup = '';
-    appState.tovien.forEach(row => {
-      const info = getTovienRowInfo(row);
-      if (info.group) lastGroup = info.group;
-      else if (lastGroup) info.group = lastGroup;
-      
-      const ckG = cleanKey(info.group);
-      if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG))) {
-        if (info.empName && !isTeamName(info.empName)) filteredUsers.add(info.empName);
-        if (info.leaderName && !isTeamName(info.leaderName)) filteredUsers.add(info.leaderName);
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { name, group } = getUserNameAndGroup(u);
+      if (!name || isTeamName(name)) return;
+
+      if (selGrpClean) {
+        const ckG = cleanKey(group);
+        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG))) {
+          filteredUsers.add(name);
+        }
+      } else {
+        filteredUsers.add(name);
       }
     });
   }
 
-  // Fallback: show all employees if no group or no match
-  if (!selGrpClean || filteredUsers.size === 0) {
-    if (appState.tovien && Array.isArray(appState.tovien)) {
-      appState.tovien.forEach(row => {
-        const info = getTovienRowInfo(row);
-        if (info.empName && !isTeamName(info.empName)) filteredUsers.add(info.empName);
-        if (info.leaderName && !isTeamName(info.leaderName)) filteredUsers.add(info.leaderName);
-      });
-    }
-    if (appState.users && Array.isArray(appState.users)) {
-      appState.users.forEach(u => {
-        const { name } = getUserNameAndGroup(u);
-        if (name && !isTeamName(name) && !isBanLanhDao('', name)) filteredUsers.add(name);
-      });
-    }
+  // Fallback: if group selected has no matching users, show all users from Sheet User
+  if (filteredUsers.size === 0 && appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { name } = getUserNameAndGroup(u);
+      if (name && !isTeamName(name)) {
+        filteredUsers.add(name);
+      }
+    });
   }
 
-  const sortedUsers = Array.from(filteredUsers).filter(n => !isTeamName(n) && !isBanLanhDao('', n)).sort();
+  const sortedUsers = Array.from(filteredUsers).sort();
 
-  const leadersList = ['Nguyễn Công Hoan', 'Đỗ Chu Đằng', 'Vũ Thị Lan Phương'];
+  // Leaders list populated from Sheet User
+  const leadersList = new Set([
+    'Nguyễn Công Hoan',
+    'Nguyễn Minh Cường',
+    'Nguyễn Trung Kiên',
+    'Bùi Văn Chung',
+    'Vũ Thị Lan Phương',
+    'Đỗ Chu Đằng'
+  ]);
+
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { name, group } = getUserNameAndGroup(u);
-      if (name && isBanLanhDao(group, name)) {
-        if (!leadersList.includes(name)) leadersList.push(name);
+      const role = u['Chức danh'] || u['Chức vụ'] || u.role || '';
+      if (name && (isBanLanhDao(group, name, role) || cleanKey(group).includes('lanhdao'))) {
+        leadersList.add(name);
       }
     });
   }
 
   if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
-  appState.dropdownData.lanhdao = Array.from(new Set(leadersList)).sort();
+  appState.dropdownData.lanhdao = Array.from(leadersList).sort();
   appState.dropdownData.leadera = sortedUsers;
   appState.dropdownData.chutri = sortedUsers;
   appState.dropdownData.phoihop = sortedUsers;
 }
 
 // Refresh tovien data from Google Sheets in background
-// Called once when task modal opens — ensures appState.tovien has latest data
 function refreshTovienFromSheet() {
   const now = Date.now();
-  // Skip if refreshed less than 10 seconds ago
   if (appState._lastTovienRefresh && (now - appState._lastTovienRefresh) < 10000) return;
   appState._lastTovienRefresh = now;
   
@@ -791,9 +804,7 @@ function refreshTovienFromSheet() {
         .withSuccessHandler(function(res) {
           if (res && res.success && res.tovien && res.tovien.length > 0) {
             appState.tovien = res.tovien;
-            console.log('[refreshTovien] ✅ Fresh tovien loaded:', res.tovien.length, 'records');
             try { localStorage.setItem('TTHT_TOVIEN_CACHE', JSON.stringify(res.tovien)); } catch(e) {}
-            // Re-filter the current group to update dropdown with fresh data
             const toSelect = document.getElementById('task-tochutri-input');
             if (toSelect && toSelect.value) {
               handleModalGroupChange(toSelect.value);
@@ -814,17 +825,14 @@ function refreshTovienFromSheet() {
       .then(res => {
         if (res && res.success && res.tovien && res.tovien.length > 0) {
           appState.tovien = res.tovien;
-          console.log('[refreshTovien] ✅ Fresh tovien loaded via fetch:', res.tovien.length, 'records');
           try { localStorage.setItem('TTHT_TOVIEN_CACHE', JSON.stringify(res.tovien)); } catch(e) {}
-          // Re-filter the current group with fresh data
           const toSelect = document.getElementById('task-tochutri-input');
           if (toSelect && toSelect.value) {
             handleModalGroupChange(toSelect.value);
-            // Refresh open dropdowns
             const chuTriDropdown = document.getElementById('dropdown-chutri');
             const phoiHopDropdown = document.getElementById('dropdown-phoihop');
-            if (chuTriDropdown) filterCustomDropdown('chutri', document.getElementById('task-chutri-input')?.value || '');
-            if (phoiHopDropdown) filterCustomDropdown('phoihop', document.getElementById('task-phoihop-input')?.value || '');
+            if (chuTriDropdown) filterCustomDropdown('chutri', '');
+            if (phoiHopDropdown) filterCustomDropdown('phoihop', '');
           }
         }
       })
@@ -839,7 +847,8 @@ function showCustomDropdown(type) {
   const inputEl = document.getElementById('task-' + type + '-input');
   if (!listEl || !inputEl) return;
 
-  filterCustomDropdown(type, inputEl.value);
+  // Render full list when opened via click/focus so user can see all options
+  filterCustomDropdown(type, '');
   listEl.classList.add('active');
 }
 
@@ -907,19 +916,47 @@ function selectCustomDropdownItem(type, val) {
   }
 }
 
-// Lookup employee code by name from appState.tovien
+// Lookup employee code by name from appState.users (Sheet User) first
 function lookupEmpCodeByName(name) {
-  if (!name || !appState.tovien || !Array.isArray(appState.tovien)) return '';
+  if (!name) return '';
   const nameClean = cleanKey(name);
   if (!nameClean) return '';
 
-  for (let i = 0; i < appState.tovien.length; i++) {
-    const info = getTovienRowInfo(appState.tovien[i]);
-    if (info.empName && cleanKey(info.empName) === nameClean && info.empCode) {
-      return info.empCode;
+  // 1. Check appState.users (Sheet User) FIRST
+  if (appState.users && Array.isArray(appState.users)) {
+    for (let i = 0; i < appState.users.length; i++) {
+      const u = appState.users[i];
+      const { name: uName } = getUserNameAndGroup(u);
+      if (uName && cleanKey(uName) === nameClean) {
+        const code = getUserCode(u);
+        if (code) return code;
+      }
     }
-    if (info.leaderName && cleanKey(info.leaderName) === nameClean && info.leaderCode) {
-      return info.leaderCode;
+  }
+
+  // Known fallback codes for leaders if not found in users list
+  const knownLeaderCodes = {
+    'nguyenconghoan': 'VNPT018256',
+    'nguyenminhcuong': 'VNPT018257',
+    'nguyentrungkien': 'VNPT018258',
+    'buivanchung': 'VNPT018259',
+    'vuthilanphuong': 'VNPT018260',
+    'dochudang': 'VNPT018261'
+  };
+  if (knownLeaderCodes[nameClean]) {
+    return knownLeaderCodes[nameClean];
+  }
+
+  // 2. Check appState.tovien (Sheet ToVien)
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    for (let i = 0; i < appState.tovien.length; i++) {
+      const info = getTovienRowInfo(appState.tovien[i]);
+      if (info.empName && cleanKey(info.empName) === nameClean && info.empCode) {
+        return info.empCode;
+      }
+      if (info.leaderName && cleanKey(info.leaderName) === nameClean && info.leaderCode) {
+        return info.leaderCode;
+      }
     }
   }
   return '';
