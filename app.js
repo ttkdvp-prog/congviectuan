@@ -551,6 +551,80 @@ function getUserNameAndGroup(u) {
   return res;
 }
 
+// Get non-leader employees filtered by group from Sheet User and tasks
+function getEmployeesByGroup(selectedGroup) {
+  const filteredUsers = new Set();
+  const selGrpClean = cleanKey(selectedGroup);
+  const leaderKeys = ['nguyenconghoan', 'nguyenminhcuong', 'nguyentrungkien'];
+
+  const addIfValid = (name, group) => {
+    if (!name || name === 'Chưa gán') return;
+    const trimmed = String(name).trim();
+    if (!trimmed || isTeamName(trimmed)) return;
+    if (leaderKeys.includes(cleanKey(trimmed))) return;
+
+    if (selGrpClean) {
+      const ckG = cleanKey(group || '');
+      if (!ckG || ckG === selGrpClean || ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) {
+        filteredUsers.add(trimmed);
+      }
+    } else {
+      filteredUsers.add(trimmed);
+    }
+  };
+
+  // 1. Collect from appState.users (Sheet User / Nguoidung)
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const name = getUserNameFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).name : '');
+      const group = getUserGroupFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).group : '');
+      addIfValid(name, group);
+    });
+  }
+
+  // 2. Collect from appState.tasks (Sheet congviec)
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const tg = getTaskGroup(t) || t['Tổ chủ trì (AR)'] || t['Tổ'] || '';
+      const tcg = getTaskCollaboratorGroup(t) || t['Tổ (R)'] || t['Tổ phối hợp'] || '';
+      const aName = getTaskLeaderName(t) || t['Tên NV (A)'];
+      const rName = getTaskEmpRName(t) || getTaskAssignee(t) || t['Tên NV (R)'] || t['Người chủ trì'];
+      const cName = getTaskEmpCName(t) || getTaskCollaborator(t) || t['Tên NV (C)'] || t['Người phối hợp'];
+      
+      if (aName) addIfValid(aName, tg);
+      if (rName) addIfValid(rName, tg);
+      if (cName) addIfValid(cName, tcg || tg);
+    });
+  }
+
+  // Fallback: If after filtering by group still no users matched, return ALL valid non-leader users
+  if (filteredUsers.size === 0) {
+    if (appState.users && Array.isArray(appState.users)) {
+      appState.users.forEach(u => {
+        const name = getUserNameFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).name : '');
+        if (name && !isTeamName(name) && !leaderKeys.includes(cleanKey(name))) {
+          filteredUsers.add(String(name).trim());
+        }
+      });
+    }
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        const aName = getTaskLeaderName(t) || t['Tên NV (A)'];
+        const rName = getTaskEmpRName(t) || getTaskAssignee(t) || t['Tên NV (R)'] || t['Người chủ trì'];
+        const cName = getTaskEmpCName(t) || getTaskCollaborator(t) || t['Tên NV (C)'] || t['Người phối hợp'];
+        [aName, rName, cName].forEach(n => {
+          if (n && n !== 'Chưa gán' && !isTeamName(n) && !leaderKeys.includes(cleanKey(n))) {
+            filteredUsers.add(String(n).trim());
+          }
+        });
+      });
+    }
+  }
+
+  return Array.from(filteredUsers).filter(Boolean).sort();
+}
+
+
 function populateSelects() {
   const groupSelect = document.getElementById('global-group-select');
   const cvluuyGroupSelect = document.getElementById('cvluuy-group-select');
@@ -676,37 +750,58 @@ function populateSelects() {
     if (curVal) kanbanAssigneeSelect.value = curVal;
   }
 
+  const modalGroups = new Set(hostGroups);
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { group } = getUserNameAndGroup(u);
+      if (group) modalGroups.add(group);
+    });
+  }
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    let lastGroup = '';
+    appState.tovien.forEach(row => {
+      const info = getTovienRowInfo(row);
+      if (info.group) lastGroup = info.group;
+      if (lastGroup) modalGroups.add(lastGroup);
+    });
+  }
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+    appState.totruonggiaoviec.forEach(t => {
+      const tg = t['Tổ'] || t['Tổ chủ trì'] || '';
+      if (tg) modalGroups.add(tg);
+    });
+  }
+
+  const sortedModalGroups = Array.from(modalGroups).filter(Boolean).sort();
+  const modalGroupOpts = ['<option value="">-- Tất cả tổ --</option>'];
+  sortedModalGroups.forEach(g => {
+    modalGroupOpts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
+  });
+
   if (taskToChuTriSelect) {
     const curVal = taskToChuTriSelect.value;
-    // Collect ALL groups from all sources for the modal dropdown
-    const modalGroups = new Set(hostGroups);
-    // Add groups from tovien (employee directory)
-    if (appState.tovien && Array.isArray(appState.tovien)) {
-      let lastGroup = '';
-      appState.tovien.forEach(row => {
-        const info = getTovienRowInfo(row);
-        if (info.group) lastGroup = info.group;
-        if (lastGroup) modalGroups.add(lastGroup);
-      });
-    }
-    // Add groups from totruonggiaoviec data
-    if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
-      appState.totruonggiaoviec.forEach(t => {
-        const tg = t['Tổ'] || t['Tổ chủ trì'] || '';
-        if (tg) modalGroups.add(tg);
-      });
-    }
-    const opts = ['<option value="">-- Tất cả tổ --</option>'];
-    Array.from(modalGroups).sort().forEach(g => {
-      if (g) opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
-    });
-    taskToChuTriSelect.innerHTML = opts.join('');
+    taskToChuTriSelect.innerHTML = modalGroupOpts.join('');
     if (curVal) taskToChuTriSelect.value = curVal;
   }
 
-  if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
-  appState.dropdownData.phoihop = Array.from(assignees).sort();
-  appState.dropdownData.chutri = Array.from(assignees).sort();
+  const taskToPhoiHopSelect = document.getElementById('task-tophoihop-input');
+  if (taskToPhoiHopSelect) {
+    const curVal = taskToPhoiHopSelect.value;
+    taskToPhoiHopSelect.innerHTML = modalGroupOpts.join('');
+    if (curVal) taskToPhoiHopSelect.value = curVal;
+  }
+
+  if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
+  const leadersList = ['Nguyễn Công Hoan', 'Nguyễn Minh Cường', 'Nguyễn Trung Kiên'];
+  appState.dropdownData.lanhdao = leadersList;
+
+  const chuTriGrp = taskToChuTriSelect ? taskToChuTriSelect.value : '';
+  const chuTriUsers = getEmployeesByGroup(chuTriGrp);
+  appState.dropdownData.leadera = chuTriUsers;
+  appState.dropdownData.chutri = chuTriUsers;
+
+  const phoiHopGrp = taskToPhoiHopSelect ? taskToPhoiHopSelect.value : '';
+  appState.dropdownData.phoihop = getEmployeesByGroup(phoiHopGrp);
 
   updateGlobalUserSelectOptions();
 }
@@ -733,46 +828,57 @@ function getUserCode(u) {
 }
 
 function handleModalGroupChange(selectedGroup) {
-  // Filter locally from appState.users (Sheet User ONLY per user directive)
-  const filteredUsers = new Set();
-  const selGrpClean = cleanKey(selectedGroup);
-
-  if (appState.users && Array.isArray(appState.users)) {
-    appState.users.forEach(u => {
-      const { name, group } = getUserNameAndGroup(u);
-      if (!name || isTeamName(name)) return;
-
-      if (selGrpClean) {
-        const ckG = cleanKey(group);
-        if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG))) {
-          filteredUsers.add(name);
-        }
-      } else {
-        filteredUsers.add(name);
-      }
-    });
-  }
-
-  // Fallback: if group selected has no matching users, show all users from Sheet User
-  if (filteredUsers.size === 0 && appState.users && Array.isArray(appState.users)) {
-    appState.users.forEach(u => {
-      const { name } = getUserNameAndGroup(u);
-      if (name && !isTeamName(name)) {
-        filteredUsers.add(name);
-      }
-    });
-  }
-
-  const sortedUsers = Array.from(filteredUsers).sort();
-
-  // Leaders list for Lãnh đạo field (EXACTLY 3 Leaders in Center)
+  const sortedUsers = getEmployeesByGroup(selectedGroup);
   const leadersList = ['Nguyễn Công Hoan', 'Nguyễn Minh Cường', 'Nguyễn Trung Kiên'];
 
   if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
   appState.dropdownData.lanhdao = leadersList;
   appState.dropdownData.leadera = sortedUsers;
   appState.dropdownData.chutri = sortedUsers;
+
+  // Clear current NV (A) input if selected employee is not in the new team list
+  const leadAInput = document.getElementById('task-leadera-input');
+  if (leadAInput && leadAInput.value && !sortedUsers.includes(leadAInput.value.trim())) {
+    leadAInput.value = '';
+    const codeDisplay = document.getElementById('task-leadera-code-display');
+    if (codeDisplay) { codeDisplay.style.display = 'none'; codeDisplay.innerHTML = ''; }
+  }
+
+  // Clear current NV (R) input if selected employee is not in the new team list
+  const chuTriInput = document.getElementById('task-chutri-input');
+  if (chuTriInput && chuTriInput.value && !sortedUsers.includes(chuTriInput.value.trim())) {
+    chuTriInput.value = '';
+    const codeDisplay = document.getElementById('task-chutri-code-display');
+    if (codeDisplay) { codeDisplay.style.display = 'none'; codeDisplay.innerHTML = ''; }
+  }
+
+  const activeLeaderA = document.getElementById('dropdown-leadera');
+  if (activeLeaderA && activeLeaderA.classList.contains('active')) {
+    filterCustomDropdown('leadera', '');
+  }
+  const activeChuTri = document.getElementById('dropdown-chutri');
+  if (activeChuTri && activeChuTri.classList.contains('active')) {
+    filterCustomDropdown('chutri', '');
+  }
+}
+
+function handleModalCollabGroupChange(selectedGroup) {
+  const sortedUsers = getEmployeesByGroup(selectedGroup);
+  if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
   appState.dropdownData.phoihop = sortedUsers;
+
+  // Clear current NV (C) input if selected employee is not in the new team list
+  const phoiHopInput = document.getElementById('task-phoihop-input');
+  if (phoiHopInput && phoiHopInput.value && !sortedUsers.includes(phoiHopInput.value.trim())) {
+    phoiHopInput.value = '';
+    const codeDisplay = document.getElementById('task-phoihop-code-display');
+    if (codeDisplay) { codeDisplay.style.display = 'none'; codeDisplay.innerHTML = ''; }
+  }
+
+  const activePhoiHop = document.getElementById('dropdown-phoihop');
+  if (activePhoiHop && activePhoiHop.classList.contains('active')) {
+    filterCustomDropdown('phoihop', '');
+  }
 }
 
 // Refresh tovien data from Google Sheets in background
@@ -830,6 +936,20 @@ function showCustomDropdown(type) {
   const inputEl = document.getElementById('task-' + type + '-input');
   if (!listEl || !inputEl) return;
 
+  // Auto-initialize dropdownData for this type if empty
+  if (!appState.dropdownData || !appState.dropdownData[type] || appState.dropdownData[type].length === 0) {
+    if (type === 'lanhdao') {
+      if (!appState.dropdownData) appState.dropdownData = {};
+      appState.dropdownData.lanhdao = ['Nguyễn Công Hoan', 'Nguyễn Minh Cường', 'Nguyễn Trung Kiên'];
+    } else if (type === 'phoihop') {
+      const collabSelect = document.getElementById('task-tophoihop-input');
+      handleModalCollabGroupChange(collabSelect ? collabSelect.value : '');
+    } else {
+      const toSelect = document.getElementById('task-tochutri-input');
+      handleModalGroupChange(toSelect ? toSelect.value : '');
+    }
+  }
+
   // Render full list when opened via click/focus so user can see all options
   filterCustomDropdown(type, '');
   listEl.classList.add('active');
@@ -851,7 +971,11 @@ function filterCustomDropdown(type, query) {
   if (!listEl) return;
 
   const rawList = (appState.dropdownData && appState.dropdownData[type]) ? appState.dropdownData[type] : [];
-  const qClean = cleanKey(query);
+  
+  let qClean = cleanKey(query);
+  if (qClean.includes('chon') || qClean.includes('tatcanhanvien') || qClean.includes('tatcato')) {
+    qClean = '';
+  }
 
   let filtered = rawList;
   if (qClean) {
@@ -2673,10 +2797,16 @@ function openTaskModal(taskId = null) {
         if (document.getElementById('task-kehoach-input')) document.getElementById('task-kehoach-input').value = task['Kế hoạch'] !== undefined ? task['Kế hoạch'] : 1;
         if (document.getElementById('task-thuchien-input')) document.getElementById('task-thuchien-input').value = task['Thực hiện'] !== undefined ? task['Thực hiện'] : 0;
         
-        const grp = task['Tổ'] || getTaskGroup(task);
+        const grp = task['Tổ chủ trì'] || task['Tổ chủ trì (AR)'] || task['Tổ'] || getTaskGroup(task) || '';
         const toSelect = document.getElementById('task-tochutri-input');
         if (toSelect) toSelect.value = grp;
+
+        const collabGrp = task['Tổ phối hợp'] || task['Tổ phối hợp (C)'] || task['Tổ (R)'] || getTaskCollaboratorGroup(task) || '';
+        const toCollabSelect = document.getElementById('task-tophoihop-input');
+        if (toCollabSelect) toCollabSelect.value = collabGrp;
+
         handleModalGroupChange(grp);
+        handleModalCollabGroupChange(collabGrp);
 
         // 1. Lãnh đạo
         const lanhdaoInput = document.getElementById('task-lanhdao-input');
@@ -2768,7 +2898,10 @@ function openTaskModal(taskId = null) {
       if (document.getElementById('task-id')) document.getElementById('task-id').value = '';
       const toSelect = document.getElementById('task-tochutri-input');
       if (toSelect) toSelect.value = '';
+      const toCollabSelect = document.getElementById('task-tophoihop-input');
+      if (toCollabSelect) toCollabSelect.value = '';
       handleModalGroupChange('');
+      handleModalCollabGroupChange('');
       // Default start date to today
       const today = new Date();
       const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
@@ -2919,6 +3052,7 @@ function handleTaskFormSubmit(e) {
     const chuTriUser = appState.users.find(u => (u['Tên'] || u.name) === chuTriName);
     const phoiHopUser = appState.users.find(u => (u['Tên'] || u.name) === phoiHopName);
     const finalToChuTri = toChuTriInput || (chuTriUser ? (chuTriUser['Tổ'] || chuTriUser.group) : '');
+    const finalToPhoiHop = toPhoiHopInput || (phoiHopUser ? (phoiHopUser['Tổ'] || phoiHopUser.group) : '');
 
     const newId = taskId || ('TSK-' + Math.floor(1000 + Math.random() * 9000));
 
@@ -2946,7 +3080,9 @@ function handleTaskFormSubmit(e) {
       'Tổ chủ trì (AR)': finalToChuTri,
       'Tổ': finalToChuTri,
       'Người phối hợp': phoiHopName,
-      'Tổ phối hợp': phoiHopUser ? (phoiHopUser['Tổ'] || phoiHopUser.group) : '',
+      'Tổ phối hợp': finalToPhoiHop,
+      'Tổ phối hợp (C)': finalToPhoiHop,
+      'Tổ (R)': finalToPhoiHop,
       'Người thực hiện': chuTriName,
       'Người phụ trách': chuTriName,
       'Tiến độ (%)': Number(document.getElementById('task-progress-input')?.value || 0),
