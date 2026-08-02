@@ -551,77 +551,103 @@ function getUserNameAndGroup(u) {
   return res;
 }
 
-// Get non-leader employees filtered by group from Sheet User and tasks
-function getEmployeesByGroup(selectedGroup) {
-  const filteredUsers = new Set();
-  const selGrpClean = cleanKey(selectedGroup);
+function getUserRole(u) {
+  if (!u || typeof u !== 'object') return '';
+  if (u['Chức vụ'] && String(u['Chức vụ']).trim()) return String(u['Chức vụ']).trim();
+  if (u['Chức danh'] && String(u['Chức danh']).trim()) return String(u['Chức danh']).trim();
+  if (u['Vai trò'] && String(u['Vai trò']).trim()) return String(u['Vai trò']).trim();
+  if (u['Role'] && String(u['Role']).trim()) return String(u['Role']).trim();
+  if (u['Vị trí'] && String(u['Vị trí']).trim()) return String(u['Vị trí']).trim();
+  if (u.role && String(u.role).trim()) return String(u.role).trim();
+  if (u.chucvu && String(u.chucvu).trim()) return String(u.chucvu).trim();
+  if (u.position && String(u.position).trim()) return String(u.position).trim();
+
+  for (let k in u) {
+    if (k.startsWith('_')) continue;
+    const ck = cleanKey(k);
+    if (ck.includes('chuc') || ck.includes('vaitro') || ck.includes('role') || ck.includes('vitri')) {
+      if (u[k] && String(u[k]).trim()) return String(u[k]).trim();
+    }
+  }
+  return '';
+}
+
+function isToTruongHoacToPho(u) {
+  if (!u || typeof u !== 'object') return false;
+  const role = getUserRole(u);
+  const name = getUserNameFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).name : '');
+  const rClean = cleanKey(role);
+  const nClean = cleanKey(name);
+
+  if (rClean.includes('totruong') || rClean.includes('topho') || rClean.includes('truongto') || rClean.includes('photo') || rClean.includes('truong') || rClean.includes('pho') || rClean.includes('lead')) {
+    return true;
+  }
+  if (nClean.includes('totruong') || nClean.includes('topho')) {
+    return true;
+  }
+  return false;
+}
+
+function isGroupMatch(userGroup, selectedGroup) {
+  if (!selectedGroup) return true;
+  if (!userGroup) return true;
+
+  const uClean = cleanKey(userGroup);
+  const sClean = cleanKey(selectedGroup);
+
+  if (!uClean || !sClean) return true;
+  if (uClean === sClean || uClean.includes(sClean) || sClean.includes(uClean)) return true;
+
+  const stopWords = ['to', 'nhom', 'donvi', 'phong', 'ban'];
+  const uTokens = uClean.split(/[^a-z0-9]/).filter(t => t && !stopWords.includes(t));
+  const sTokens = sClean.split(/[^a-z0-9]/).filter(t => t && !stopWords.includes(t));
+
+  if (uTokens.length === 0 || sTokens.length === 0) return true;
+
+  return uTokens.some(ut => sTokens.some(st => ut.includes(st) || st.includes(ut)));
+}
+
+// Get non-leader employees filtered by group STRICTLY from Sheet User (appState.users)
+function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
+  const userSet = new Set();
+  const leaderUserSet = new Set();
   const leaderKeys = ['nguyenconghoan', 'nguyenminhcuong', 'nguyentrungkien'];
 
-  const addIfValid = (name, group) => {
-    if (!name || name === 'Chưa gán') return;
-    const trimmed = String(name).trim();
-    if (!trimmed || isTeamName(trimmed)) return;
-    if (leaderKeys.includes(cleanKey(trimmed))) return;
-
-    if (selGrpClean) {
-      const ckG = cleanKey(group || '');
-      if (!ckG || ckG === selGrpClean || ckG.includes(selGrpClean) || selGrpClean.includes(ckG)) {
-        filteredUsers.add(trimmed);
-      }
-    } else {
-      filteredUsers.add(trimmed);
-    }
-  };
-
-  // 1. Collect from appState.users (Sheet User / Nguoidung)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const name = getUserNameFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).name : '');
+      if (!name || isTeamName(name)) return;
+      const nameClean = cleanKey(name);
+      if (leaderKeys.includes(nameClean)) return;
+
       const group = getUserGroupFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).group : '');
-      addIfValid(name, group);
-    });
-  }
 
-  // 2. Collect from appState.tasks (Sheet congviec)
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
-      const tg = getTaskGroup(t) || t['Tổ chủ trì (AR)'] || t['Tổ'] || '';
-      const tcg = getTaskCollaboratorGroup(t) || t['Tổ (R)'] || t['Tổ phối hợp'] || '';
-      const aName = getTaskLeaderName(t) || t['Tên NV (A)'];
-      const rName = getTaskEmpRName(t) || getTaskAssignee(t) || t['Tên NV (R)'] || t['Người chủ trì'];
-      const cName = getTaskEmpCName(t) || getTaskCollaborator(t) || t['Tên NV (C)'] || t['Người phối hợp'];
-      
-      if (aName) addIfValid(aName, tg);
-      if (rName) addIfValid(rName, tg);
-      if (cName) addIfValid(cName, tcg || tg);
-    });
-  }
-
-  // Fallback: If after filtering by group still no users matched, return ALL valid non-leader users
-  if (filteredUsers.size === 0) {
-    if (appState.users && Array.isArray(appState.users)) {
-      appState.users.forEach(u => {
-        const name = getUserNameFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).name : '');
-        if (name && !isTeamName(name) && !leaderKeys.includes(cleanKey(name))) {
-          filteredUsers.add(String(name).trim());
+      if (isGroupMatch(group, selectedGroup)) {
+        userSet.add(String(name).trim());
+        if (isToTruongHoacToPho(u)) {
+          leaderUserSet.add(String(name).trim());
         }
-      });
-    }
-    if (appState.tasks && Array.isArray(appState.tasks)) {
-      appState.tasks.forEach(t => {
-        const aName = getTaskLeaderName(t) || t['Tên NV (A)'];
-        const rName = getTaskEmpRName(t) || getTaskAssignee(t) || t['Tên NV (R)'] || t['Người chủ trì'];
-        const cName = getTaskEmpCName(t) || getTaskCollaborator(t) || t['Tên NV (C)'] || t['Người phối hợp'];
-        [aName, rName, cName].forEach(n => {
-          if (n && n !== 'Chưa gán' && !isTeamName(n) && !leaderKeys.includes(cleanKey(n))) {
-            filteredUsers.add(String(n).trim());
-          }
-        });
-      });
+      }
+    });
+  }
+
+  if (isLeaderAOnly) {
+    if (leaderUserSet.size > 0) {
+      return Array.from(leaderUserSet).sort();
     }
   }
 
-  return Array.from(filteredUsers).filter(Boolean).sort();
+  // Fallback: If no users match specific group in Sheet User, return ALL valid non-leader users from Sheet User
+  if (userSet.size === 0 && appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const name = getUserNameFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).name : '');
+      if (name && !isTeamName(name) && !leaderKeys.includes(cleanKey(name))) {
+        userSet.add(String(name).trim());
+      }
+    });
+  }
+
+  return Array.from(userSet).filter(Boolean).sort();
 }
 
 
@@ -796,12 +822,11 @@ function populateSelects() {
   appState.dropdownData.lanhdao = leadersList;
 
   const chuTriGrp = taskToChuTriSelect ? taskToChuTriSelect.value : '';
-  const chuTriUsers = getEmployeesByGroup(chuTriGrp);
-  appState.dropdownData.leadera = chuTriUsers;
-  appState.dropdownData.chutri = chuTriUsers;
+  appState.dropdownData.leadera = getEmployeesByGroup(chuTriGrp, true);
+  appState.dropdownData.chutri = getEmployeesByGroup(chuTriGrp, false);
 
   const phoiHopGrp = taskToPhoiHopSelect ? taskToPhoiHopSelect.value : '';
-  appState.dropdownData.phoihop = getEmployeesByGroup(phoiHopGrp);
+  appState.dropdownData.phoihop = getEmployeesByGroup(phoiHopGrp, false);
 
   updateGlobalUserSelectOptions();
 }
@@ -828,17 +853,18 @@ function getUserCode(u) {
 }
 
 function handleModalGroupChange(selectedGroup) {
-  const sortedUsers = getEmployeesByGroup(selectedGroup);
+  const leaderAUsers = getEmployeesByGroup(selectedGroup, true);
+  const chuTriUsers = getEmployeesByGroup(selectedGroup, false);
   const leadersList = ['Nguyễn Công Hoan', 'Nguyễn Minh Cường', 'Nguyễn Trung Kiên'];
 
   if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
   appState.dropdownData.lanhdao = leadersList;
-  appState.dropdownData.leadera = sortedUsers;
-  appState.dropdownData.chutri = sortedUsers;
+  appState.dropdownData.leadera = leaderAUsers;
+  appState.dropdownData.chutri = chuTriUsers;
 
   // Clear current NV (A) input if selected employee is not in the new team list
   const leadAInput = document.getElementById('task-leadera-input');
-  if (leadAInput && leadAInput.value && !sortedUsers.includes(leadAInput.value.trim())) {
+  if (leadAInput && leadAInput.value && !leaderAUsers.includes(leadAInput.value.trim())) {
     leadAInput.value = '';
     const codeDisplay = document.getElementById('task-leadera-code-display');
     if (codeDisplay) { codeDisplay.style.display = 'none'; codeDisplay.innerHTML = ''; }
@@ -846,7 +872,7 @@ function handleModalGroupChange(selectedGroup) {
 
   // Clear current NV (R) input if selected employee is not in the new team list
   const chuTriInput = document.getElementById('task-chutri-input');
-  if (chuTriInput && chuTriInput.value && !sortedUsers.includes(chuTriInput.value.trim())) {
+  if (chuTriInput && chuTriInput.value && !chuTriUsers.includes(chuTriInput.value.trim())) {
     chuTriInput.value = '';
     const codeDisplay = document.getElementById('task-chutri-code-display');
     if (codeDisplay) { codeDisplay.style.display = 'none'; codeDisplay.innerHTML = ''; }
@@ -863,13 +889,13 @@ function handleModalGroupChange(selectedGroup) {
 }
 
 function handleModalCollabGroupChange(selectedGroup) {
-  const sortedUsers = getEmployeesByGroup(selectedGroup);
+  const phoiHopUsers = getEmployeesByGroup(selectedGroup, false);
   if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
-  appState.dropdownData.phoihop = sortedUsers;
+  appState.dropdownData.phoihop = phoiHopUsers;
 
   // Clear current NV (C) input if selected employee is not in the new team list
   const phoiHopInput = document.getElementById('task-phoihop-input');
-  if (phoiHopInput && phoiHopInput.value && !sortedUsers.includes(phoiHopInput.value.trim())) {
+  if (phoiHopInput && phoiHopInput.value && !phoiHopUsers.includes(phoiHopInput.value.trim())) {
     phoiHopInput.value = '';
     const codeDisplay = document.getElementById('task-phoihop-code-display');
     if (codeDisplay) { codeDisplay.style.display = 'none'; codeDisplay.innerHTML = ''; }
