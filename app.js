@@ -658,30 +658,36 @@ function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
   const allSystemUsers = new Set();
   const leaderKeys = ['nguyenconghoan', 'nguyenminhcuong', 'nguyentrungkien'];
 
-  const addCandidate = (name, group, roleInfo = '') => {
-    if (!name || name === 'Chưa gán') return;
-    const trimmed = String(name).trim();
-    if (!trimmed || isTeamName(trimmed)) return;
-    if (leaderKeys.includes(cleanKey(trimmed))) return;
+  const addName = (rawName, group = '', roleInfo = '') => {
+    if (!rawName || rawName === 'Chưa gán') return;
+    const str = String(rawName).trim();
+    if (!str || isTeamName(str)) return;
 
-    allSystemUsers.add(trimmed);
+    const names = str.includes(',') ? str.split(',') : [str];
+    names.forEach(n => {
+      const trimmed = n.trim();
+      if (!trimmed || isTeamName(trimmed)) return;
+      if (leaderKeys.includes(cleanKey(trimmed))) return;
 
-    if (isGroupMatch(group, selectedGroup)) {
-      teamMembers.add(trimmed);
-      const rClean = cleanKey(roleInfo || '');
-      const nClean = cleanKey(trimmed);
-      if (rClean.includes('totruong') || rClean.includes('topho') || rClean.includes('truong') || rClean.includes('pho') || rClean.includes('lead') || nClean.includes('totruong') || nClean.includes('topho')) {
-        teamLeadersAndDeputies.add(trimmed);
+      allSystemUsers.add(trimmed);
+
+      if (selectedGroup && isGroupMatch(group, selectedGroup)) {
+        teamMembers.add(trimmed);
+        const rClean = cleanKey(roleInfo || '');
+        const nClean = cleanKey(trimmed);
+        if (rClean.includes('totruong') || rClean.includes('topho') || rClean.includes('truong') || rClean.includes('pho') || rClean.includes('lead') || nClean.includes('totruong') || nClean.includes('topho')) {
+          teamLeadersAndDeputies.add(trimmed);
+        }
       }
-    }
+    });
   };
 
-  // 1. Collect from appState.users (Sheet User)
+  // 1. Collect from appState.users (Sheet User / Nguoidung)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { name, group } = getUserNameAndGroup(u);
       const role = getUserRole(u);
-      addCandidate(name, group, role);
+      addName(name, group, role);
     });
   }
 
@@ -689,8 +695,8 @@ function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
   if (appState.tovien && Array.isArray(appState.tovien)) {
     appState.tovien.forEach(row => {
       const info = getTovienRowInfo(row);
-      if (info.leaderName) addCandidate(info.leaderName, info.group, 'totruong');
-      if (info.empName) addCandidate(info.empName, info.group, '');
+      if (info.leaderName) addName(info.leaderName, info.group, 'totruong');
+      if (info.empName) addName(info.empName, info.group, '');
     });
   }
 
@@ -703,9 +709,20 @@ function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
       const rName = getTaskEmpRName(t) || getTaskAssignee(t) || t['Tên NV (R)'];
       const cName = getTaskEmpCName(t) || getTaskCollaborator(t) || t['Tên NV (C)'];
 
-      if (aName) addCandidate(aName, tg, 'totruong');
-      if (rName) addCandidate(rName, tg, '');
-      if (cName) addCandidate(cName, tcg || tg, '');
+      if (aName) addName(aName, tg, 'totruong');
+      if (rName) addName(rName, tg, '');
+      if (cName) addName(cName, tcg || tg, '');
+    });
+  }
+
+  // 4. Collect from appState.totruonggiaoviec
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+    appState.totruonggiaoviec.forEach(t => {
+      const tg = t['Tổ'] || t['Tổ chủ trì'] || '';
+      const aName = t['Tên NV (A)'] || t['Tên tổ trưởng'] || t['Người giao việc'] || '';
+      const rName = t['Tên NV (R)'] || t['Người nhận việc'] || t['Người chủ trì'] || '';
+      if (aName) addName(aName, tg, 'totruong');
+      if (rName) addName(rName, tg, '');
     });
   }
 
