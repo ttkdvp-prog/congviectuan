@@ -1535,14 +1535,18 @@ function handleKanbanFilter() {
 }
 
 function getFilteredTasks() {
-  const search = (appState.filters.search || '').trim().toLowerCase();
-  const groupFilter = (appState.filters.group || '').trim().toLowerCase();
-  const collabGroupFilter = (appState.filters.collabGroup || '').trim().toLowerCase();
-  const leaderAFilter = (appState.filters.leaderA || '').trim().toLowerCase();
-  const userFilter = (appState.filters.user || '').trim().toLowerCase();
-  const collabUserFilter = (appState.filters.collabUser || '').trim().toLowerCase();
-  const kanbanAssignee = (appState.filters.kanbanAssignee || '').trim().toLowerCase();
+  if (!appState.tasks || !Array.isArray(appState.tasks)) return [];
+
+  const search = cleanKey(appState.filters.search || '');
+  const groupFilter = cleanKey(appState.filters.group || '');
+  const collabGroupFilter = cleanKey(appState.filters.collabGroup || '');
+  const leaderAFilter = cleanKey(appState.filters.leaderA || '');
+  const userFilter = cleanKey(appState.filters.user || '');
+  const collabUserFilter = cleanKey(appState.filters.collabUser || '');
+  const kanbanAssignee = cleanKey(appState.filters.kanbanAssignee || '');
   const kanbanPriority = (appState.filters.kanbanPriority || '').trim();
+
+  const isAllText = (txt) => !txt || txt.includes('tatca');
 
   return appState.tasks.filter(t => {
     const titleVal = String(t['Tiêu đề'] || t['Tiêu đề công việc'] || '').toLowerCase();
@@ -1556,12 +1560,12 @@ function getFilteredTasks() {
     const empCVal = String(getTaskEmpCName(t) || getTaskCollaborator(t) || t['Tên NV (C)'] || '').toLowerCase();
     const empCCodeVal = String(getTaskEmpCCode(t) || t['Mã NV (C)'] || '').toLowerCase();
     const toChuTriVal = String(getTaskGroup(t) || t['Tổ chủ trì (AR)'] || t['Tổ'] || '').toLowerCase();
-    const toPhoiHopVal = String(getTaskCollaboratorGroup(t) || t['Tổ (R)'] || '').toLowerCase();
+    const toPhoiHopVal = String(getTaskCollaboratorGroup(t) || t['Tổ (R)'] || t['Tổ phối hợp'] || '').toLowerCase();
     const ghiChuVal = String(t['Ghi chú'] || '').toLowerCase();
     const idVal = String(t['ID'] || t['id'] || '').toLowerCase();
 
     // 1. Search filter
-    if (search) {
+    if (search && !isAllText(search)) {
       const match = titleVal.includes(search) ||
                     descVal.includes(search) ||
                     lanhDaoVal.includes(search) ||
@@ -1580,49 +1584,41 @@ function getFilteredTasks() {
     }
 
     // 2. Tổ chủ trì (AR) filter
-    if (groupFilter) {
-      const groupFilterClean = cleanKey(groupFilter);
-      const matchHostGroup = cleanKey(toChuTriVal).includes(groupFilterClean);
+    if (groupFilter && !isAllText(groupFilter)) {
+      const matchHostGroup = cleanKey(toChuTriVal).includes(groupFilter) || groupFilter.includes(cleanKey(toChuTriVal));
       if (!matchHostGroup) return false;
     }
 
-    // 3. Tổ (R) filter
-    if (collabGroupFilter) {
-      const collabGroupFilterClean = cleanKey(collabGroupFilter);
-      const matchCollabGroup = cleanKey(toPhoiHopVal).includes(collabGroupFilterClean);
+    // 3. Tổ (R) / Tổ phối hợp filter
+    if (collabGroupFilter && !isAllText(collabGroupFilter)) {
+      const matchCollabGroup = cleanKey(toPhoiHopVal).includes(collabGroupFilter) || collabGroupFilter.includes(cleanKey(toPhoiHopVal));
       if (!matchCollabGroup) return false;
     }
 
     // 4. Tên NV (A) filter
-    if (leaderAFilter) {
-      const leaderAFilterClean = cleanKey(leaderAFilter);
-      const matchLeader = cleanKey(chuTriAVal).includes(leaderAFilterClean) ||
-                          cleanKey(lanhDaoVal).includes(leaderAFilterClean) ||
-                          cleanKey(t['Tên NV (A)'] || '').includes(leaderAFilterClean) ||
-                          cleanKey(t['Người chủ trì'] || '').includes(leaderAFilterClean);
+    if (leaderAFilter && !isAllText(leaderAFilter)) {
+      const matchLeader = cleanKey(chuTriAVal).includes(leaderAFilter) ||
+                          cleanKey(lanhDaoVal).includes(leaderAFilter) ||
+                          cleanKey(t['Tên NV (A)'] || '').includes(leaderAFilter);
       if (!matchLeader) return false;
     }
 
     // 5. Tên NV (R) filter
-    if (userFilter) {
-      const userFilterClean = cleanKey(userFilter);
-      const matchEmpR = cleanKey(empRVal).includes(userFilterClean) ||
-                        cleanKey(t['Tên NV (R)'] || '').includes(userFilterClean) ||
-                        cleanKey(t['Người phối hợp'] || '').includes(userFilterClean) ||
-                        cleanKey(t['Người thực hiện'] || '').includes(userFilterClean);
+    if (userFilter && !isAllText(userFilter)) {
+      const matchEmpR = cleanKey(empRVal).includes(userFilter) ||
+                        cleanKey(t['Tên NV (R)'] || '').includes(userFilter);
       if (!matchEmpR) return false;
     }
 
     // 6. Tên NV (C) filter
-    if (collabUserFilter) {
-      const collabUserFilterClean = cleanKey(collabUserFilter);
-      const matchEmpC = cleanKey(empCVal).includes(collabUserFilterClean) ||
-                        cleanKey(t['Tên NV (C)'] || '').includes(collabUserFilterClean);
+    if (collabUserFilter && !isAllText(collabUserFilter)) {
+      const matchEmpC = cleanKey(empCVal).includes(collabUserFilter) ||
+                        cleanKey(t['Tên NV (C)'] || '').includes(collabUserFilter);
       if (!matchEmpC) return false;
     }
 
-    // 7. Kanban specific filters
-    if (kanbanAssignee && cleanKey(empRVal) !== cleanKey(kanbanAssignee)) return false;
+    // 7. Kanban filters
+    if (kanbanAssignee && !isAllText(kanbanAssignee) && cleanKey(empRVal) !== kanbanAssignee) return false;
     if (kanbanPriority && String(t['Mức độ ưu tiên'] || '').trim() !== kanbanPriority) return false;
 
     return true;

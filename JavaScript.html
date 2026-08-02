@@ -1536,14 +1536,18 @@ function handleKanbanFilter() {
 }
 
 function getFilteredTasks() {
-  const search = (appState.filters.search || '').trim().toLowerCase();
-  const groupFilter = (appState.filters.group || '').trim().toLowerCase();
-  const collabGroupFilter = (appState.filters.collabGroup || '').trim().toLowerCase();
-  const leaderAFilter = (appState.filters.leaderA || '').trim().toLowerCase();
-  const userFilter = (appState.filters.user || '').trim().toLowerCase();
-  const collabUserFilter = (appState.filters.collabUser || '').trim().toLowerCase();
-  const kanbanAssignee = (appState.filters.kanbanAssignee || '').trim().toLowerCase();
+  if (!appState.tasks || !Array.isArray(appState.tasks)) return [];
+
+  const search = cleanKey(appState.filters.search || '');
+  const groupFilter = cleanKey(appState.filters.group || '');
+  const collabGroupFilter = cleanKey(appState.filters.collabGroup || '');
+  const leaderAFilter = cleanKey(appState.filters.leaderA || '');
+  const userFilter = cleanKey(appState.filters.user || '');
+  const collabUserFilter = cleanKey(appState.filters.collabUser || '');
+  const kanbanAssignee = cleanKey(appState.filters.kanbanAssignee || '');
   const kanbanPriority = (appState.filters.kanbanPriority || '').trim();
+
+  const isAllText = (txt) => !txt || txt.includes('tatca');
 
   return appState.tasks.filter(t => {
     const titleVal = String(t['TiÃªu Ä‘á»'] || t['TiÃªu Ä‘á» cÃ´ng viá»‡c'] || '').toLowerCase();
@@ -1557,12 +1561,12 @@ function getFilteredTasks() {
     const empCVal = String(getTaskEmpCName(t) || getTaskCollaborator(t) || t['TÃªn NV (C)'] || '').toLowerCase();
     const empCCodeVal = String(getTaskEmpCCode(t) || t['MÃ£ NV (C)'] || '').toLowerCase();
     const toChuTriVal = String(getTaskGroup(t) || t['Tá»• chá»§ trÃ¬ (AR)'] || t['Tá»•'] || '').toLowerCase();
-    const toPhoiHopVal = String(getTaskCollaboratorGroup(t) || t['Tá»• (R)'] || '').toLowerCase();
+    const toPhoiHopVal = String(getTaskCollaboratorGroup(t) || t['Tá»• (R)'] || t['Tá»• phá»‘i há»£p'] || '').toLowerCase();
     const ghiChuVal = String(t['Ghi chÃº'] || '').toLowerCase();
     const idVal = String(t['ID'] || t['id'] || '').toLowerCase();
 
     // 1. Search filter
-    if (search) {
+    if (search && !isAllText(search)) {
       const match = titleVal.includes(search) ||
                     descVal.includes(search) ||
                     lanhDaoVal.includes(search) ||
@@ -1581,49 +1585,41 @@ function getFilteredTasks() {
     }
 
     // 2. Tá»• chá»§ trÃ¬ (AR) filter
-    if (groupFilter) {
-      const groupFilterClean = cleanKey(groupFilter);
-      const matchHostGroup = cleanKey(toChuTriVal).includes(groupFilterClean);
+    if (groupFilter && !isAllText(groupFilter)) {
+      const matchHostGroup = cleanKey(toChuTriVal).includes(groupFilter) || groupFilter.includes(cleanKey(toChuTriVal));
       if (!matchHostGroup) return false;
     }
 
-    // 3. Tá»• (R) filter
-    if (collabGroupFilter) {
-      const collabGroupFilterClean = cleanKey(collabGroupFilter);
-      const matchCollabGroup = cleanKey(toPhoiHopVal).includes(collabGroupFilterClean);
+    // 3. Tá»• (R) / Tá»• phá»‘i há»£p filter
+    if (collabGroupFilter && !isAllText(collabGroupFilter)) {
+      const matchCollabGroup = cleanKey(toPhoiHopVal).includes(collabGroupFilter) || collabGroupFilter.includes(cleanKey(toPhoiHopVal));
       if (!matchCollabGroup) return false;
     }
 
     // 4. TÃªn NV (A) filter
-    if (leaderAFilter) {
-      const leaderAFilterClean = cleanKey(leaderAFilter);
-      const matchLeader = cleanKey(chuTriAVal).includes(leaderAFilterClean) ||
-                          cleanKey(lanhDaoVal).includes(leaderAFilterClean) ||
-                          cleanKey(t['TÃªn NV (A)'] || '').includes(leaderAFilterClean) ||
-                          cleanKey(t['NgÆ°á»i chá»§ trÃ¬'] || '').includes(leaderAFilterClean);
+    if (leaderAFilter && !isAllText(leaderAFilter)) {
+      const matchLeader = cleanKey(chuTriAVal).includes(leaderAFilter) ||
+                          cleanKey(lanhDaoVal).includes(leaderAFilter) ||
+                          cleanKey(t['TÃªn NV (A)'] || '').includes(leaderAFilter);
       if (!matchLeader) return false;
     }
 
     // 5. TÃªn NV (R) filter
-    if (userFilter) {
-      const userFilterClean = cleanKey(userFilter);
-      const matchEmpR = cleanKey(empRVal).includes(userFilterClean) ||
-                        cleanKey(t['TÃªn NV (R)'] || '').includes(userFilterClean) ||
-                        cleanKey(t['NgÆ°á»i phá»‘i há»£p'] || '').includes(userFilterClean) ||
-                        cleanKey(t['NgÆ°á»i thá»±c hiá»‡n'] || '').includes(userFilterClean);
+    if (userFilter && !isAllText(userFilter)) {
+      const matchEmpR = cleanKey(empRVal).includes(userFilter) ||
+                        cleanKey(t['TÃªn NV (R)'] || '').includes(userFilter);
       if (!matchEmpR) return false;
     }
 
     // 6. TÃªn NV (C) filter
-    if (collabUserFilter) {
-      const collabUserFilterClean = cleanKey(collabUserFilter);
-      const matchEmpC = cleanKey(empCVal).includes(collabUserFilterClean) ||
-                        cleanKey(t['TÃªn NV (C)'] || '').includes(collabUserFilterClean);
+    if (collabUserFilter && !isAllText(collabUserFilter)) {
+      const matchEmpC = cleanKey(empCVal).includes(collabUserFilter) ||
+                        cleanKey(t['TÃªn NV (C)'] || '').includes(collabUserFilter);
       if (!matchEmpC) return false;
     }
 
-    // 7. Kanban specific filters
-    if (kanbanAssignee && cleanKey(empRVal) !== cleanKey(kanbanAssignee)) return false;
+    // 7. Kanban filters
+    if (kanbanAssignee && !isAllText(kanbanAssignee) && cleanKey(empRVal) !== kanbanAssignee) return false;
     if (kanbanPriority && String(t['Má»©c Ä‘á»™ Æ°u tiÃªn'] || '').trim() !== kanbanPriority) return false;
 
     return true;
