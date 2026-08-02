@@ -1579,7 +1579,7 @@ function renderTaskListTable() {
   
   tbody.innerHTML = '';
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="16" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
     return;
   }
   
@@ -1625,8 +1625,10 @@ function renderTaskListTable() {
     const chuTriName = getTaskLeaderName(t) || getTaskAssignee(t);
     const chuTriCode = getTaskLeaderCode(t) || lookupEmpCodeByName(chuTriName);
     const toChuTriName = t['Tổ chủ trì (AR)'] || getTaskGroup(t);
-    const phoiHopName = getTaskEmpRName(t) || getTaskCollaborator(t);
+    const phoiHopName = getTaskEmpRName(t) || getTaskAssignee(t);
     const phoiHopCode = getTaskEmpRCode(t) || lookupEmpCodeByName(phoiHopName);
+    const empCName = getTaskEmpCName(t) || getTaskCollaborator(t);
+    const empCCode = getTaskEmpCCode(t) || lookupEmpCodeByName(empCName);
 
     rowsHtml.push(`
       <tr>
@@ -1637,6 +1639,7 @@ function renderTaskListTable() {
         <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
         <td><div>${formatNameList(chuTriName)}</div>${chuTriCode ? `<div style="color:#64748b; font-size:0.72rem; margin-top:2px;">${escapeHtml(chuTriCode)}</div>` : ''}</td>
         <td><div>${formatNameList(phoiHopName)}</div>${phoiHopCode ? `<div style="color:#64748b; font-size:0.72rem; margin-top:2px;">${escapeHtml(phoiHopCode)}</div>` : ''}</td>
+        <td><div>${formatNameList(empCName)}</div>${empCCode ? `<div style="color:#64748b; font-size:0.72rem; margin-top:2px;">${escapeHtml(empCCode)}</div>` : ''}</td>
         <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
         <td>${formatDateVN(t['Ngày kết thúc'])}</td>
         <td>
