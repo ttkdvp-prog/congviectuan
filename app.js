@@ -1307,14 +1307,13 @@ function renderTaskListTable() {
     const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
     const ghiChu = t['Ghi chú'] || '';
     const ngayLamXong = t['Ngày làm xong'] || '';
+    const lanhDaoName = getTaskLanhDaoName(t);
+    const lanhDaoCode = getTaskLanhDaoCode(t) || lookupEmpCodeByName(lanhDaoName);
     const chuTriName = getTaskLeaderName(t) || getTaskAssignee(t);
     const chuTriCode = getTaskLeaderCode(t) || lookupEmpCodeByName(chuTriName);
     const toChuTriName = t['Tổ chủ trì (AR)'] || getTaskGroup(t);
     const phoiHopName = getTaskEmpRName(t) || getTaskCollaborator(t);
     const phoiHopCode = getTaskEmpRCode(t) || lookupEmpCodeByName(phoiHopName);
-
-    const lanhDaoName = t['Lãnh đạo'] || '';
-    const lanhDaoCode = t['Mã LĐ'] || '';
 
     rowsHtml.push(`
       <tr>
@@ -2776,6 +2775,22 @@ function getToTruongTaskGroup(task) {
   const exact = getExactValueByKeyPattern(task, ['Tổ', 'Tổ chủ trì', 'Tổ chủ trì (AR)', 'Tổ hạ tầng', 'to', 'tochutri', 'tochutriar', 'tohatang']);
   if (exact) return exact;
   return task['Tổ chủ trì (AR)'] || task['Tổ'] || getTaskGroup(task) || '';
+}
+
+function getTaskLanhDaoName(t) {
+  if (!t || typeof t !== 'object') return '';
+  if (t['Lãnh đạo'] !== undefined && t['Lãnh đạo'] !== null && String(t['Lãnh đạo']).trim() !== '') {
+    return String(t['Lãnh đạo']).trim();
+  }
+  return getExactValueByKeyPattern(t, ['Lãnh đạo', 'Lãnh Đạo', 'lanhdao']);
+}
+
+function getTaskLanhDaoCode(t) {
+  if (!t || typeof t !== 'object') return '';
+  if (t['Mã LĐ'] !== undefined && t['Mã LĐ'] !== null && String(t['Mã LĐ']).trim() !== '') {
+    return String(t['Mã LĐ']).trim();
+  }
+  return getExactValueByKeyPattern(t, ['Mã LĐ', 'Mã Lanh dao', 'mald', 'malanhdao']);
 }
 
 function getTaskLeaderName(task) {
