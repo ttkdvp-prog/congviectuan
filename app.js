@@ -1045,9 +1045,6 @@ function getHeaderGroupOptions() {
   return Array.from(hostGroups).sort();
 }
 
-  return Array.from(hostGroups).sort();
-}
-
 function getHeaderCollabGroupOptions() {
   const collabGroups = new Set();
   const addGroup = (g) => {
