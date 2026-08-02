@@ -1556,8 +1556,44 @@ function handleKanbanFilter() {
   renderKanbanBoard();
 }
 
+function getAllCombinedTasks() {
+  const taskMap = new Map();
+  
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const id = String(t.ID || t.id || '').trim();
+      if (id) {
+        taskMap.set(id, t);
+      } else {
+        const titleKey = cleanKey(t['Tiêu đề'] || t['Tiêu đề công việc'] || '');
+        if (titleKey) taskMap.set('task_' + titleKey, t);
+        else taskMap.set('task_' + Math.random(), t);
+      }
+    });
+  }
+  
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+    appState.totruonggiaoviec.forEach(t => {
+      const id = String(t.ID || t.id || '').trim();
+      if (id && !taskMap.has(id)) {
+        taskMap.set(id, t);
+      } else if (!id) {
+        const titleKey = cleanKey(t['Tiêu đề'] || t['Tiêu đề công việc'] || '');
+        if (titleKey && !taskMap.has('totruong_' + titleKey)) {
+          taskMap.set('totruong_' + titleKey, t);
+        } else if (!titleKey) {
+          taskMap.set('totruong_' + Math.random(), t);
+        }
+      }
+    });
+  }
+  
+  return Array.from(taskMap.values());
+}
+
 function getFilteredTasks() {
-  if (!appState.tasks || !Array.isArray(appState.tasks)) return [];
+  const allTasks = getAllCombinedTasks();
+  if (!allTasks || !Array.isArray(allTasks)) return [];
 
   const search = cleanKey(appState.filters.search || '');
   const groupFilter = cleanKey(appState.filters.group || '');
@@ -1565,12 +1601,10 @@ function getFilteredTasks() {
   const leaderAFilter = cleanKey(appState.filters.leaderA || '');
   const userFilter = cleanKey(appState.filters.user || '');
   const collabUserFilter = cleanKey(appState.filters.collabUser || '');
-  const kanbanAssignee = cleanKey(appState.filters.kanbanAssignee || '');
-  const kanbanPriority = (appState.filters.kanbanPriority || '').trim();
 
   const isAllText = (txt) => !txt || txt.includes('tatca');
 
-  return appState.tasks.filter(t => {
+  return allTasks.filter(t => {
     const titleVal = String(t['Tiêu đề'] || t['Tiêu đề công việc'] || '').toLowerCase();
     const descVal = String(t['Mô tả'] || t['Mô tả công việc'] || '').toLowerCase();
     const lanhDaoVal = String(getTaskLanhDaoName(t)).toLowerCase();
@@ -1638,10 +1672,6 @@ function getFilteredTasks() {
                         cleanKey(t['Tên NV (C)'] || '').includes(collabUserFilter);
       if (!matchEmpC) return false;
     }
-
-    // 7. Kanban filters
-    if (kanbanAssignee && !isAllText(kanbanAssignee) && cleanKey(empRVal) !== kanbanAssignee) return false;
-    if (kanbanPriority && String(t['Mức độ ưu tiên'] || '').trim() !== kanbanPriority) return false;
 
     return true;
   });
