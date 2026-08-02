@@ -154,7 +154,7 @@ function getTaskGroup(task) {
   for (let k in task) {
     if (k.startsWith('_')) continue;
     const ck = cleanKey(k);
-    if (ck === 'tochutri' || ck === 'to' || ck === 'tentocutri' || ck === 'tengroup') {
+    if (ck === 'tochutri' || ck === 'tochutriar' || ck === 'to' || ck === 'tentocutri' || ck === 'tengroup') {
       if (task[k] !== undefined && task[k] !== null && String(task[k]).trim() !== '') {
         rawGroup = String(task[k]).trim();
         break;
@@ -1308,18 +1308,20 @@ function renderTaskListTable() {
     const tyLe = t['Tỷ lệ'] || (keHoach > 0 ? Math.round((thucHien / keHoach) * 100) + '%' : '0%');
     const ghiChu = t['Ghi chú'] || '';
     const ngayLamXong = t['Ngày làm xong'] || '';
-    const chuTriName = getTaskAssignee(t);
-    const toChuTriName = getTaskGroup(t);
-    const phoiHopName = getTaskCollaborator(t);
+    const chuTriName = getTaskLeaderName(t) || getTaskAssignee(t);
+    const chuTriCode = getTaskLeaderCode(t) || lookupEmpCodeByName(chuTriName);
+    const toChuTriName = t['Tổ chủ trì (AR)'] || getTaskGroup(t);
+    const phoiHopName = getTaskEmpRName(t) || getTaskCollaborator(t);
+    const phoiHopCode = getTaskEmpRCode(t) || lookupEmpCodeByName(phoiHopName);
 
     rowsHtml.push(`
       <tr>
         <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index + 1}.</span><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
         <td class="col-desc-cell">${escapeHtml(t['Mô tả'] || '')}</td>
         <td class="status-col-cell">${statusBadge}</td>
-        <td>${formatNameList(chuTriName)}</td>
+        <td><div>${formatNameList(chuTriName)}</div>${chuTriCode ? `<div style="color:#64748b; font-size:0.72rem; margin-top:2px;">${escapeHtml(chuTriCode)}</div>` : ''}</td>
         <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
-        <td>${formatNameList(phoiHopName)}</td>
+        <td><div>${formatNameList(phoiHopName)}</div>${phoiHopCode ? `<div style="color:#64748b; font-size:0.72rem; margin-top:2px;">${escapeHtml(phoiHopCode)}</div>` : ''}</td>
         <td>${formatDateVN(t['Ngày bắt đầu'])}</td>
         <td>${formatDateVN(t['Ngày kết thúc'])}</td>
         <td>
@@ -2768,9 +2770,9 @@ function getExactValueByKeyPattern(obj, targetKeys) {
 
 function getToTruongTaskGroup(task) {
   if (!task || typeof task !== 'object') return '';
-  const exact = getExactValueByKeyPattern(task, ['Tổ', 'Tổ chủ trì', 'Tổ hạ tầng', 'to', 'tochutri', 'tohatang']);
+  const exact = getExactValueByKeyPattern(task, ['Tổ', 'Tổ chủ trì', 'Tổ chủ trì (AR)', 'Tổ hạ tầng', 'to', 'tochutri', 'tochutriar', 'tohatang']);
   if (exact) return exact;
-  return task['Tổ'] || getTaskGroup(task) || '';
+  return task['Tổ chủ trì (AR)'] || task['Tổ'] || getTaskGroup(task) || '';
 }
 
 function getTaskLeaderName(task) {
