@@ -1556,44 +1556,8 @@ function handleKanbanFilter() {
   renderKanbanBoard();
 }
 
-function getAllCombinedTasks() {
-  const taskMap = new Map();
-  
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
-      const id = String(t.ID || t.id || '').trim();
-      if (id) {
-        taskMap.set(id, t);
-      } else {
-        const titleKey = cleanKey(t['Tiêu đề'] || t['Tiêu đề công việc'] || '');
-        if (titleKey) taskMap.set('task_' + titleKey, t);
-        else taskMap.set('task_' + Math.random(), t);
-      }
-    });
-  }
-  
-  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
-    appState.totruonggiaoviec.forEach(t => {
-      const id = String(t.ID || t.id || '').trim();
-      if (id && !taskMap.has(id)) {
-        taskMap.set(id, t);
-      } else if (!id) {
-        const titleKey = cleanKey(t['Tiêu đề'] || t['Tiêu đề công việc'] || '');
-        if (titleKey && !taskMap.has('totruong_' + titleKey)) {
-          taskMap.set('totruong_' + titleKey, t);
-        } else if (!titleKey) {
-          taskMap.set('totruong_' + Math.random(), t);
-        }
-      }
-    });
-  }
-  
-  return Array.from(taskMap.values());
-}
-
 function getFilteredTasks() {
-  const allTasks = getAllCombinedTasks();
-  if (!allTasks || !Array.isArray(allTasks)) return [];
+  if (!appState.tasks || !Array.isArray(appState.tasks)) return [];
 
   const search = cleanKey(appState.filters.search || '');
   const groupFilter = cleanKey(appState.filters.group || '');
@@ -1604,7 +1568,7 @@ function getFilteredTasks() {
 
   const isAllText = (txt) => !txt || txt.includes('tatca');
 
-  return allTasks.filter(t => {
+  return appState.tasks.filter(t => {
     const titleVal = String(t['Tiêu đề'] || t['Tiêu đề công việc'] || '').toLowerCase();
     const descVal = String(t['Mô tả'] || t['Mô tả công việc'] || '').toLowerCase();
     const lanhDaoVal = String(getTaskLanhDaoName(t)).toLowerCase();
