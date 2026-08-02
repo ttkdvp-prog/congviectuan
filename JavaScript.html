@@ -777,28 +777,11 @@ function handleModalGroupChange(selectedGroup) {
 
   const sortedUsers = Array.from(filteredUsers).sort();
 
-  // Leaders list populated from Sheet User
-  const leadersList = new Set([
-    'Nguyễn Công Hoan',
-    'Nguyễn Minh Cường',
-    'Nguyễn Trung Kiên',
-    'Bùi Văn Chung',
-    'Vũ Thị Lan Phương',
-    'Đỗ Chu Đằng'
-  ]);
-
-  if (appState.users && Array.isArray(appState.users)) {
-    appState.users.forEach(u => {
-      const { name, group } = getUserNameAndGroup(u);
-      const role = u['Chức danh'] || u['Chức vụ'] || u.role || '';
-      if (name && (isBanLanhDao(group, name, role) || cleanKey(group).includes('lanhdao'))) {
-        leadersList.add(name);
-      }
-    });
-  }
+  // Leaders list for Lãnh đạo field (EXACTLY 3 Leaders in Center)
+  const leadersList = ['Nguyễn Công Hoan', 'Nguyễn Minh Cường', 'Nguyễn Trung Kiên'];
 
   if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
-  appState.dropdownData.lanhdao = Array.from(leadersList).sort();
+  appState.dropdownData.lanhdao = leadersList;
   appState.dropdownData.leadera = sortedUsers;
   appState.dropdownData.chutri = sortedUsers;
   appState.dropdownData.phoihop = sortedUsers;
