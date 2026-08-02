@@ -822,11 +822,12 @@ function populateSelects() {
   appState.dropdownData.lanhdao = leadersList;
 
   const chuTriGrp = taskToChuTriSelect ? taskToChuTriSelect.value : '';
-  appState.dropdownData.leadera = getEmployeesByGroup(chuTriGrp, true);
-  appState.dropdownData.chutri = getEmployeesByGroup(chuTriGrp, false);
-
   const phoiHopGrp = taskToPhoiHopSelect ? taskToPhoiHopSelect.value : '';
-  appState.dropdownData.phoihop = getEmployeesByGroup(phoiHopGrp, false);
+  const effectiveCollabGrp = phoiHopGrp || chuTriGrp;
+
+  appState.dropdownData.leadera = getEmployeesByGroup(chuTriGrp, true);
+  appState.dropdownData.chutri = getEmployeesByGroup(effectiveCollabGrp, false);
+  appState.dropdownData.phoihop = getEmployeesByGroup(effectiveCollabGrp, false);
 
   updateGlobalUserSelectOptions();
 }
@@ -853,14 +854,21 @@ function getUserCode(u) {
 }
 
 function handleModalGroupChange(selectedGroup) {
+  // Tổ chủ trì (AR) governs Tên NV (A) [Tổ trưởng, Tổ phó]
   const leaderAUsers = getEmployeesByGroup(selectedGroup, true);
-  const chuTriUsers = getEmployeesByGroup(selectedGroup, false);
   const leadersList = ['Nguyễn Công Hoan', 'Nguyễn Minh Cường', 'Nguyễn Trung Kiên'];
 
   if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
   appState.dropdownData.lanhdao = leadersList;
   appState.dropdownData.leadera = leaderAUsers;
-  appState.dropdownData.chutri = chuTriUsers;
+
+  // Fallback chutri & phoihop to AR group if Tổ phối hợp (C) is unselected
+  const toCollabSelect = document.getElementById('task-tophoihop-input');
+  if (!toCollabSelect || !toCollabSelect.value) {
+    const chuTriUsers = getEmployeesByGroup(selectedGroup, false);
+    appState.dropdownData.chutri = chuTriUsers;
+    appState.dropdownData.phoihop = chuTriUsers;
+  }
 
   // Clear current NV (A) input if selected employee is not in the new team list
   const leadAInput = document.getElementById('task-leadera-input');
@@ -870,37 +878,41 @@ function handleModalGroupChange(selectedGroup) {
     if (codeDisplay) { codeDisplay.style.display = 'none'; codeDisplay.innerHTML = ''; }
   }
 
+  const activeLeaderA = document.getElementById('dropdown-leadera');
+  if (activeLeaderA && activeLeaderA.classList.contains('active')) {
+    filterCustomDropdown('leadera', '');
+  }
+}
+
+function handleModalCollabGroupChange(selectedGroup) {
+  // Tổ phối hợp (C) governs Tên NV (R) AND Tên NV (C)
+  const effectiveGrp = selectedGroup || document.getElementById('task-tochutri-input')?.value || '';
+  const collabUsers = getEmployeesByGroup(effectiveGrp, false);
+
+  if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
+  appState.dropdownData.chutri = collabUsers;
+  appState.dropdownData.phoihop = collabUsers;
+
   // Clear current NV (R) input if selected employee is not in the new team list
   const chuTriInput = document.getElementById('task-chutri-input');
-  if (chuTriInput && chuTriInput.value && !chuTriUsers.includes(chuTriInput.value.trim())) {
+  if (chuTriInput && chuTriInput.value && !collabUsers.includes(chuTriInput.value.trim())) {
     chuTriInput.value = '';
     const codeDisplay = document.getElementById('task-chutri-code-display');
     if (codeDisplay) { codeDisplay.style.display = 'none'; codeDisplay.innerHTML = ''; }
   }
 
-  const activeLeaderA = document.getElementById('dropdown-leadera');
-  if (activeLeaderA && activeLeaderA.classList.contains('active')) {
-    filterCustomDropdown('leadera', '');
-  }
-  const activeChuTri = document.getElementById('dropdown-chutri');
-  if (activeChuTri && activeChuTri.classList.contains('active')) {
-    filterCustomDropdown('chutri', '');
-  }
-}
-
-function handleModalCollabGroupChange(selectedGroup) {
-  const phoiHopUsers = getEmployeesByGroup(selectedGroup, false);
-  if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
-  appState.dropdownData.phoihop = phoiHopUsers;
-
   // Clear current NV (C) input if selected employee is not in the new team list
   const phoiHopInput = document.getElementById('task-phoihop-input');
-  if (phoiHopInput && phoiHopInput.value && !phoiHopUsers.includes(phoiHopInput.value.trim())) {
+  if (phoiHopInput && phoiHopInput.value && !collabUsers.includes(phoiHopInput.value.trim())) {
     phoiHopInput.value = '';
     const codeDisplay = document.getElementById('task-phoihop-code-display');
     if (codeDisplay) { codeDisplay.style.display = 'none'; codeDisplay.innerHTML = ''; }
   }
 
+  const activeChuTri = document.getElementById('dropdown-chutri');
+  if (activeChuTri && activeChuTri.classList.contains('active')) {
+    filterCustomDropdown('chutri', '');
+  }
   const activePhoiHop = document.getElementById('dropdown-phoihop');
   if (activePhoiHop && activePhoiHop.classList.contains('active')) {
     filterCustomDropdown('phoihop', '');
