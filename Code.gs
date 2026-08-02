@@ -124,7 +124,16 @@ function getInitialData(forceRefresh) {
     tasks = getSheetDataAsObjects(SHEETS.TASKS); 
   } catch(e) { Logger.log('Error loading tasks: ' + e); }
   
-  try { users = getSheetDataAsObjects(SHEETS.USERS); } catch(e) { Logger.log('Error loading users: ' + e); }
+  try {
+    const userSheetVariants = ['Nguoidung', 'User', 'Users', 'Nguoi dung', 'Nhanvien', 'Nhân viên', 'Danhsachnhanvien'];
+    for (const uName of userSheetVariants) {
+      users = getSheetDataAsObjects(uName);
+      if (users && users.length > 0) {
+        Logger.log('Successfully loaded ' + users.length + ' users from sheet: ' + uName);
+        break;
+      }
+    }
+  } catch(e) { Logger.log('Error loading users: ' + e); }
   try { cvluuy = getSheetDataAsObjects(SHEETS.CVLUUY); } catch(e) { Logger.log('Error loading cvluuy: ' + e); }
   try { documents = getSheetDataAsObjects(SHEETS.DOCUMENTS); } catch(e) { Logger.log('Error loading documents: ' + e); }
   try { tovien = getSheetDataAsObjects(SHEETS.TOVIEN); } catch(e) { Logger.log('Error loading tovien: ' + e); }
