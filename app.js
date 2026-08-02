@@ -972,33 +972,65 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     const trimmed = String(name).trim();
     if (!trimmed) return;
     if (isBanLanhDao(group, trimmed)) return;
-
-    const grpClean = cleanKey(group || '');
-    const isMatchGroup = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
-    if (isMatchGroup) {
-      userSet.add(trimmed);
-    }
+    userSet.add(trimmed);
   };
 
-  // 1. Collect ONLY from appState.users (Sheet User / Nguoidung)
+  // 1. Collect from appState.users (Sheet User / Nguoidung)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const name = getUserNameFromUserObj(u);
       const group = getUserGroupFromUserObj(u);
-      addIfValid(name, group);
+      if (!name) return;
+
+      const grpClean = cleanKey(group);
+      const isMatchGroup = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
+      if (isMatchGroup) {
+        addIfValid(name, group);
+      }
     });
   }
 
-  // 2. Fallback: Check appState.totruonggiaoviec (Tab Tổ trưởng giao việc) ONLY if appState.users had no match
-  if (userSet.size === 0 && appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+  // 2. Collect from appState.tasks (Sheet congviec) where task group matches selected group
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const taskGroupClean = cleanKey(getTaskGroup(t) || t['Tổ chủ trì (AR)'] || '');
+      const taskCollabGroupClean = cleanKey(getTaskCollaboratorGroup(t) || t['Tổ (R)'] || '');
+
+      const matchHost = !selectedGroupClean || taskGroupClean === selectedGroupClean || taskGroupClean.includes(selectedGroupClean) || selectedGroupClean.includes(taskGroupClean);
+      const matchCollab = !selectedGroupClean || taskCollabGroupClean === selectedGroupClean || taskCollabGroupClean.includes(selectedGroupClean) || selectedGroupClean.includes(taskCollabGroupClean);
+
+      if (matchHost || matchCollab) {
+        const aName = getTaskLeaderName(t);
+        const rName = getTaskEmpRName(t) || getTaskAssignee(t);
+        const cName = getTaskEmpCName(t) || getTaskCollaborator(t);
+        const taskGrp = getTaskGroup(t) || t['Tổ chủ trì (AR)'];
+
+        addIfValid(aName, taskGrp);
+        addIfValid(rName, taskGrp);
+        addIfValid(cName, taskGrp);
+      }
+    });
+  }
+
+  // 3. Collect from appState.totruonggiaoviec (Tab Tổ trưởng giao việc) matching selected group
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
     appState.totruonggiaoviec.forEach(t => {
-      const tg = getToTruongTaskGroup(t);
-      const aName = t['Tên NV (A)'] || t['Tên NV A'] || t['Tên tổ trưởng'];
-      const rName = t['Tên NV (R)'] || t['Tên NV R'] || t['Tên nhân viên'];
-      const cName = t['Tên NV (C)'] || t['Tên NV C'];
-      addIfValid(aName, tg);
-      addIfValid(rName, tg);
-      addIfValid(cName, tg);
+      const tgClean = cleanKey(getToTruongTaskGroup(t) || t['Tổ chủ trì (AR)'] || '');
+      const tcClean = cleanKey(t['Tổ (R)'] || '');
+
+      const matchHost = !selectedGroupClean || tgClean === selectedGroupClean || tgClean.includes(selectedGroupClean) || selectedGroupClean.includes(tgClean);
+      const matchCollab = !selectedGroupClean || tcClean === selectedGroupClean || tcClean.includes(selectedGroupClean) || selectedGroupClean.includes(tcClean);
+
+      if (matchHost || matchCollab) {
+        const aName = t['Tên NV (A)'] || t['Tên NV A'] || t['Tên tổ trưởng'];
+        const rName = t['Tên NV (R)'] || t['Tên NV R'] || t['Tên nhân viên'];
+        const cName = t['Tên NV (C)'] || t['Tên NV C'];
+        const taskGrp = getToTruongTaskGroup(t);
+
+        addIfValid(aName, taskGrp);
+        addIfValid(rName, taskGrp);
+        addIfValid(cName, taskGrp);
+      }
     });
   }
 
