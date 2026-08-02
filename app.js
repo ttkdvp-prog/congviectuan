@@ -963,6 +963,16 @@ function getUserGroupFromUserObj(u) {
   return result;
 }
 
+const ALLOWED_KEY_PERSONNEL = [
+  "Trần Nam Trung", "Vũ Thị Lan Phương", "Đỗ Chu Đằng", "Vũ Mạnh Khương",
+  "Ngô Tiến Mạnh", "Lê Minh Thuyết", "Bùi Văn Chung", "Ngô Minh Tuấn",
+  "Chúc Mạnh Sơn", "Chử Hồng Thái", "Trần Duy Hưng", "Nguyễn Thị Ánh Tuyết",
+  "Trần Xuân Trường", "Đỗ Đức Hoàng", "Đặng Hồng Quân", "Tống Tiến Mạnh",
+  "Lê Đức Anh", "Trần Ngọc Ánh", "Nguyễn Trọng Thái", "Dương Văn Nam",
+  "Đỗ Quang Thanh", "Nguyễn Thu Trang", "Nguyễn Thị Phương Anh",
+  "Vương Văn Trung", "Trần Thị Thủy", "Nguyễn Thị Thúy", "Ngô Thị Anh"
+];
+
 function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
   const selectedGroupClean = cleanKey(selectedGroupStr || '');
   const userSet = new Set();
@@ -989,16 +999,10 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     });
   }
 
-  // 2. Collect from appState.tovien (Sheet ToVien)
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    let currentGroup = '';
-    appState.tovien.forEach(row => {
-      const info = getTovienRowInfo(row);
-      if (info.group) currentGroup = info.group;
-      addIfValid(info.empName, currentGroup);
-      addIfValid(info.leaderName, currentGroup);
-    });
-  }
+  // 2. Collect from ALLOWED_KEY_PERSONNEL list explicitly provided
+  ALLOWED_KEY_PERSONNEL.forEach(name => {
+    addIfValid(name, '');
+  });
 
   // 3. Collect from appState.totruonggiaoviec (Tab Tổ trưởng giao việc)
   if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
@@ -1025,6 +1029,8 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
       addIfValid(cName, tg);
     });
   }
+
+  // NOTE: appState.tovien (Sheet tovien) is STRICTLY EXCLUDED!
 
   return Array.from(userSet).sort();
 }
