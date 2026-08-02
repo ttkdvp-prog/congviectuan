@@ -790,6 +790,38 @@ function selectCustomDropdownItem(type, val) {
   if (inputEl) inputEl.value = val;
   const listEl = document.getElementById('dropdown-' + type);
   if (listEl) listEl.classList.remove('active');
+
+  // Auto-lookup employee code and display it
+  const empCode = lookupEmpCodeByName(val);
+  const codeDisplayId = (type === 'chutri') ? 'task-chutri-code-display' : 'task-phoihop-code-display';
+  const codeDisplay = document.getElementById(codeDisplayId);
+  if (codeDisplay) {
+    if (empCode) {
+      codeDisplay.innerHTML = `<span style="color:#00c897; font-weight:600;">Mã NV: ${escapeHtml(empCode)}</span>`;
+      codeDisplay.style.display = 'block';
+    } else {
+      codeDisplay.innerHTML = `<span style="color:#f59e0b; font-size:0.78rem;">⚠ Không tìm thấy mã NV</span>`;
+      codeDisplay.style.display = 'block';
+    }
+  }
+}
+
+// Lookup employee code by name from appState.tovien
+function lookupEmpCodeByName(name) {
+  if (!name || !appState.tovien || !Array.isArray(appState.tovien)) return '';
+  const nameClean = cleanKey(name);
+  if (!nameClean) return '';
+
+  for (let i = 0; i < appState.tovien.length; i++) {
+    const info = getTovienRowInfo(appState.tovien[i]);
+    if (info.empName && cleanKey(info.empName) === nameClean && info.empCode) {
+      return info.empCode;
+    }
+    if (info.leaderName && cleanKey(info.leaderName) === nameClean && info.leaderCode) {
+      return info.leaderCode;
+    }
+  }
+  return '';
 }
 
 function closeAllCustomDropdowns() {
@@ -2176,11 +2208,39 @@ function openTaskModal(taskId = null) {
         if (chuTriSelect) {
           chuTriSelect.value = assigneeName;
         }
+        // Show employee R code
+        const empRCode = task['Mã NV (R)'] || lookupEmpCodeByName(assigneeName);
+        const chuTriCodeDisplay = document.getElementById('task-chutri-code-display');
+        if (chuTriCodeDisplay) {
+          if (empRCode) {
+            chuTriCodeDisplay.innerHTML = `<span style="color:#00c897; font-weight:600;">Mã NV: ${escapeHtml(empRCode)}</span>`;
+            chuTriCodeDisplay.style.display = 'block';
+          } else if (assigneeName) {
+            chuTriCodeDisplay.innerHTML = `<span style="color:#f59e0b; font-size:0.78rem;">⚠ Không tìm thấy mã NV</span>`;
+            chuTriCodeDisplay.style.display = 'block';
+          } else {
+            chuTriCodeDisplay.style.display = 'none';
+          }
+        }
 
         const phoiHopSelect = document.getElementById('task-phoihop-input');
         const collabName = getTaskEmpCName(task) || getTaskCollaborator(task);
         if (phoiHopSelect) {
           phoiHopSelect.value = collabName;
+        }
+        // Show employee C code
+        const empCCode = task['Mã NV (C)'] || lookupEmpCodeByName(collabName);
+        const phoiHopCodeDisplay = document.getElementById('task-phoihop-code-display');
+        if (phoiHopCodeDisplay) {
+          if (empCCode) {
+            phoiHopCodeDisplay.innerHTML = `<span style="color:#00c897; font-weight:600;">Mã NV: ${escapeHtml(empCCode)}</span>`;
+            phoiHopCodeDisplay.style.display = 'block';
+          } else if (collabName) {
+            phoiHopCodeDisplay.innerHTML = `<span style="color:#f59e0b; font-size:0.78rem;">⚠ Không tìm thấy mã NV</span>`;
+            phoiHopCodeDisplay.style.display = 'block';
+          } else {
+            phoiHopCodeDisplay.style.display = 'none';
+          }
         }
 
         if (document.getElementById('task-progress-input')) document.getElementById('task-progress-input').value = task['Tiến độ (%)'] || 0;
@@ -2198,6 +2258,11 @@ function openTaskModal(taskId = null) {
       const toSelect = document.getElementById('task-tochutri-input');
       if (toSelect) toSelect.value = '';
       handleModalGroupChange('');
+      // Reset employee code displays
+      const chuTriCodeDisplay = document.getElementById('task-chutri-code-display');
+      if (chuTriCodeDisplay) { chuTriCodeDisplay.style.display = 'none'; chuTriCodeDisplay.innerHTML = ''; }
+      const phoiHopCodeDisplay = document.getElementById('task-phoihop-code-display');
+      if (phoiHopCodeDisplay) { phoiHopCodeDisplay.style.display = 'none'; phoiHopCodeDisplay.innerHTML = ''; }
     }
   } catch (err) {
     console.error('Error in openTaskModal:', err);
@@ -2286,9 +2351,9 @@ function handleTaskFormSubmit(e) {
       'Tên NV (A)': leaderName,
       'Mã NV (A)': leaderCode,
       'Tên NV (R)': chuTriName,
-      'Mã NV (R)': '',
+      'Mã NV (R)': lookupEmpCodeByName(chuTriName),
       'Tên NV (C)': phoiHopName,
-      'Mã NV (C)': '',
+      'Mã NV (C)': lookupEmpCodeByName(phoiHopName),
       'Ngày bắt đầu': startVal,
       'Ngày kết thúc': endVal,
       'Hạn hoàn thành': endVal,
