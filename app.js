@@ -711,8 +711,18 @@ function populateSelects() {
   updateGlobalUserSelectOptions();
 }
 
+function isTeamName(name) {
+  if (!name) return false;
+  const str = String(name).trim();
+  const lower = str.toLowerCase();
+  if (lower.startsWith('tổ ') || lower.startsWith('tổ_') || lower === 'tổ' || lower.includes('tổ hạ tầng') || lower.includes('tổ tổng hợp') || lower.includes('tổ khách hàng') || lower.includes('tổ kỹ thuật')) {
+    return true;
+  }
+  return false;
+}
+
 function handleModalGroupChange(selectedGroup) {
-  // Filter locally from appState.tovien — INSTANT, no API call
+  // Filter locally from appState.tovien & appState.users — INSTANT, no API call
   const filteredUsers = new Set();
   const selGrpClean = cleanKey(selectedGroup);
 
@@ -725,8 +735,8 @@ function handleModalGroupChange(selectedGroup) {
       
       const ckG = cleanKey(info.group);
       if (ckG && (ckG.includes(selGrpClean) || selGrpClean.includes(ckG))) {
-        if (info.empName) filteredUsers.add(info.empName);
-        if (info.leaderName) filteredUsers.add(info.leaderName);
+        if (info.empName && !isTeamName(info.empName)) filteredUsers.add(info.empName);
+        if (info.leaderName && !isTeamName(info.leaderName)) filteredUsers.add(info.leaderName);
       }
     });
   }
@@ -736,20 +746,33 @@ function handleModalGroupChange(selectedGroup) {
     if (appState.tovien && Array.isArray(appState.tovien)) {
       appState.tovien.forEach(row => {
         const info = getTovienRowInfo(row);
-        if (info.empName) filteredUsers.add(info.empName);
-        if (info.leaderName) filteredUsers.add(info.leaderName);
+        if (info.empName && !isTeamName(info.empName)) filteredUsers.add(info.empName);
+        if (info.leaderName && !isTeamName(info.leaderName)) filteredUsers.add(info.leaderName);
       });
     }
     if (appState.users && Array.isArray(appState.users)) {
       appState.users.forEach(u => {
         const { name } = getUserNameAndGroup(u);
-        if (name) filteredUsers.add(name);
+        if (name && !isTeamName(name) && !isBanLanhDao('', name)) filteredUsers.add(name);
       });
     }
   }
 
-  const sortedUsers = Array.from(filteredUsers).sort();
-  if (!appState.dropdownData) appState.dropdownData = { chutri: [], phoihop: [] };
+  const sortedUsers = Array.from(filteredUsers).filter(n => !isTeamName(n) && !isBanLanhDao('', n)).sort();
+
+  const leadersList = ['Nguyễn Công Hoan', 'Đỗ Chu Đằng', 'Vũ Thị Lan Phương'];
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { name, group } = getUserNameAndGroup(u);
+      if (name && isBanLanhDao(group, name)) {
+        if (!leadersList.includes(name)) leadersList.push(name);
+      }
+    });
+  }
+
+  if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
+  appState.dropdownData.lanhdao = Array.from(new Set(leadersList)).sort();
+  appState.dropdownData.leadera = sortedUsers;
   appState.dropdownData.chutri = sortedUsers;
   appState.dropdownData.phoihop = sortedUsers;
 }
@@ -863,15 +886,23 @@ function selectCustomDropdownItem(type, val) {
 
   // Auto-lookup employee code and display it
   const empCode = lookupEmpCodeByName(val);
-  const codeDisplayId = (type === 'chutri') ? 'task-chutri-code-display' : 'task-phoihop-code-display';
+  const codeDisplayIdMap = {
+    lanhdao: 'task-lanhdao-code-display',
+    leadera: 'task-leadera-code-display',
+    chutri: 'task-chutri-code-display',
+    phoihop: 'task-phoihop-code-display'
+  };
+  const codeDisplayId = codeDisplayIdMap[type];
   const codeDisplay = document.getElementById(codeDisplayId);
   if (codeDisplay) {
     if (empCode) {
       codeDisplay.innerHTML = `<span style="color:#00c897; font-weight:600;">Mã NV: ${escapeHtml(empCode)}</span>`;
       codeDisplay.style.display = 'block';
-    } else {
+    } else if (val) {
       codeDisplay.innerHTML = `<span style="color:#f59e0b; font-size:0.78rem;">⚠ Không tìm thấy mã NV</span>`;
       codeDisplay.style.display = 'block';
+    } else {
+      codeDisplay.style.display = 'none';
     }
   }
 }
@@ -2627,12 +2658,48 @@ function openTaskModal(taskId = null) {
         if (toSelect) toSelect.value = grp;
         handleModalGroupChange(grp);
 
+        // 1. Lãnh đạo
+        const lanhdaoInput = document.getElementById('task-lanhdao-input');
+        const lanhdaoName = task['Lãnh đạo'] || getTaskLanhDaoName(task) || 'Nguyễn Công Hoan';
+        if (lanhdaoInput) lanhdaoInput.value = lanhdaoName;
+        const lanhdaoCode = task['Mã LĐ'] || lookupEmpCodeByName(lanhdaoName);
+        const lanhdaoCodeDisplay = document.getElementById('task-lanhdao-code-display');
+        if (lanhdaoCodeDisplay) {
+          if (lanhdaoCode) {
+            lanhdaoCodeDisplay.innerHTML = `<span style="color:#00c897; font-weight:600;">Mã NV: ${escapeHtml(lanhdaoCode)}</span>`;
+            lanhdaoCodeDisplay.style.display = 'block';
+          } else if (lanhdaoName) {
+            lanhdaoCodeDisplay.innerHTML = `<span style="color:#f59e0b; font-size:0.78rem;">⚠ Không tìm thấy mã NV</span>`;
+            lanhdaoCodeDisplay.style.display = 'block';
+          } else {
+            lanhdaoCodeDisplay.style.display = 'none';
+          }
+        }
+
+        // 2. Tên NV (A)
+        const leaderAInput = document.getElementById('task-leadera-input');
+        const leaderAName = task['Tên NV (A)'] || getTaskLeaderName(task) || '';
+        if (leaderAInput) leaderAInput.value = leaderAName;
+        const leaderACode = task['Mã NV (A)'] || lookupEmpCodeByName(leaderAName);
+        const leaderACodeDisplay = document.getElementById('task-leadera-code-display');
+        if (leaderACodeDisplay) {
+          if (leaderACode) {
+            leaderACodeDisplay.innerHTML = `<span style="color:#00c897; font-weight:600;">Mã NV: ${escapeHtml(leaderACode)}</span>`;
+            leaderACodeDisplay.style.display = 'block';
+          } else if (leaderAName) {
+            leaderACodeDisplay.innerHTML = `<span style="color:#f59e0b; font-size:0.78rem;">⚠ Không tìm thấy mã NV</span>`;
+            leaderACodeDisplay.style.display = 'block';
+          } else {
+            leaderACodeDisplay.style.display = 'none';
+          }
+        }
+
+        // 3. Tên NV (R)
         const chuTriSelect = document.getElementById('task-chutri-input');
         const assigneeName = getTaskEmpRName(task) || getTaskAssignee(task);
         if (chuTriSelect) {
           chuTriSelect.value = assigneeName;
         }
-        // Show employee R code
         const empRCode = task['Mã NV (R)'] || lookupEmpCodeByName(assigneeName);
         const chuTriCodeDisplay = document.getElementById('task-chutri-code-display');
         if (chuTriCodeDisplay) {
@@ -2647,12 +2714,12 @@ function openTaskModal(taskId = null) {
           }
         }
 
+        // 4. Tên NV (C)
         const phoiHopSelect = document.getElementById('task-phoihop-input');
         const collabName = getTaskEmpCName(task) || getTaskCollaborator(task);
         if (phoiHopSelect) {
           phoiHopSelect.value = collabName;
         }
-        // Show employee C code
         const empCCode = task['Mã NV (C)'] || lookupEmpCodeByName(collabName);
         const phoiHopCodeDisplay = document.getElementById('task-phoihop-code-display');
         if (phoiHopCodeDisplay) {
@@ -2686,9 +2753,29 @@ function openTaskModal(taskId = null) {
       const today = new Date();
       const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
       if (document.getElementById('task-start-input')) document.getElementById('task-start-input').value = todayStr;
-      // Reset employee code displays
+
+      // Default Lãnh đạo
+      if (document.getElementById('task-lanhdao-input')) document.getElementById('task-lanhdao-input').value = 'Nguyễn Công Hoan';
+      const lanhdaoCode = lookupEmpCodeByName('Nguyễn Công Hoan');
+      const lanhdaoCodeDisplay = document.getElementById('task-lanhdao-code-display');
+      if (lanhdaoCodeDisplay) {
+        if (lanhdaoCode) {
+          lanhdaoCodeDisplay.innerHTML = `<span style="color:#00c897; font-weight:600;">Mã NV: ${escapeHtml(lanhdaoCode)}</span>`;
+          lanhdaoCodeDisplay.style.display = 'block';
+        } else {
+          lanhdaoCodeDisplay.style.display = 'none';
+        }
+      }
+
+      if (document.getElementById('task-leadera-input')) document.getElementById('task-leadera-input').value = '';
+      const leaderACodeDisplay = document.getElementById('task-leadera-code-display');
+      if (leaderACodeDisplay) { leaderACodeDisplay.style.display = 'none'; leaderACodeDisplay.innerHTML = ''; }
+
+      if (document.getElementById('task-chutri-input')) document.getElementById('task-chutri-input').value = '';
       const chuTriCodeDisplay = document.getElementById('task-chutri-code-display');
       if (chuTriCodeDisplay) { chuTriCodeDisplay.style.display = 'none'; chuTriCodeDisplay.innerHTML = ''; }
+
+      if (document.getElementById('task-phoihop-input')) document.getElementById('task-phoihop-input').value = '';
       const phoiHopCodeDisplay = document.getElementById('task-phoihop-code-display');
       if (phoiHopCodeDisplay) { phoiHopCodeDisplay.style.display = 'none'; phoiHopCodeDisplay.innerHTML = ''; }
     }
@@ -2744,28 +2831,21 @@ function handleTaskFormSubmit(e) {
   const thuchienVal = Number(document.getElementById('task-thuchien-input')?.value || 0);
 
   const toChuTriInput = document.getElementById('task-tochutri-input')?.value || '';
-  const chuTriName = document.getElementById('task-chutri-input')?.value || '';
-  const phoiHopName = document.getElementById('task-phoihop-input')?.value || '';
+  const lanhDaoName = document.getElementById('task-lanhdao-input')?.value.trim() || 'Nguyễn Công Hoan';
+  const leaderAName = document.getElementById('task-leadera-input')?.value.trim() || '';
+  const chuTriName = document.getElementById('task-chutri-input')?.value.trim() || '';
+  const phoiHopName = document.getElementById('task-phoihop-input')?.value.trim() || '';
+
+  const lanhDaoCode = lookupEmpCodeByName(lanhDaoName);
+  const leaderACode = lookupEmpCodeByName(leaderAName);
+  const chuTriCode = lookupEmpCodeByName(chuTriName);
+  const phoiHopCode = lookupEmpCodeByName(phoiHopName);
 
   const isToTruongTab = appState.currentTab === 'totruong' || appState.currentTab === 'totruonggiaoviec';
 
   if (isToTruongTab) {
     // === SAVE TO totruonggiaoviec sheet ===
     const newId = taskId || ('TT-' + Math.floor(1000 + Math.random() * 9000));
-
-    // Find leader info from tovien
-    let leaderName = '', leaderCode = '';
-    if (toChuTriInput && appState.tovien) {
-      const grpClean = cleanKey(toChuTriInput);
-      appState.tovien.forEach(row => {
-        const info = getTovienRowInfo(row);
-        const ckG = cleanKey(info.group);
-        if (ckG && (ckG.includes(grpClean) || grpClean.includes(ckG)) && info.leaderName) {
-          leaderName = info.leaderName;
-          leaderCode = info.leaderCode || '';
-        }
-      });
-    }
 
     const payload = {
       id: newId,
@@ -2776,12 +2856,15 @@ function handleTaskFormSubmit(e) {
       'Mô tả công việc': descVal,
       'Trạng thái': statusVal,
       'Tổ': toChuTriInput,
-      'Tên NV (A)': leaderName,
-      'Mã NV (A)': leaderCode,
+      'Tổ chủ trì (AR)': toChuTriInput,
+      'Lãnh đạo': lanhDaoName,
+      'Mã LĐ': lanhDaoCode,
+      'Tên NV (A)': leaderAName || lanhDaoName,
+      'Mã NV (A)': leaderACode || lanhDaoCode,
       'Tên NV (R)': chuTriName,
-      'Mã NV (R)': lookupEmpCodeByName(chuTriName),
+      'Mã NV (R)': chuTriCode,
       'Tên NV (C)': phoiHopName,
-      'Mã NV (C)': lookupEmpCodeByName(phoiHopName),
+      'Mã NV (C)': phoiHopCode,
       'Ngày bắt đầu': startVal,
       'Ngày kết thúc': endVal,
       'Hạn hoàn thành': endVal,
@@ -2812,7 +2895,7 @@ function handleTaskFormSubmit(e) {
     callBackend('saveToTruongTask', payload);
 
   } else {
-    // === SAVE TO congviec sheet (original behavior) ===
+    // === SAVE TO congviec sheet ===
     const chuTriUser = appState.users.find(u => (u['Tên'] || u.name) === chuTriName);
     const phoiHopUser = appState.users.find(u => (u['Tên'] || u.name) === phoiHopName);
     const finalToChuTri = toChuTriInput || (chuTriUser ? (chuTriUser['Tổ'] || chuTriUser.group) : '');
@@ -2830,15 +2913,24 @@ function handleTaskFormSubmit(e) {
       'Ngày kết thúc': endVal,
       'Kế hoạch': kehoachVal,
       'Thực hiện': thuchienVal,
+      'Lãnh đạo': lanhDaoName,
+      'Mã LĐ': lanhDaoCode,
+      'Tên NV (A)': leaderAName,
+      'Mã NV (A)': leaderACode,
+      'Tên NV (R)': chuTriName,
+      'Mã NV (R)': chuTriCode,
+      'Tên NV (C)': phoiHopName,
+      'Mã NV (C)': phoiHopCode,
       'Người chủ trì': chuTriName,
       'Tổ chủ trì': finalToChuTri,
+      'Tổ chủ trì (AR)': finalToChuTri,
+      'Tổ': finalToChuTri,
       'Người phối hợp': phoiHopName,
       'Tổ phối hợp': phoiHopUser ? (phoiHopUser['Tổ'] || phoiHopUser.group) : '',
       'Người thực hiện': chuTriName,
       'Người phụ trách': chuTriName,
       'Tiến độ (%)': Number(document.getElementById('task-progress-input')?.value || 0),
       'Ghi chú': document.getElementById('task-ghichu-input')?.value || '',
-      'Tệp đính kèm': document.getElementById('task-attachment-input')?.value || '',
       subtasks: subtasks
     };
 

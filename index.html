@@ -579,6 +579,16 @@
             </div>
           </div>
 
+          <div class="dark-form-group">
+            <label>Lãnh đạo</label>
+            <div class="custom-select-box" id="box-lanhdao">
+              <input type="text" class="dark-form-control custom-select-input" id="task-lanhdao-input" value="Nguyễn Công Hoan" placeholder="Chọn hoặc nhập tên Lãnh đạo..." autocomplete="off" onfocus="showCustomDropdown('lanhdao')" oninput="filterCustomDropdown('lanhdao', this.value)">
+              <i class="fa-solid fa-chevron-down custom-select-arrow" onclick="toggleCustomDropdown('lanhdao', event)"></i>
+              <div class="custom-dropdown-list" id="dropdown-lanhdao"></div>
+            </div>
+            <div id="task-lanhdao-code-display" style="display:none; margin-top:4px; font-size:0.82rem; padding:2px 6px;"></div>
+          </div>
+
           <div class="dark-form-row">
             <div class="dark-form-group">
               <label>Tổ chủ trì</label>
@@ -586,6 +596,18 @@
                 <option value="">-- Tất cả tổ --</option>
               </select>
             </div>
+            <div class="dark-form-group">
+              <label>Tên NV (A)</label>
+              <div class="custom-select-box" id="box-leadera">
+                <input type="text" class="dark-form-control custom-select-input" id="task-leadera-input" placeholder="Chọn Tên NV (A)..." autocomplete="off" onfocus="showCustomDropdown('leadera')" oninput="filterCustomDropdown('leadera', this.value)">
+                <i class="fa-solid fa-chevron-down custom-select-arrow" onclick="toggleCustomDropdown('leadera', event)"></i>
+                <div class="custom-dropdown-list" id="dropdown-leadera"></div>
+              </div>
+              <div id="task-leadera-code-display" style="display:none; margin-top:4px; font-size:0.82rem; padding:2px 6px;"></div>
+            </div>
+          </div>
+
+          <div class="dark-form-row">
             <div class="dark-form-group">
               <label>Tên NV (R)</label>
               <div class="custom-select-box" id="box-chutri">
@@ -595,16 +617,15 @@
               </div>
               <div id="task-chutri-code-display" style="display:none; margin-top:4px; font-size:0.82rem; padding:2px 6px;"></div>
             </div>
-          </div>
-
-          <div class="dark-form-group">
-            <label>Tên NV (C)</label>
-            <div class="custom-select-box" id="box-phoihop">
-              <input type="text" class="dark-form-control custom-select-input" id="task-phoihop-input" placeholder="Tất cả nhân viên trong tổ..." autocomplete="off" onfocus="showCustomDropdown('phoihop')" oninput="filterCustomDropdown('phoihop', this.value)">
-              <i class="fa-solid fa-chevron-down custom-select-arrow" onclick="toggleCustomDropdown('phoihop', event)"></i>
-              <div class="custom-dropdown-list" id="dropdown-phoihop"></div>
+            <div class="dark-form-group">
+              <label>Tên NV (C)</label>
+              <div class="custom-select-box" id="box-phoihop">
+                <input type="text" class="dark-form-control custom-select-input" id="task-phoihop-input" placeholder="Tất cả nhân viên trong tổ..." autocomplete="off" onfocus="showCustomDropdown('phoihop')" oninput="filterCustomDropdown('phoihop', this.value)">
+                <i class="fa-solid fa-chevron-down custom-select-arrow" onclick="toggleCustomDropdown('phoihop', event)"></i>
+                <div class="custom-dropdown-list" id="dropdown-phoihop"></div>
+              </div>
+              <div id="task-phoihop-code-display" style="display:none; margin-top:4px; font-size:0.82rem; padding:2px 6px;"></div>
             </div>
-            <div id="task-phoihop-code-display" style="display:none; margin-top:4px; font-size:0.82rem; padding:2px 6px;"></div>
           </div>
 
           <div class="dark-form-group">
