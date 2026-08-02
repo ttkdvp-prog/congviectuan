@@ -653,27 +653,59 @@ function findTeamLeaderName(selectedGroup) {
 }
 
 function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
-  const userSet = new Set();
-  const leaderUserSet = new Set();
+  const teamLeadersAndDeputies = new Set();
+  const teamMembers = new Set();
+  const allSystemUsers = new Set();
   const leaderKeys = ['nguyenconghoan', 'nguyenminhcuong', 'nguyentrungkien'];
-  const allSheetUsers = [];
 
+  const addCandidate = (name, group, roleInfo = '') => {
+    if (!name || name === 'Chưa gán') return;
+    const trimmed = String(name).trim();
+    if (!trimmed || isTeamName(trimmed)) return;
+    if (leaderKeys.includes(cleanKey(trimmed))) return;
+
+    allSystemUsers.add(trimmed);
+
+    if (isGroupMatch(group, selectedGroup)) {
+      teamMembers.add(trimmed);
+      const rClean = cleanKey(roleInfo || '');
+      const nClean = cleanKey(trimmed);
+      if (rClean.includes('totruong') || rClean.includes('topho') || rClean.includes('truong') || rClean.includes('pho') || rClean.includes('lead') || nClean.includes('totruong') || nClean.includes('topho')) {
+        teamLeadersAndDeputies.add(trimmed);
+      }
+    }
+  };
+
+  // 1. Collect from appState.users (Sheet User)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { name, group } = getUserNameAndGroup(u);
-      if (!name || name === 'Chưa gán' || isTeamName(name)) return;
-      const nameClean = cleanKey(name);
-      if (leaderKeys.includes(nameClean)) return;
+      const role = getUserRole(u);
+      addCandidate(name, group, role);
+    });
+  }
 
-      const trimmedName = String(name).trim();
-      allSheetUsers.push(trimmedName);
+  // 2. Collect from appState.tovien (Sheet tovien)
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    appState.tovien.forEach(row => {
+      const info = getTovienRowInfo(row);
+      if (info.leaderName) addCandidate(info.leaderName, info.group, 'totruong');
+      if (info.empName) addCandidate(info.empName, info.group, '');
+    });
+  }
 
-      if (isGroupMatch(group, selectedGroup)) {
-        userSet.add(trimmedName);
-        if (isToTruongHoacToPho(u)) {
-          leaderUserSet.add(trimmedName);
-        }
-      }
+  // 3. Collect from appState.tasks (Sheet congviec)
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const tg = getTaskGroup(t) || t['Tổ chủ trì (AR)'] || t['Tổ'] || '';
+      const tcg = getTaskCollaboratorGroup(t) || t['Tổ (R)'] || t['Tổ phối hợp'] || '';
+      const aName = getTaskLeaderName(t) || t['Tên NV (A)'] || t['Tên tổ trưởng'];
+      const rName = getTaskEmpRName(t) || getTaskAssignee(t) || t['Tên NV (R)'];
+      const cName = getTaskEmpCName(t) || getTaskCollaborator(t) || t['Tên NV (C)'];
+
+      if (aName) addCandidate(aName, tg, 'totruong');
+      if (rName) addCandidate(rName, tg, '');
+      if (cName) addCandidate(cName, tcg || tg, '');
     });
   }
 
@@ -683,13 +715,15 @@ function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
     resultList.push(teamLeaderName);
   }
 
-  const teamMembers = Array.from(userSet).sort();
-  teamMembers.forEach(m => {
+  Array.from(teamLeadersAndDeputies).sort().forEach(n => {
+    if (!resultList.includes(n)) resultList.push(n);
+  });
+
+  Array.from(teamMembers).sort().forEach(m => {
     if (!resultList.includes(m)) resultList.push(m);
   });
 
-  const sortedAllUsers = Array.from(new Set(allSheetUsers)).sort();
-  sortedAllUsers.forEach(u => {
+  Array.from(allSystemUsers).sort().forEach(u => {
     if (!resultList.includes(u)) resultList.push(u);
   });
 
@@ -988,6 +1022,13 @@ function filterCustomDropdown(type, query) {
   
   let qClean = cleanKey(query);
   if (qClean.includes('chon') || qClean.includes('tatcanhanvien') || qClean.includes('tatcato')) {
+    qClean = '';
+  }
+
+  // If query is exact match of currently pre-filled item name and element is focused,
+  // show full candidate list so user can choose other team members/deputies
+  const isExactCurrentVal = rawList.some(item => cleanKey(item) === qClean);
+  if (isExactCurrentVal && document.activeElement && document.activeElement.id === 'task-' + type + '-input') {
     qClean = '';
   }
 
