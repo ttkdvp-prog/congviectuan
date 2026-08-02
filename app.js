@@ -253,12 +253,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Attach search & group filter event listeners
   const sInput = document.getElementById('global-search-input');
-  const uSelect = document.getElementById('global-user-select');
   const gSelect = document.getElementById('global-group-select');
+  const lSelect = document.getElementById('global-leader-select');
+  const uSelect = document.getElementById('global-user-select');
 
   if (sInput) sInput.addEventListener('input', handleGlobalFilterDebounced);
-  if (uSelect) uSelect.addEventListener('change', handleGlobalFilter);
   if (gSelect) gSelect.addEventListener('change', onGlobalGroupChange);
+  if (lSelect) lSelect.addEventListener('change', handleGlobalFilter);
+  if (uSelect) uSelect.addEventListener('change', handleGlobalFilter);
 
   // Restore local cache for zero-latency initial view on F5 across all devices
   const cachedTasks = localStorage.getItem('TTHT_TASKS_CACHE');
@@ -589,6 +591,28 @@ function populateSelects() {
     });
   }
 
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    let lastGroup = '';
+    appState.tovien.forEach(row => {
+      const info = getTovienRowInfo(row);
+      if (info.group) lastGroup = info.group;
+      if (lastGroup) {
+        hostGroups.add(lastGroup);
+        allGroups.add(lastGroup);
+      }
+    });
+  }
+
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+    appState.totruonggiaoviec.forEach(t => {
+      const tg = getToTruongTaskGroup(t);
+      if (tg) {
+        hostGroups.add(tg);
+        allGroups.add(tg);
+      }
+    });
+  }
+
   if (appState.cvluuy && Array.isArray(appState.cvluuy)) {
     appState.cvluuy.forEach(item => {
       for (let k in item) {
@@ -864,46 +888,90 @@ function onGlobalGroupChange() {
 }
 
 function updateGlobalUserSelectOptions() {
-  const userSelect = document.getElementById('global-user-select');
   const groupSelect = document.getElementById('global-group-select');
-  if (!userSelect || !groupSelect) return;
+  const leaderSelect = document.getElementById('global-leader-select');
+  const userSelect = document.getElementById('global-user-select');
+  if (!groupSelect) return;
 
-  const selectedGroup = String(groupSelect.value || '').trim().toLowerCase();
-  const currentSelectedUser = userSelect.value;
+  const selectedGroupClean = cleanKey(groupSelect.value || '');
+  const currentLeader = leaderSelect ? leaderSelect.value : '';
+  const currentUser = userSelect ? userSelect.value : '';
 
+  const leadersInGroup = new Set();
   const usersInGroup = new Set();
 
-  appState.users.forEach(u => {
-    const g = String(u['Tổ'] || u['TỔ'] || u['Tên tổ'] || u.group || '').trim();
-    const name = String(u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u.name || '').trim();
-    if (name) {
-      if (!selectedGroup || g.toLowerCase() === selectedGroup) {
+  // 1. Collect from appState.tovien (employee directory)
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    let currentGroup = '';
+    appState.tovien.forEach(row => {
+      const info = getTovienRowInfo(row);
+      if (info.group) currentGroup = info.group;
+      
+      const grpClean = cleanKey(currentGroup);
+      const isMatch = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
+      if (isMatch) {
+        if (info.leaderName) leadersInGroup.add(info.leaderName);
+        if (info.empName) usersInGroup.add(info.empName);
+      }
+    });
+  }
+
+  // 2. Collect from appState.tasks
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const taskGroupClean = cleanKey(getTaskGroup(t) || t['Tổ chủ trì (AR)'] || '');
+      const isMatch = !selectedGroupClean || taskGroupClean === selectedGroupClean || taskGroupClean.includes(selectedGroupClean) || selectedGroupClean.includes(taskGroupClean);
+      if (isMatch) {
+        const leaderName = getTaskLeaderName(t) || getTaskLanhDaoName(t);
+        const empRName = getTaskEmpRName(t) || getTaskAssignee(t);
+        const collabName = getTaskEmpCName(t) || getTaskCollaborator(t);
+        
+        if (leaderName && leaderName !== 'Chưa gán') leadersInGroup.add(leaderName);
+        if (empRName && empRName !== 'Chưa gán') usersInGroup.add(empRName);
+        if (collabName) usersInGroup.add(collabName);
+      }
+    });
+  }
+
+  // 3. Collect from appState.users
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { name, group } = getUserNameAndGroup(u);
+      const grpClean = cleanKey(group);
+      if (name && (!selectedGroupClean || grpClean === selectedGroupClean)) {
         usersInGroup.add(name);
       }
+    });
+  }
+
+  // Populate leaderSelect (Tên NV A)
+  if (leaderSelect) {
+    const optsA = ['<option value="">Tất cả Tên NV (A)</option>'];
+    Array.from(leadersInGroup).sort().forEach(name => {
+      optsA.push(`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`);
+    });
+    leaderSelect.innerHTML = optsA.join('');
+    if (currentLeader && Array.from(leadersInGroup).some(n => n.toLowerCase() === currentLeader.toLowerCase())) {
+      leaderSelect.value = currentLeader;
+    } else {
+      leaderSelect.value = '';
+      if (appState.filters) appState.filters.leaderA = '';
     }
-  });
+  }
 
-  appState.tasks.forEach(t => {
-    const tg = getTaskGroup(t).trim().toLowerCase();
-    if (!selectedGroup || tg === selectedGroup) {
-      const chuTri = getTaskAssignee(t);
-      const phoiHop = getTaskCollaborator(t);
-      if (chuTri && chuTri !== 'Chưa gán') usersInGroup.add(chuTri);
-      if (phoiHop) usersInGroup.add(phoiHop);
+  // Populate userSelect (Tên NV R)
+  if (userSelect) {
+    const optsR = ['<option value="">Tất cả Tên NV (R)</option>'];
+    Array.from(usersInGroup).sort().forEach(name => {
+      optsR.push(`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`);
+    });
+    userSelect.innerHTML = optsR.join('');
+    if (currentUser && Array.from(usersInGroup).some(n => n.toLowerCase() === currentUser.toLowerCase())) {
+      userSelect.value = currentUser;
+    } else {
+      userSelect.value = '';
+      if (appState.filters) appState.filters.user = '';
     }
-  });
-
-  const opts = ['<option value="">Tất cả người phụ trách</option>'];
-  Array.from(usersInGroup).sort().forEach(name => {
-    opts.push(`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`);
-  });
-  userSelect.innerHTML = opts.join('');
-
-  if (currentSelectedUser && Array.from(usersInGroup).some(u => u.toLowerCase() === currentSelectedUser.toLowerCase())) {
-    userSelect.value = currentSelectedUser;
-  } else {
-    userSelect.value = '';
-    appState.filters.user = '';
   }
 }
 
@@ -964,12 +1032,14 @@ function renderCvLuuYTableDebounced() {
 
 function handleGlobalFilter() {
   const sEl = document.getElementById('global-search-input');
-  const uEl = document.getElementById('global-user-select');
   const gEl = document.getElementById('global-group-select');
+  const lEl = document.getElementById('global-leader-select');
+  const uEl = document.getElementById('global-user-select');
 
   appState.filters.search = sEl ? sEl.value.trim() : '';
-  appState.filters.user = uEl ? uEl.value : '';
   appState.filters.group = gEl ? gEl.value : '';
+  appState.filters.leaderA = lEl ? lEl.value : '';
+  appState.filters.user = uEl ? uEl.value : '';
   
   renderActiveTab();
 }
@@ -983,42 +1053,70 @@ function handleKanbanFilter() {
 function getFilteredTasks() {
   const search = (appState.filters.search || '').trim().toLowerCase();
   const groupFilter = (appState.filters.group || '').trim().toLowerCase();
+  const leaderAFilter = (appState.filters.leaderA || '').trim().toLowerCase();
   const userFilter = (appState.filters.user || '').trim().toLowerCase();
   const kanbanAssignee = (appState.filters.kanbanAssignee || '').trim().toLowerCase();
   const kanbanPriority = (appState.filters.kanbanPriority || '').trim();
 
   return appState.tasks.filter(t => {
-    const chuTri = getTaskAssignee(t);
-    const phoiHop = getTaskCollaborator(t);
-    const toChuTri = getTaskGroup(t);
-    const toPhoiHop = getTaskCollaboratorGroup(t);
+    const titleVal = String(t['Tiêu đề'] || t['Tiêu đề công việc'] || '').toLowerCase();
+    const descVal = String(t['Mô tả'] || t['Mô tả công việc'] || '').toLowerCase();
+    const lanhDaoVal = String(getTaskLanhDaoName(t)).toLowerCase();
+    const lanhDaoCodeVal = String(getTaskLanhDaoCode(t)).toLowerCase();
+    const chuTriAVal = String(getTaskLeaderName(t) || t['Tên NV (A)'] || '').toLowerCase();
+    const chuTriACodeVal = String(getTaskLeaderCode(t) || t['Mã NV (A)'] || '').toLowerCase();
+    const empRVal = String(getTaskEmpRName(t) || getTaskAssignee(t) || t['Tên NV (R)'] || '').toLowerCase();
+    const empRCodeVal = String(getTaskEmpRCode(t) || t['Mã NV (R)'] || '').toLowerCase();
+    const empCVal = String(getTaskEmpCName(t) || getTaskCollaborator(t) || t['Tên NV (C)'] || '').toLowerCase();
+    const empCCodeVal = String(getTaskEmpCCode(t) || t['Mã NV (C)'] || '').toLowerCase();
+    const toChuTriVal = String(getTaskGroup(t) || t['Tổ chủ trì (AR)'] || t['Tổ'] || '').toLowerCase();
+    const toPhoiHopVal = String(getTaskCollaboratorGroup(t) || t['Tổ (R)'] || '').toLowerCase();
+    const ghiChuVal = String(t['Ghi chú'] || '').toLowerCase();
+    const idVal = String(t['ID'] || t['id'] || '').toLowerCase();
 
     // 1. Search filter
     if (search) {
-      const titleMatch = (t['Tiêu đề công việc'] || '').toLowerCase().includes(search);
-      const descMatch = (t['Mô tả công việc'] || '').toLowerCase().includes(search);
-      const chuTriMatch = chuTri.toLowerCase().includes(search);
-      const phoiHopMatch = phoiHop.toLowerCase().includes(search);
-      const toChuTriMatch = toChuTri.toLowerCase().includes(search);
-      if (!titleMatch && !descMatch && !chuTriMatch && !phoiHopMatch && !toChuTriMatch) return false;
+      const match = titleVal.includes(search) ||
+                    descVal.includes(search) ||
+                    lanhDaoVal.includes(search) ||
+                    lanhDaoCodeVal.includes(search) ||
+                    chuTriAVal.includes(search) ||
+                    chuTriACodeVal.includes(search) ||
+                    empRVal.includes(search) ||
+                    empRCodeVal.includes(search) ||
+                    empCVal.includes(search) ||
+                    empCCodeVal.includes(search) ||
+                    toChuTriVal.includes(search) ||
+                    toPhoiHopVal.includes(search) ||
+                    ghiChuVal.includes(search) ||
+                    idVal.includes(search);
+      if (!match) return false;
     }
 
     // 2. Group filter
     if (groupFilter) {
-      const matchHostGroup = toChuTri.toLowerCase().includes(groupFilter);
-      const matchCollabGroup = toPhoiHop.toLowerCase().includes(groupFilter);
+      const groupFilterClean = cleanKey(groupFilter);
+      const matchHostGroup = cleanKey(toChuTriVal).includes(groupFilterClean);
+      const matchCollabGroup = cleanKey(toPhoiHopVal).includes(groupFilterClean);
       if (!matchHostGroup && !matchCollabGroup) return false;
     }
 
-    // 3. User filter
-    if (userFilter) {
-      const matchChuTri = chuTri.toLowerCase() === userFilter;
-      const matchPhoiHop = phoiHop.toLowerCase() === userFilter;
-      if (!matchChuTri && !matchPhoiHop) return false;
+    // 3. Tên NV (A) filter
+    if (leaderAFilter) {
+      const leaderAFilterClean = cleanKey(leaderAFilter);
+      const matchLeader = cleanKey(chuTriAVal).includes(leaderAFilterClean) || cleanKey(lanhDaoVal).includes(leaderAFilterClean);
+      if (!matchLeader) return false;
     }
 
-    // 4. Kanban specific filters
-    if (kanbanAssignee && chuTri.toLowerCase() !== kanbanAssignee) return false;
+    // 4. Tên NV (R) filter
+    if (userFilter) {
+      const userFilterClean = cleanKey(userFilter);
+      const matchEmpR = cleanKey(empRVal).includes(userFilterClean) || cleanKey(empCVal).includes(userFilterClean);
+      if (!matchEmpR) return false;
+    }
+
+    // 5. Kanban specific filters
+    if (kanbanAssignee && cleanKey(empRVal) !== cleanKey(kanbanAssignee)) return false;
     if (kanbanPriority && String(t['Mức độ ưu tiên'] || '').trim() !== kanbanPriority) return false;
 
     return true;
