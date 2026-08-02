@@ -909,16 +909,58 @@ function isBanLanhDao(groupName, empName, roleName) {
   const gClean = cleanKey(groupName || '');
   const rClean = cleanKey(roleName || '');
   const nClean = cleanKey(empName || '');
-  if (gClean === 'banlanhdao' || gClean === 'lanhdao' || gClean.includes('banlanhdao') || gClean.includes('bangiamboc')) {
+  if (gClean === 'banlanhdao' || gClean === 'lanhdao' || gClean.includes('banlanhdao') || gClean.includes('bangiamboc') || gClean.includes('lanhdaotrungtam')) {
     return true;
   }
   if (rClean.includes('lanhdao') || rClean.includes('giamdoc')) {
     return true;
   }
-  if (nClean.includes('banlanhdao') || nClean.includes('bangiamboc')) {
+  if (nClean.includes('banlanhdao') || nClean.includes('bangiamboc') || nClean === 'nguyenconghoan' || nClean.includes('nguyenconghoan')) {
     return true;
   }
   return false;
+}
+
+function getUserNameFromUserObj(u) {
+  if (!u || typeof u !== 'object') return '';
+  if (u._cachedName) return u._cachedName;
+  let name = u['Tên'] || u['Tên nhân viên'] || u['Họ và tên'] || u['Tên người dùng'] || u.name || u.ten || u.fullName || '';
+  if (!name) {
+    for (let k in u) {
+      if (k.startsWith('_')) continue;
+      const ck = cleanKey(k);
+      if (ck === 'ten' || ck === 'tennhanvien' || ck === 'hovaten' || ck === 'tennguoidung' || ck === 'name') {
+        if (u[k] && String(u[k]).trim()) {
+          name = String(u[k]).trim();
+          break;
+        }
+      }
+    }
+  }
+  const result = String(name).trim();
+  u._cachedName = result;
+  return result;
+}
+
+function getUserGroupFromUserObj(u) {
+  if (!u || typeof u !== 'object') return '';
+  if (u._cachedGroup) return u._cachedGroup;
+  let group = u['Tổ'] || u['Tổ chủ trì'] || u['Đơn vị'] || u['Tổ công tác'] || u.group || u.to || '';
+  if (!group) {
+    for (let k in u) {
+      if (k.startsWith('_')) continue;
+      const ck = cleanKey(k);
+      if (ck === 'to' || ck === 'tochutri' || ck === 'tento' || ck === 'group' || ck === 'donvi') {
+        if (u[k] && String(u[k]).trim()) {
+          group = String(u[k]).trim();
+          break;
+        }
+      }
+    }
+  }
+  const result = String(group).trim();
+  u._cachedGroup = result;
+  return result;
 }
 
 function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
@@ -938,49 +980,25 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     }
   };
 
-  // 1. Collect from appState.users (Sheet User / Nguoidung)
+  // 1. Collect ONLY from appState.users (Sheet User / Nguoidung)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
-      const { name, group } = getUserNameAndGroup(u);
+      const name = getUserNameFromUserObj(u);
+      const group = getUserGroupFromUserObj(u);
       addIfValid(name, group);
     });
   }
 
-  // 2. Collect from appState.totruonggiaoviec (Tab Tổ trưởng giao việc)
-  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+  // 2. Fallback: Check appState.totruonggiaoviec (Tab Tổ trưởng giao việc) ONLY if appState.users had no match
+  if (userSet.size === 0 && appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
     appState.totruonggiaoviec.forEach(t => {
       const tg = getToTruongTaskGroup(t);
-      const aName = t['Tên NV (A)'] || t['Tên NV A'] || t['Tên tổ trưởng'] || getTaskLeaderName(t);
-      const rName = t['Tên NV (R)'] || t['Tên NV R'] || t['Tên nhân viên'] || getTaskEmpRName(t);
-      const cName = t['Tên NV (C)'] || t['Tên NV C'] || getTaskEmpCName(t);
+      const aName = t['Tên NV (A)'] || t['Tên NV A'] || t['Tên tổ trưởng'];
+      const rName = t['Tên NV (R)'] || t['Tên NV R'] || t['Tên nhân viên'];
+      const cName = t['Tên NV (C)'] || t['Tên NV C'];
       addIfValid(aName, tg);
       addIfValid(rName, tg);
       addIfValid(cName, tg);
-    });
-  }
-
-  // 3. Collect from appState.tovien (Sheet ToVien)
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    let currentGroup = '';
-    appState.tovien.forEach(row => {
-      const info = getTovienRowInfo(row);
-      if (info.group) currentGroup = info.group;
-      addIfValid(info.empName, currentGroup);
-      addIfValid(info.leaderName, currentGroup);
-    });
-  }
-
-  // 4. Fallback from appState.tasks (Sheet congviec)
-  if (userSet.size === 0 && appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
-      const tg = getTaskGroup(t);
-      const cg = getTaskCollaboratorGroup(t);
-      const aName = getTaskLeaderName(t);
-      const rName = getTaskEmpRName(t) || getTaskAssignee(t);
-      const cName = getTaskEmpCName(t) || getTaskCollaborator(t);
-      addIfValid(aName, tg);
-      addIfValid(rName, tg);
-      addIfValid(cName, cg || tg);
     });
   }
 
@@ -995,7 +1013,7 @@ function getHeaderGroupOptions() {
 
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
-      const { group } = getUserNameAndGroup(u);
+      const group = getUserGroupFromUserObj(u);
       addGroup(group);
     });
   }
@@ -1004,17 +1022,6 @@ function getHeaderGroupOptions() {
       addGroup(getToTruongTaskGroup(t));
       addGroup(t['Tổ chủ trì (AR)']);
     });
-  }
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    let lastGroup = '';
-    appState.tovien.forEach(row => {
-      const info = getTovienRowInfo(row);
-      if (info.group) lastGroup = info.group;
-      addGroup(lastGroup);
-    });
-  }
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => addGroup(getTaskGroup(t)));
   }
 
   return Array.from(hostGroups).sort();
@@ -1035,12 +1042,6 @@ function getHeaderCollabGroupOptions() {
   if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
     appState.totruonggiaoviec.forEach(t => {
       addGroup(t['Tổ (R)']);
-    });
-  }
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    appState.tovien.forEach(row => {
-      const info = getTovienRowInfo(row);
-      addGroup(info.group);
     });
   }
 
