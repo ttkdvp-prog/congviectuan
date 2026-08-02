@@ -2287,6 +2287,10 @@ function openTaskModal(taskId = null) {
       const toSelect = document.getElementById('task-tochutri-input');
       if (toSelect) toSelect.value = '';
       handleModalGroupChange('');
+      // Default start date to today
+      const today = new Date();
+      const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+      if (document.getElementById('task-start-input')) document.getElementById('task-start-input').value = todayStr;
       // Reset employee code displays
       const chuTriCodeDisplay = document.getElementById('task-chutri-code-display');
       if (chuTriCodeDisplay) { chuTriCodeDisplay.style.display = 'none'; chuTriCodeDisplay.innerHTML = ''; }
