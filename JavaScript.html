@@ -964,16 +964,6 @@ function getUserGroupFromUserObj(u) {
   return result;
 }
 
-const ALLOWED_KEY_PERSONNEL = [
-  "Trần Nam Trung", "Vũ Thị Lan Phương", "Đỗ Chu Đằng", "Vũ Mạnh Khương",
-  "Ngô Tiến Mạnh", "Lê Minh Thuyết", "Bùi Văn Chung", "Ngô Minh Tuấn",
-  "Chúc Mạnh Sơn", "Chử Hồng Thái", "Trần Duy Hưng", "Nguyễn Thị Ánh Tuyết",
-  "Trần Xuân Trường", "Đỗ Đức Hoàng", "Đặng Hồng Quân", "Tống Tiến Mạnh",
-  "Lê Đức Anh", "Trần Ngọc Ánh", "Nguyễn Trọng Thái", "Dương Văn Nam",
-  "Đỗ Quang Thanh", "Nguyễn Thu Trang", "Nguyễn Thị Phương Anh",
-  "Vương Văn Trung", "Trần Thị Thủy", "Nguyễn Thị Thúy", "Ngô Thị Anh"
-];
-
 function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
   const selectedGroupClean = cleanKey(selectedGroupStr || '');
   const userSet = new Set();
@@ -991,7 +981,7 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     }
   };
 
-  // 1. Collect from appState.users (Sheet User / Nguoidung)
+  // 1. Collect from appState.users (Sheet User / Nguoidung ONLY)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const name = getUserNameFromUserObj(u);
@@ -1000,25 +990,7 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     });
   }
 
-  // 2. Collect from ALLOWED_KEY_PERSONNEL list explicitly provided
-  ALLOWED_KEY_PERSONNEL.forEach(name => {
-    addIfValid(name, '');
-  });
-
-  // 3. Collect from appState.totruonggiaoviec (Tab Tổ trưởng giao việc)
-  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
-    appState.totruonggiaoviec.forEach(t => {
-      const tg = getToTruongTaskGroup(t) || t['Tổ chủ trì (AR)'];
-      const aName = t['Tên NV (A)'] || t['Tên NV A'] || t['Tên tổ trưởng'];
-      const rName = t['Tên NV (R)'] || t['Tên NV R'] || t['Tên nhân viên'];
-      const cName = t['Tên NV (C)'] || t['Tên NV C'];
-      addIfValid(aName, tg);
-      addIfValid(rName, tg);
-      addIfValid(cName, tg);
-    });
-  }
-
-  // 4. Collect from appState.tasks (Sheet congviec)
+  // 2. Collect from appState.tasks (Sheet congviec ONLY - strictly isolated from totruonggiaoviec)
   if (appState.tasks && Array.isArray(appState.tasks)) {
     appState.tasks.forEach(t => {
       const tg = getTaskGroup(t) || t['Tổ chủ trì (AR)'];
@@ -1031,7 +1003,7 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     });
   }
 
-  // NOTE: appState.tovien (Sheet tovien) is STRICTLY EXCLUDED!
+  // NOTE: appState.totruonggiaoviec and appState.tovien are STRICTLY EXCLUDED to keep sheet congviec and totruonggiaoviec separated!
 
   return Array.from(userSet).sort();
 }
