@@ -926,29 +926,7 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
   const selectedGroupClean = cleanKey(selectedGroupStr || '');
   const userSet = new Set();
 
-  // 1. From appState.tovien (Sheet Users)
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    let currentGroup = '';
-    appState.tovien.forEach(row => {
-      const info = getTovienRowInfo(row);
-      if (info.group) currentGroup = info.group;
-      
-      const grpClean = cleanKey(currentGroup);
-      if (isBanLanhDao(currentGroup, info.empName)) return;
-
-      const isMatchGroup = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
-      if (isMatchGroup) {
-        if (info.empName && String(info.empName).trim()) {
-          userSet.add(String(info.empName).trim());
-        }
-        if (info.leaderName && String(info.leaderName).trim() && !isBanLanhDao(currentGroup, info.leaderName)) {
-          userSet.add(String(info.leaderName).trim());
-        }
-      }
-    });
-  }
-
-  // 2. From appState.users (Sheet Users)
+  // ONLY collect from appState.users (Sheet User)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { name, group } = getUserNameAndGroup(u);
@@ -967,14 +945,6 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
 
 function getHeaderGroupOptions() {
   const hostGroups = new Set();
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    let lastGroup = '';
-    appState.tovien.forEach(row => {
-      const info = getTovienRowInfo(row);
-      if (info.group) lastGroup = info.group;
-      if (lastGroup && !isBanLanhDao(lastGroup)) hostGroups.add(lastGroup);
-    });
-  }
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { group } = getUserNameAndGroup(u);
