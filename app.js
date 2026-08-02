@@ -495,7 +495,6 @@ function onDataError(error) {
 
 function getUserNameAndGroup(u) {
   if (!u || typeof u !== 'object') return { name: '', group: '' };
-  if (u._cachedInfo) return u._cachedInfo;
 
   let name = '';
   let group = '';
@@ -546,9 +545,7 @@ function getUserNameAndGroup(u) {
     }
   }
 
-  const res = { name, group };
-  u._cachedInfo = res;
-  return res;
+  return { name, group };
 }
 
 function getUserRole(u) {
@@ -575,7 +572,7 @@ function getUserRole(u) {
 function isToTruongHoacToPho(u) {
   if (!u || typeof u !== 'object') return false;
   const role = getUserRole(u);
-  const name = getUserNameFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).name : '');
+  const { name } = getUserNameAndGroup(u);
   const rClean = cleanKey(role);
   const nClean = cleanKey(name);
 
@@ -615,12 +612,10 @@ function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
 
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
-      const name = getUserNameFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).name : '');
-      if (!name || isTeamName(name)) return;
+      const { name, group } = getUserNameAndGroup(u);
+      if (!name || name === 'Chưa gán' || isTeamName(name)) return;
       const nameClean = cleanKey(name);
       if (leaderKeys.includes(nameClean)) return;
-
-      const group = getUserGroupFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).group : '');
 
       if (isGroupMatch(group, selectedGroup)) {
         userSet.add(String(name).trim());
@@ -631,23 +626,28 @@ function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
     });
   }
 
-  if (isLeaderAOnly) {
-    if (leaderUserSet.size > 0) {
-      return Array.from(leaderUserSet).sort();
-    }
+  // If searching for Tên NV (A) and team has explicit Tổ trưởng/Tổ phó in Sheet User, return them
+  if (isLeaderAOnly && leaderUserSet.size > 0) {
+    return Array.from(leaderUserSet).sort();
   }
 
-  // Fallback: If no users match specific group in Sheet User, return ALL valid non-leader users from Sheet User
-  if (userSet.size === 0 && appState.users && Array.isArray(appState.users)) {
+  // Return matching employees for this group
+  if (userSet.size > 0) {
+    return Array.from(userSet).sort();
+  }
+
+  // Fallback: If no users in Sheet User match specific group, return ALL valid non-leader users from Sheet User
+  const fallbackSet = new Set();
+  if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
-      const name = getUserNameFromUserObj(u) || (getUserNameAndGroup(u) ? getUserNameAndGroup(u).name : '');
-      if (name && !isTeamName(name) && !leaderKeys.includes(cleanKey(name))) {
-        userSet.add(String(name).trim());
+      const { name } = getUserNameAndGroup(u);
+      if (name && name !== 'Chưa gán' && !isTeamName(name) && !leaderKeys.includes(cleanKey(name))) {
+        fallbackSet.add(String(name).trim());
       }
     });
   }
 
-  return Array.from(userSet).filter(Boolean).sort();
+  return Array.from(fallbackSet).filter(Boolean).sort();
 }
 
 
