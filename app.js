@@ -1005,6 +1005,19 @@ function filterCustomDropdown(type, query) {
   const listEl = document.getElementById('dropdown-' + type);
   if (!listEl) return;
 
+  if (!appState.dropdownData || !appState.dropdownData[type] || appState.dropdownData[type].length === 0) {
+    if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
+    if (type === 'lanhdao') {
+      appState.dropdownData.lanhdao = ['Nguyễn Công Hoan', 'Nguyễn Minh Cường', 'Nguyễn Trung Kiên'];
+    } else if (type === 'phoihop') {
+      const collabSelect = document.getElementById('task-tophoihop-input');
+      handleModalCollabGroupChange(collabSelect ? collabSelect.value : '');
+    } else {
+      const toSelect = document.getElementById('task-tochutri-input');
+      handleModalGroupChange(toSelect ? toSelect.value : '');
+    }
+  }
+
   const rawList = (appState.dropdownData && appState.dropdownData[type]) ? appState.dropdownData[type] : [];
   
   let qClean = cleanKey(query);
@@ -1012,16 +1025,24 @@ function filterCustomDropdown(type, query) {
     qClean = '';
   }
 
-  // If query is exact match of currently pre-filled item name and element is focused,
-  // show full candidate list so user can choose other team members/deputies
-  const isExactCurrentVal = rawList.some(item => cleanKey(item) === qClean);
-  if (isExactCurrentVal && document.activeElement && document.activeElement.id === 'task-' + type + '-input') {
-    qClean = '';
+  // When input element is focused/active, show full candidate list so user can pick any user
+  const inputEl = document.getElementById('task-' + type + '-input');
+  if (document.activeElement && inputEl && document.activeElement === inputEl) {
+    // If the input value matches an exact item or is unchanged, show full list
+    const isExactCurrentVal = rawList.some(item => cleanKey(item) === qClean);
+    if (isExactCurrentVal || !query || cleanKey(inputEl.value) === qClean) {
+      qClean = '';
+    }
   }
 
   let filtered = rawList;
   if (qClean) {
     filtered = rawList.filter(item => cleanKey(item).includes(qClean));
+  }
+
+  // Fallback: If search filter yields 0 items, fallback to rawList
+  if (filtered.length === 0 && rawList.length > 0) {
+    filtered = rawList;
   }
 
   if (filtered.length === 0) {
