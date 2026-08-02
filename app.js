@@ -967,23 +967,55 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
   const selectedGroupClean = cleanKey(selectedGroupStr || '');
   const userSet = new Set();
 
-  // EXCLUSIVELY collect from appState.users (Sheet User / Nguoidung)
+  const addIfValid = (name, group) => {
+    if (!name || name === 'Chưa gán') return;
+    const trimmed = String(name).trim();
+    if (!trimmed) return;
+    if (isBanLanhDao(group, trimmed)) return;
+
+    const grpClean = cleanKey(group || '');
+    const isMatchGroup = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
+    if (isMatchGroup) {
+      userSet.add(trimmed);
+    }
+  };
+
+  // 1. Collect from appState.users (Sheet User / Nguoidung)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const name = getUserNameFromUserObj(u);
       const group = getUserGroupFromUserObj(u);
-      
-      if (!name || name === 'Chưa gán') return;
-      if (isBanLanhDao(group, name)) return;
-
-      const grpClean = cleanKey(group || '');
-      const isMatchGroup = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
-      
-      if (isMatchGroup) {
-        userSet.add(name);
-      }
+      addIfValid(name, group);
     });
   }
+
+  // 2. Collect from appState.totruonggiaoviec (Tab Tổ trưởng giao việc - Team Leaders & Experts)
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+    appState.totruonggiaoviec.forEach(t => {
+      const tg = getToTruongTaskGroup(t) || t['Tổ chủ trì (AR)'];
+      const aName = t['Tên NV (A)'] || t['Tên NV A'] || t['Tên tổ trưởng'];
+      const rName = t['Tên NV (R)'] || t['Tên NV R'] || t['Tên nhân viên'];
+      const cName = t['Tên NV (C)'] || t['Tên NV C'];
+      addIfValid(aName, tg);
+      addIfValid(rName, tg);
+      addIfValid(cName, tg);
+    });
+  }
+
+  // 3. Collect from appState.tasks (Sheet congviec - Assigned Team Leaders & Experts)
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const tg = getTaskGroup(t) || t['Tổ chủ trì (AR)'];
+      const aName = getTaskLeaderName(t);
+      const rName = getTaskEmpRName(t) || getTaskAssignee(t);
+      const cName = getTaskEmpCName(t) || getTaskCollaborator(t);
+      addIfValid(aName, tg);
+      addIfValid(rName, tg);
+      addIfValid(cName, tg);
+    });
+  }
+
+  // NOTE: appState.tovien (Sheet tovien - Tổ viên) is STRICTLY EXCLUDED!
 
   return Array.from(userSet).sort();
 }
@@ -1006,6 +1038,12 @@ function getHeaderGroupOptions() {
       addGroup(t['Tổ chủ trì (AR)']);
     });
   }
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => addGroup(getTaskGroup(t)));
+  }
+
+  return Array.from(hostGroups).sort();
+}
 
   return Array.from(hostGroups).sort();
 }
