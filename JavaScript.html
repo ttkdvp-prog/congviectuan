@@ -255,13 +255,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Attach search & group filter event listeners
   const sInput = document.getElementById('global-search-input');
   const gSelect = document.getElementById('global-group-select');
+  const cgSelect = document.getElementById('global-collab-group-select');
   const lSelect = document.getElementById('global-leader-select');
   const uSelect = document.getElementById('global-user-select');
+  const cuSelect = document.getElementById('global-collab-user-select');
 
   if (sInput) sInput.addEventListener('input', handleGlobalFilterDebounced);
   if (gSelect) gSelect.addEventListener('change', onGlobalGroupChange);
+  if (cgSelect) cgSelect.addEventListener('change', onGlobalGroupChange);
   if (lSelect) lSelect.addEventListener('change', handleGlobalFilter);
   if (uSelect) uSelect.addEventListener('change', handleGlobalFilter);
+  if (cuSelect) cuSelect.addEventListener('change', handleGlobalFilter);
 
   // Restore local cache for zero-latency initial view on F5 across all devices
   const cachedTasks = localStorage.getItem('TTHT_TASKS_CACHE');
@@ -627,12 +631,30 @@ function populateSelects() {
 
   if (groupSelect) {
     const curVal = groupSelect.value;
-    const opts = ['<option value="">Tất cả tổ chủ trì</option>'];
+    const opts = ['<option value="">Tất cả Tổ chủ trì (AR)</option>'];
     Array.from(hostGroups).sort().forEach(g => {
       if (g) opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
     });
     groupSelect.innerHTML = opts.join('');
     if (curVal) groupSelect.value = curVal;
+  }
+
+  const collabGroupSelect = document.getElementById('global-collab-group-select');
+  if (collabGroupSelect) {
+    const curVal = collabGroupSelect.value;
+    const collabGroups = new Set();
+    if (appState.tasks && Array.isArray(appState.tasks)) {
+      appState.tasks.forEach(t => {
+        const tcg = getTaskCollaboratorGroup(t) || t['Tổ (R)'] || '';
+        if (tcg && String(tcg).trim()) collabGroups.add(String(tcg).trim());
+      });
+    }
+    const opts = ['<option value="">Tất cả Tổ (R)</option>'];
+    Array.from(collabGroups).sort().forEach(g => {
+      if (g) opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
+    });
+    collabGroupSelect.innerHTML = opts.join('');
+    if (curVal) collabGroupSelect.value = curVal;
   }
 
   if (cvluuyGroupSelect) {
@@ -890,16 +912,21 @@ function onGlobalGroupChange() {
 
 function updateGlobalUserSelectOptions() {
   const groupSelect = document.getElementById('global-group-select');
+  const collabGroupSelect = document.getElementById('global-collab-group-select');
   const leaderSelect = document.getElementById('global-leader-select');
   const userSelect = document.getElementById('global-user-select');
+  const collabUserSelect = document.getElementById('global-collab-user-select');
   if (!groupSelect) return;
 
   const selectedGroupClean = cleanKey(groupSelect.value || '');
+  const selectedCollabGroupClean = cleanKey(collabGroupSelect ? collabGroupSelect.value : '');
   const currentLeader = leaderSelect ? leaderSelect.value : '';
   const currentUser = userSelect ? userSelect.value : '';
+  const currentCollabUser = collabUserSelect ? collabUserSelect.value : '';
 
   const leadersInGroup = new Set();
   const usersInGroup = new Set();
+  const collabUsersInGroup = new Set();
 
   // 1. Collect from appState.tovien (employee directory)
   if (appState.tovien && Array.isArray(appState.tovien)) {
@@ -909,10 +936,15 @@ function updateGlobalUserSelectOptions() {
       if (info.group) currentGroup = info.group;
       
       const grpClean = cleanKey(currentGroup);
-      const isMatch = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
-      if (isMatch) {
+      const matchHost = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
+      const matchCollab = !selectedCollabGroupClean || grpClean === selectedCollabGroupClean || grpClean.includes(selectedCollabGroupClean) || selectedCollabGroupClean.includes(grpClean);
+
+      if (matchHost) {
         if (info.leaderName) leadersInGroup.add(info.leaderName);
         if (info.empName) usersInGroup.add(info.empName);
+      }
+      if (matchCollab) {
+        if (info.empName) collabUsersInGroup.add(info.empName);
       }
     });
   }
@@ -921,15 +953,21 @@ function updateGlobalUserSelectOptions() {
   if (appState.tasks && Array.isArray(appState.tasks)) {
     appState.tasks.forEach(t => {
       const taskGroupClean = cleanKey(getTaskGroup(t) || t['Tổ chủ trì (AR)'] || '');
-      const isMatch = !selectedGroupClean || taskGroupClean === selectedGroupClean || taskGroupClean.includes(selectedGroupClean) || selectedGroupClean.includes(taskGroupClean);
-      if (isMatch) {
+      const taskCollabGroupClean = cleanKey(getTaskCollaboratorGroup(t) || t['Tổ (R)'] || '');
+      
+      const matchHost = !selectedGroupClean || taskGroupClean === selectedGroupClean || taskGroupClean.includes(selectedGroupClean) || selectedGroupClean.includes(taskGroupClean);
+      const matchCollab = !selectedCollabGroupClean || taskCollabGroupClean === selectedCollabGroupClean || taskCollabGroupClean.includes(selectedCollabGroupClean) || selectedCollabGroupClean.includes(taskCollabGroupClean);
+
+      if (matchHost) {
         const leaderName = getTaskLeaderName(t) || getTaskLanhDaoName(t);
         const empRName = getTaskEmpRName(t) || getTaskAssignee(t);
-        const collabName = getTaskEmpCName(t) || getTaskCollaborator(t);
-        
         if (leaderName && leaderName !== 'Chưa gán') leadersInGroup.add(leaderName);
         if (empRName && empRName !== 'Chưa gán') usersInGroup.add(empRName);
-        if (collabName) usersInGroup.add(collabName);
+      }
+
+      if (matchCollab || matchHost) {
+        const collabName = getTaskEmpCName(t) || getTaskCollaborator(t);
+        if (collabName) collabUsersInGroup.add(collabName);
       }
     });
   }
@@ -939,8 +977,9 @@ function updateGlobalUserSelectOptions() {
     appState.users.forEach(u => {
       const { name, group } = getUserNameAndGroup(u);
       const grpClean = cleanKey(group);
-      if (name && (!selectedGroupClean || grpClean === selectedGroupClean)) {
-        usersInGroup.add(name);
+      if (name) {
+        if (!selectedGroupClean || grpClean === selectedGroupClean) usersInGroup.add(name);
+        if (!selectedCollabGroupClean || grpClean === selectedCollabGroupClean) collabUsersInGroup.add(name);
       }
     });
   }
@@ -972,6 +1011,21 @@ function updateGlobalUserSelectOptions() {
     } else {
       userSelect.value = '';
       if (appState.filters) appState.filters.user = '';
+    }
+  }
+
+  // Populate collabUserSelect (Tên NV C)
+  if (collabUserSelect) {
+    const optsC = ['<option value="">Tất cả Tên NV (C)</option>'];
+    Array.from(collabUsersInGroup).sort().forEach(name => {
+      optsC.push(`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`);
+    });
+    collabUserSelect.innerHTML = optsC.join('');
+    if (currentCollabUser && Array.from(collabUsersInGroup).some(n => n.toLowerCase() === currentCollabUser.toLowerCase())) {
+      collabUserSelect.value = currentCollabUser;
+    } else {
+      collabUserSelect.value = '';
+      if (appState.filters) appState.filters.collabUser = '';
     }
   }
 }
@@ -1034,13 +1088,17 @@ function renderCvLuuYTableDebounced() {
 function handleGlobalFilter() {
   const sEl = document.getElementById('global-search-input');
   const gEl = document.getElementById('global-group-select');
+  const cgEl = document.getElementById('global-collab-group-select');
   const lEl = document.getElementById('global-leader-select');
   const uEl = document.getElementById('global-user-select');
+  const cuEl = document.getElementById('global-collab-user-select');
 
   appState.filters.search = sEl ? sEl.value.trim() : '';
   appState.filters.group = gEl ? gEl.value : '';
+  appState.filters.collabGroup = cgEl ? cgEl.value : '';
   appState.filters.leaderA = lEl ? lEl.value : '';
   appState.filters.user = uEl ? uEl.value : '';
+  appState.filters.collabUser = cuEl ? cuEl.value : '';
   
   renderActiveTab();
 }
@@ -1054,8 +1112,10 @@ function handleKanbanFilter() {
 function getFilteredTasks() {
   const search = (appState.filters.search || '').trim().toLowerCase();
   const groupFilter = (appState.filters.group || '').trim().toLowerCase();
+  const collabGroupFilter = (appState.filters.collabGroup || '').trim().toLowerCase();
   const leaderAFilter = (appState.filters.leaderA || '').trim().toLowerCase();
   const userFilter = (appState.filters.user || '').trim().toLowerCase();
+  const collabUserFilter = (appState.filters.collabUser || '').trim().toLowerCase();
   const kanbanAssignee = (appState.filters.kanbanAssignee || '').trim().toLowerCase();
   const kanbanPriority = (appState.filters.kanbanPriority || '').trim();
 
@@ -1094,29 +1154,42 @@ function getFilteredTasks() {
       if (!match) return false;
     }
 
-    // 2. Group filter
+    // 2. Tổ chủ trì (AR) filter
     if (groupFilter) {
       const groupFilterClean = cleanKey(groupFilter);
       const matchHostGroup = cleanKey(toChuTriVal).includes(groupFilterClean);
-      const matchCollabGroup = cleanKey(toPhoiHopVal).includes(groupFilterClean);
-      if (!matchHostGroup && !matchCollabGroup) return false;
+      if (!matchHostGroup) return false;
     }
 
-    // 3. Tên NV (A) filter
+    // 3. Tổ (R) filter
+    if (collabGroupFilter) {
+      const collabGroupFilterClean = cleanKey(collabGroupFilter);
+      const matchCollabGroup = cleanKey(toPhoiHopVal).includes(collabGroupFilterClean);
+      if (!matchCollabGroup) return false;
+    }
+
+    // 4. Tên NV (A) filter
     if (leaderAFilter) {
       const leaderAFilterClean = cleanKey(leaderAFilter);
       const matchLeader = cleanKey(chuTriAVal).includes(leaderAFilterClean) || cleanKey(lanhDaoVal).includes(leaderAFilterClean);
       if (!matchLeader) return false;
     }
 
-    // 4. Tên NV (R) filter
+    // 5. Tên NV (R) filter
     if (userFilter) {
       const userFilterClean = cleanKey(userFilter);
-      const matchEmpR = cleanKey(empRVal).includes(userFilterClean) || cleanKey(empCVal).includes(userFilterClean);
+      const matchEmpR = cleanKey(empRVal).includes(userFilterClean);
       if (!matchEmpR) return false;
     }
 
-    // 5. Kanban specific filters
+    // 6. Tên NV (C) filter
+    if (collabUserFilter) {
+      const collabUserFilterClean = cleanKey(collabUserFilter);
+      const matchEmpC = cleanKey(empCVal).includes(collabUserFilterClean);
+      if (!matchEmpC) return false;
+    }
+
+    // 7. Kanban specific filters
     if (kanbanAssignee && cleanKey(empRVal) !== cleanKey(kanbanAssignee)) return false;
     if (kanbanPriority && String(t['Mức độ ưu tiên'] || '').trim() !== kanbanPriority) return false;
 

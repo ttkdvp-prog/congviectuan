@@ -87,7 +87,11 @@
           </div>
 
           <select class="header-select" id="global-group-select" onchange="onGlobalGroupChange()" onfocus="ensureSelectsPopulated()">
-            <option value="">Tất cả tổ chủ trì</option>
+            <option value="">Tất cả Tổ chủ trì (AR)</option>
+          </select>
+
+          <select class="header-select" id="global-collab-group-select" onchange="onGlobalGroupChange()" onfocus="ensureSelectsPopulated()">
+            <option value="">Tất cả Tổ (R)</option>
           </select>
 
           <select class="header-select" id="global-leader-select" onchange="handleGlobalFilter()" onfocus="ensureSelectsPopulated()">
@@ -96,6 +100,10 @@
 
           <select class="header-select" id="global-user-select" onchange="handleGlobalFilter()" onfocus="ensureSelectsPopulated()">
             <option value="">Tất cả Tên NV (R)</option>
+          </select>
+
+          <select class="header-select" id="global-collab-user-select" onchange="handleGlobalFilter()" onfocus="ensureSelectsPopulated()">
+            <option value="">Tất cả Tên NV (C)</option>
           </select>
 
           <button class="btn-icon-btn" onclick="appState.loadData(true)" title="Làm mới dữ liệu">
