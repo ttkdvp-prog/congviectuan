@@ -1540,12 +1540,12 @@ function handleGlobalFilter() {
   const uEl = document.getElementById('global-user-select');
   const cuEl = document.getElementById('global-collab-user-select');
 
-  if (sEl) appState.filters.search = sEl.value.trim();
-  if (gEl && gEl.value) appState.filters.group = gEl.value;
-  if (cgEl && cgEl.value) appState.filters.collabGroup = cgEl.value;
-  if (lEl && lEl.value) appState.filters.leaderA = lEl.value;
-  if (uEl && uEl.value) appState.filters.user = uEl.value;
-  if (cuEl && cuEl.value) appState.filters.collabUser = cuEl.value;
+  appState.filters.search = sEl ? sEl.value.trim() : '';
+  appState.filters.group = gEl ? gEl.value : '';
+  appState.filters.collabGroup = cgEl ? cgEl.value : '';
+  appState.filters.leaderA = lEl ? lEl.value : '';
+  appState.filters.user = uEl ? uEl.value : '';
+  appState.filters.collabUser = cuEl ? cuEl.value : '';
   
   renderActiveTab();
 }
@@ -1881,6 +1881,45 @@ function formatNameList(nameStr) {
 }
 
 /* 3. DANH SÁCH (TABLE) */
+function resetAllGlobalFilters() {
+  appState.filters = {
+    search: '',
+    user: '',
+    group: '',
+    collabGroup: '',
+    leaderA: '',
+    collabUser: '',
+    kanbanAssignee: '',
+    kanbanPriority: ''
+  };
+  const sEl = document.getElementById('global-search-input');
+  if (sEl) sEl.value = '';
+  ['group', 'collabGroup', 'leaderA', 'user', 'collabUser'].forEach(type => {
+    const hiddenSelectId = {
+      group: 'global-group-select',
+      collabGroup: 'global-collab-group-select',
+      leaderA: 'global-leader-select',
+      user: 'global-user-select',
+      collabUser: 'global-collab-user-select'
+    }[type];
+    const hiddenSelect = document.getElementById(hiddenSelectId);
+    if (hiddenSelect) hiddenSelect.value = '';
+    const labelEl = document.getElementById(`header-select-${type}-label`);
+    if (labelEl) {
+      labelEl.innerText = {
+        group: 'Tất cả Tổ chủ trì (AR)',
+        collabGroup: 'Tất cả Tổ (R)',
+        leaderA: 'Tất cả Tên NV (A)',
+        user: 'Tất cả Tên NV (R)',
+        collabUser: 'Tất cả Tên NV (C)'
+      }[type];
+      labelEl.style.color = '';
+      labelEl.style.fontWeight = '';
+    }
+  });
+  renderActiveTab();
+}
+
 function renderTaskListTable() {
   const filtered = getFilteredTasks();
   const tbody = document.getElementById('task-list-tbody');
@@ -1888,7 +1927,13 @@ function renderTaskListTable() {
   
   tbody.innerHTML = '';
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:30px; color:var(--text-muted);">Không có dữ liệu công việc phù hợp</td></tr>`;
+    if (!appState.isGAS && !appState.apiUrl && (!appState.tasks || appState.tasks.length === 0)) {
+      tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:35px; color:#f59e0b;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i> Chưa cấu hình URL Google Apps Script. Vui lòng bấm biểu tượng <strong>Cấu hình (⚙️)</strong> ở góc trên bên phải để dán Web App URL và tải công việc. <button class="btn-dark-sec btn-sm" onclick="openModal('modal-settings')" style="margin-left:12px;"><i class="fa-solid fa-gear"></i> Mở cấu hình</button></td></tr>`;
+    } else if (!appState.tasks || appState.tasks.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:35px; color:var(--text-muted);"><i class="fa-solid fa-arrows-rotate fa-spin" style="margin-right:8px;"></i> Đang tải danh sách công việc... <button class="btn-dark-sec btn-sm" onclick="appState.loadData(true, true)" style="margin-left:12px;"><i class="fa-solid fa-rotate-right"></i> Tải lại</button></td></tr>`;
+    } else {
+      tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:35px; color:var(--text-muted);"><i class="fa-solid fa-filter-circle-xmark" style="margin-right:8px;"></i> Không tìm thấy công việc nào phù hợp với bộ lọc hiện tại. <button class="btn-dark-sec btn-sm" onclick="resetAllGlobalFilters()" style="margin-left:12px;"><i class="fa-solid fa-xmark"></i> Xóa bộ lọc</button></td></tr>`;
+    }
     return;
   }
   
