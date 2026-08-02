@@ -607,6 +607,7 @@ function findTeamLeaderName(selectedGroup) {
   if (!selectedGroup) return '';
   const leaderKeys = ['nguyenconghoan', 'nguyenminhcuong', 'nguyentrungkien'];
 
+  // Search STRICTLY in appState.users (Sheet User) for matching group & leader role
   if (appState.users && Array.isArray(appState.users)) {
     for (let u of appState.users) {
       const { name, group } = getUserNameAndGroup(u);
@@ -615,30 +616,8 @@ function findTeamLeaderName(selectedGroup) {
         return name.trim();
       }
     }
-  }
 
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    for (let row of appState.tovien) {
-      const info = getTovienRowInfo(row);
-      if (info.leaderName && !leaderKeys.includes(cleanKey(info.leaderName)) && isGroupMatch(info.group, selectedGroup)) {
-        return info.leaderName.trim();
-      }
-    }
-  }
-
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    for (let t of appState.tasks) {
-      const tg = getTaskGroup(t) || t['Tổ chủ trì (AR)'] || t['Tổ'] || '';
-      if (isGroupMatch(tg, selectedGroup)) {
-        const aName = getTaskLeaderName(t) || t['Tên NV (A)'] || t['Tên tổ trưởng'];
-        if (aName && aName !== 'Chưa gán' && !isTeamName(aName) && !leaderKeys.includes(cleanKey(aName))) {
-          return String(aName).trim();
-        }
-      }
-    }
-  }
-
-  if (appState.users && Array.isArray(appState.users)) {
+    // Fallback: First matching employee of that group from Sheet User
     for (let u of appState.users) {
       const { name, group } = getUserNameAndGroup(u);
       if (name && name !== 'Chưa gán' && !isTeamName(name) && !leaderKeys.includes(cleanKey(name))) {
@@ -652,10 +631,11 @@ function findTeamLeaderName(selectedGroup) {
   return '';
 }
 
+// Get non-leader employees filtered by group STRICTLY from Sheet User (appState.users)
 function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
   const teamLeadersAndDeputies = new Set();
   const teamMembers = new Set();
-  const allSystemUsers = new Set();
+  const allSheetUsers = new Set();
   const leaderKeys = ['nguyenconghoan', 'nguyenminhcuong', 'nguyentrungkien'];
 
   const addName = (rawName, group = '', roleInfo = '') => {
@@ -667,9 +647,9 @@ function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
     names.forEach(n => {
       const trimmed = n.trim();
       if (!trimmed || isTeamName(trimmed)) return;
-      if (leaderKeys.includes(cleanKey(trimmed))) return;
+      if (leaderKeys.includes(cleanKey(trimmed))) return; // Exclude Center Leaders
 
-      allSystemUsers.add(trimmed);
+      allSheetUsers.add(trimmed);
 
       if (selectedGroup && isGroupMatch(group, selectedGroup)) {
         teamMembers.add(trimmed);
@@ -682,7 +662,7 @@ function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
     });
   };
 
-  // 1. Collect from appState.users (Sheet User / Nguoidung)
+  // Collect EXCLUSIVELY from appState.users (Sheet User / Nguoidung) per Data Source Constraints
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { name, group } = getUserNameAndGroup(u);
@@ -691,56 +671,26 @@ function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
     });
   }
 
-  // 2. Collect from appState.tovien (Sheet tovien)
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    appState.tovien.forEach(row => {
-      const info = getTovienRowInfo(row);
-      if (info.leaderName) addName(info.leaderName, info.group, 'totruong');
-      if (info.empName) addName(info.empName, info.group, '');
-    });
-  }
-
-  // 3. Collect from appState.tasks (Sheet congviec)
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
-      const tg = getTaskGroup(t) || t['Tổ chủ trì (AR)'] || t['Tổ'] || '';
-      const tcg = getTaskCollaboratorGroup(t) || t['Tổ (R)'] || t['Tổ phối hợp'] || '';
-      const aName = getTaskLeaderName(t) || t['Tên NV (A)'] || t['Tên tổ trưởng'];
-      const rName = getTaskEmpRName(t) || getTaskAssignee(t) || t['Tên NV (R)'];
-      const cName = getTaskEmpCName(t) || getTaskCollaborator(t) || t['Tên NV (C)'];
-
-      if (aName) addName(aName, tg, 'totruong');
-      if (rName) addName(rName, tg, '');
-      if (cName) addName(cName, tcg || tg, '');
-    });
-  }
-
-  // 4. Collect from appState.totruonggiaoviec
-  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
-    appState.totruonggiaoviec.forEach(t => {
-      const tg = t['Tổ'] || t['Tổ chủ trì'] || '';
-      const aName = t['Tên NV (A)'] || t['Tên tổ trưởng'] || t['Người giao việc'] || '';
-      const rName = t['Tên NV (R)'] || t['Người nhận việc'] || t['Người chủ trì'] || '';
-      if (aName) addName(aName, tg, 'totruong');
-      if (rName) addName(rName, tg, '');
-    });
-  }
-
   const resultList = [];
+
+  // Priority 1: Team Leader name for the selected group from Sheet User
   const teamLeaderName = findTeamLeaderName(selectedGroup);
   if (teamLeaderName && !resultList.includes(teamLeaderName)) {
     resultList.push(teamLeaderName);
   }
 
+  // Priority 2: Team Leaders & Deputy Team Leaders of selected group from Sheet User
   Array.from(teamLeadersAndDeputies).sort().forEach(n => {
     if (!resultList.includes(n)) resultList.push(n);
   });
 
+  // Priority 3: Other members of selected group from Sheet User
   Array.from(teamMembers).sort().forEach(m => {
     if (!resultList.includes(m)) resultList.push(m);
   });
 
-  Array.from(allSystemUsers).sort().forEach(u => {
+  // Priority 4: All other non-leader employees in Sheet User (guarantees list is never empty)
+  Array.from(allSheetUsers).sort().forEach(u => {
     if (!resultList.includes(u)) resultList.push(u);
   });
 
