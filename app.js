@@ -989,7 +989,18 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     });
   }
 
-  // 2. Collect from appState.totruonggiaoviec (Tab Tổ trưởng giao việc - Team Leaders & Experts)
+  // 2. Collect from appState.tovien (Sheet ToVien)
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    let currentGroup = '';
+    appState.tovien.forEach(row => {
+      const info = getTovienRowInfo(row);
+      if (info.group) currentGroup = info.group;
+      addIfValid(info.empName, currentGroup);
+      addIfValid(info.leaderName, currentGroup);
+    });
+  }
+
+  // 3. Collect from appState.totruonggiaoviec (Tab Tổ trưởng giao việc)
   if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
     appState.totruonggiaoviec.forEach(t => {
       const tg = getToTruongTaskGroup(t) || t['Tổ chủ trì (AR)'];
@@ -1002,7 +1013,7 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
     });
   }
 
-  // 3. Collect from appState.tasks (Sheet congviec - Assigned Team Leaders & Experts)
+  // 4. Collect from appState.tasks (Sheet congviec)
   if (appState.tasks && Array.isArray(appState.tasks)) {
     appState.tasks.forEach(t => {
       const tg = getTaskGroup(t) || t['Tổ chủ trì (AR)'];
@@ -1014,8 +1025,6 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
       addIfValid(cName, tg);
     });
   }
-
-  // NOTE: appState.tovien (Sheet tovien - Tổ viên) is STRICTLY EXCLUDED!
 
   return Array.from(userSet).sort();
 }
