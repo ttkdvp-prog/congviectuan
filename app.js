@@ -1977,10 +1977,13 @@ function renderTaskListTable() {
     const empCName = getTaskEmpCName(t) || getTaskCollaborator(t);
     const empCCode = getTaskEmpCCode(t) || lookupEmpCodeByName(empCName);
 
+    const titleDisplay = getTaskTitle(t) || ('Công việc #' + (index + 1));
+    const descDisplay = getTaskDesc(t) || '';
+
     rowsHtml.push(`
       <tr>
-        <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index + 1}.</span><strong style="color:#ffffff;">${escapeHtml(t['Tiêu đề'] || '')}</strong></td>
-        <td class="col-desc-cell">${escapeHtml(t['Mô tả'] || '')}</td>
+        <td class="col-title-cell"><span style="color:#38bdf8; font-weight:700; margin-right:4px;">${index + 1}.</span><strong style="color:#ffffff;">${escapeHtml(titleDisplay)}</strong></td>
+        <td class="col-desc-cell">${escapeHtml(descDisplay)}</td>
         <td class="status-col-cell">${statusBadge}</td>
         <td><div>${formatNameList(lanhDaoName)}</div>${lanhDaoCode ? `<div style="color:#64748b; font-size:0.72rem; margin-top:2px;">${escapeHtml(lanhDaoCode)}</div>` : ''}</td>
         <td><span class="tag-org">${escapeHtml(toChuTriName || 'Chung')}</span></td>
@@ -3500,6 +3503,38 @@ function getExactValueByKeyPattern(obj, targetKeys) {
         if (obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== '') {
           return String(obj[k]).trim();
         }
+      }
+    }
+  }
+  return '';
+}
+
+function getTaskTitle(t) {
+  if (!t || typeof t !== 'object') return '';
+  const exact = getExactValueByKeyPattern(t, ['Tiêu đề', 'Tiêu đề công việc', 'Tên công việc', 'Nội dung', 'Công việc', 'Mô tả', 'Mô tả công việc']);
+  if (exact) return exact;
+  for (let k in t) {
+    if (k.startsWith('_')) continue;
+    const ck = cleanKey(k);
+    if (ck.includes('tieude') || ck.includes('tencongviec') || ck.includes('noidung') || ck.includes('mota')) {
+      if (t[k] !== undefined && t[k] !== null && String(t[k]).trim() !== '') {
+        return String(t[k]).trim();
+      }
+    }
+  }
+  return '';
+}
+
+function getTaskDesc(t) {
+  if (!t || typeof t !== 'object') return '';
+  const exact = getExactValueByKeyPattern(t, ['Mô tả', 'Mô tả công việc', 'Nội dung', 'Ghi chú']);
+  if (exact) return exact;
+  for (let k in t) {
+    if (k.startsWith('_')) continue;
+    const ck = cleanKey(k);
+    if (ck.includes('mota') || ck.includes('noidung')) {
+      if (t[k] !== undefined && t[k] !== null && String(t[k]).trim() !== '') {
+        return String(t[k]).trim();
       }
     }
   }
