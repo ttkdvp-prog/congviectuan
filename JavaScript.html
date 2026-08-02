@@ -282,6 +282,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Background silent sync with backend if available
   appState.loadData();
   setupKanbanDragAndDrop();
+
+  // === AUTO-SYNC: Refresh data from Google Sheets every 60 seconds ===
+  setInterval(function() {
+    console.log('[AutoSync] Refreshing data from Google Sheets...');
+    appState.loadData(false, false);
+  }, 60000);
 });
 
 appState.loadData = function (forceRefresh = false, showNotification = false) {
@@ -359,10 +365,11 @@ function onDataLoaded(response, showNotification = false) {
   console.log('[onDataLoaded] totruonggiaoviec in response:', response?.totruonggiaoviec ? response.totruonggiaoviec.length + ' records' : 'MISSING');
   if (response && response.success) {
     clearTaskCaches();
-    if (response.tasks && response.tasks.length > 0) appState.tasks = response.tasks;
-    if (response.users && response.users.length > 0) appState.users = response.users;
-    if (response.tovien && response.tovien.length > 0) appState.tovien = response.tovien;
-    if (response.totruonggiaoviec && response.totruonggiaoviec.length > 0) {
+    // Accept data from server even if empty (supports deletions on Google Sheets)
+    if (Array.isArray(response.tasks)) appState.tasks = response.tasks;
+    if (Array.isArray(response.users)) appState.users = response.users;
+    if (Array.isArray(response.tovien)) appState.tovien = response.tovien;
+    if (Array.isArray(response.totruonggiaoviec)) {
       appState.totruonggiaoviec = response.totruonggiaoviec;
       console.log('[onDataLoaded] totruonggiaoviec loaded:', response.totruonggiaoviec.length, 'records');
       if (response.totruonggiaoviec[0]) {
@@ -372,8 +379,8 @@ function onDataLoaded(response, showNotification = false) {
       console.warn('[onDataLoaded] totruonggiaoviec MISSING from main response. Triggering backup load...');
       loadToTruongBackup();
     }
-    if (response.cvluuy && response.cvluuy.length > 0) appState.cvluuy = response.cvluuy;
-    if (response.documents && response.documents.length > 0) appState.documents = response.documents;
+    if (Array.isArray(response.cvluuy)) appState.cvluuy = response.cvluuy;
+    if (Array.isArray(response.documents)) appState.documents = response.documents;
     
     appState.tasks.forEach(t => {
       if (typeof t['Danh sách công việc con'] === 'string' && t['Danh sách công việc con']) {
@@ -911,6 +918,11 @@ function switchSidebarTab(tabName) {
   };
   const titleDisplay = document.getElementById('page-title-display');
   if (titleDisplay) titleDisplay.innerText = titles[tabName] || 'TTHT Tasks';
+
+  // Auto-refresh data from Google Sheets when switching to totruonggiaoviec tab
+  if (tabName === 'totruonggiaoviec') {
+    appState.loadData(false, false);
+  }
 
   renderActiveTab();
 }
@@ -3364,6 +3376,33 @@ function renderToTruongTaskList() {
   setTimeout(() => {
     document.querySelectorAll('#totruong-task-tbody .inline-note-textarea').forEach(autoResizeTextarea);
   }, 50);
+}
+
+// Manual sync button: force refresh ALL data from Google Sheets
+function syncToTruongFromSheet() {
+  showToast('Đang đồng bộ dữ liệu từ Google Sheet...', 'info');
+  
+  // Clear all caches to force fresh data
+  try {
+    localStorage.removeItem('TTHT_TOTRUONGGIAOVIEC_CACHE');
+    localStorage.removeItem('TTHT_TASKS_CACHE');
+    localStorage.removeItem('TTHT_USERS_CACHE');
+    localStorage.removeItem('TTHT_TOVIEN_CACHE');
+    localStorage.removeItem('TTHT_CVLUUY_CACHE');
+  } catch(e) {}
+  
+  // Clear internal caches
+  clearTaskCaches();
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    appState.tovien.forEach(row => delete row._cachedInfo);
+  }
+  
+  // Force reload from server
+  appState.loadData(true, true);
+  
+  // Also trigger independent backup load for totruonggiaoviec
+  appState._toTruongBackupTriggered = false;
+  loadToTruongBackup();
 }
 
 function openTaskModalForTeamLeader() {
