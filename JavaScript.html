@@ -1198,7 +1198,21 @@ function selectHeaderOption(type, value) {
   }
 
   if (hiddenSelect) {
+    if (value && !Array.from(hiddenSelect.options).some(opt => opt.value === value)) {
+      const newOpt = document.createElement('option');
+      newOpt.value = value;
+      newOpt.text = value;
+      hiddenSelect.appendChild(newOpt);
+    }
     hiddenSelect.value = value;
+  }
+
+  if (appState.filters) {
+    if (type === 'group') appState.filters.group = value;
+    else if (type === 'collabGroup') appState.filters.collabGroup = value;
+    else if (type === 'leaderA') appState.filters.leaderA = value;
+    else if (type === 'user') appState.filters.user = value;
+    else if (type === 'collabUser') appState.filters.collabUser = value;
   }
 
   if (type === 'group' || type === 'collabGroup') {
@@ -1222,7 +1236,8 @@ function updateGlobalUserSelectOptions() {
     }[type];
     const hiddenSelect = document.getElementById(hiddenSelectId);
     const labelEl = document.getElementById(`header-select-${type}-label`);
-    const val = hiddenSelect ? hiddenSelect.value : '';
+    const filterKey = type === 'leaderA' ? 'leaderA' : type === 'user' ? 'user' : 'collabUser';
+    const val = appState.filters ? (appState.filters[filterKey] || '') : (hiddenSelect ? hiddenSelect.value : '');
     const validUsers = getNonLeaderUsersFromSheetUsers(type === 'collabUser' ? appState.filters.collabGroup || appState.filters.group : appState.filters.group);
     
     if (val && !validUsers.some(u => u.toLowerCase() === val.toLowerCase())) {
@@ -1237,10 +1252,16 @@ function updateGlobalUserSelectOptions() {
         labelEl.style.fontWeight = '';
       }
       if (appState.filters) {
-        if (type === 'leaderA') appState.filters.leaderA = '';
-        if (type === 'user') appState.filters.user = '';
-        if (type === 'collabUser') appState.filters.collabUser = '';
+        appState.filters[filterKey] = '';
       }
+    } else if (val && hiddenSelect) {
+      if (!Array.from(hiddenSelect.options).some(opt => opt.value === val)) {
+        const newOpt = document.createElement('option');
+        newOpt.value = val;
+        newOpt.text = val;
+        hiddenSelect.appendChild(newOpt);
+      }
+      hiddenSelect.value = val;
     }
   });
 }
@@ -1308,12 +1329,12 @@ function handleGlobalFilter() {
   const uEl = document.getElementById('global-user-select');
   const cuEl = document.getElementById('global-collab-user-select');
 
-  appState.filters.search = sEl ? sEl.value.trim() : '';
-  appState.filters.group = gEl ? gEl.value : '';
-  appState.filters.collabGroup = cgEl ? cgEl.value : '';
-  appState.filters.leaderA = lEl ? lEl.value : '';
-  appState.filters.user = uEl ? uEl.value : '';
-  appState.filters.collabUser = cuEl ? cuEl.value : '';
+  if (sEl) appState.filters.search = sEl.value.trim();
+  if (gEl && gEl.value) appState.filters.group = gEl.value;
+  if (cgEl && cgEl.value) appState.filters.collabGroup = cgEl.value;
+  if (lEl && lEl.value) appState.filters.leaderA = lEl.value;
+  if (uEl && uEl.value) appState.filters.user = uEl.value;
+  if (cuEl && cuEl.value) appState.filters.collabUser = cuEl.value;
   
   renderActiveTab();
 }
@@ -1386,21 +1407,28 @@ function getFilteredTasks() {
     // 4. Tên NV (A) filter
     if (leaderAFilter) {
       const leaderAFilterClean = cleanKey(leaderAFilter);
-      const matchLeader = cleanKey(chuTriAVal).includes(leaderAFilterClean) || cleanKey(lanhDaoVal).includes(leaderAFilterClean);
+      const matchLeader = cleanKey(chuTriAVal).includes(leaderAFilterClean) ||
+                          cleanKey(lanhDaoVal).includes(leaderAFilterClean) ||
+                          cleanKey(t['Tên NV (A)'] || '').includes(leaderAFilterClean) ||
+                          cleanKey(t['Người chủ trì'] || '').includes(leaderAFilterClean);
       if (!matchLeader) return false;
     }
 
     // 5. Tên NV (R) filter
     if (userFilter) {
       const userFilterClean = cleanKey(userFilter);
-      const matchEmpR = cleanKey(empRVal).includes(userFilterClean);
+      const matchEmpR = cleanKey(empRVal).includes(userFilterClean) ||
+                        cleanKey(t['Tên NV (R)'] || '').includes(userFilterClean) ||
+                        cleanKey(t['Người phối hợp'] || '').includes(userFilterClean) ||
+                        cleanKey(t['Người thực hiện'] || '').includes(userFilterClean);
       if (!matchEmpR) return false;
     }
 
     // 6. Tên NV (C) filter
     if (collabUserFilter) {
       const collabUserFilterClean = cleanKey(collabUserFilter);
-      const matchEmpC = cleanKey(empCVal).includes(collabUserFilterClean);
+      const matchEmpC = cleanKey(empCVal).includes(collabUserFilterClean) ||
+                        cleanKey(t['Tên NV (C)'] || '').includes(collabUserFilterClean);
       if (!matchEmpC) return false;
     }
 
