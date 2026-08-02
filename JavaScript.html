@@ -652,94 +652,72 @@ function findTeamLeaderName(selectedGroup) {
   return '';
 }
 
-// Get non-leader employees filtered by group with Sheet User primary and seamless fallback
-function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
-  const teamLeadersAndDeputies = new Set();
-  const teamMembers = new Set();
-  const allSheetUsers = new Set();
+// Returns full employee list from Sheet User with selected team prioritized
+function getEmployeesByGroup(selectedGroup) {
   const leaderKeys = ['nguyenconghoan', 'nguyenminhcuong', 'nguyentrungkien'];
+  const allSheetUsersSet = new Set();
+  const teamLeaderName = findTeamLeaderName(selectedGroup);
+  const teamMembersSet = new Set();
 
-  const addName = (rawName, group = '', roleInfo = '') => {
-    if (!rawName || rawName === 'ChÆ°a gÃ¡n') return;
-    const str = String(rawName).trim();
-    if (!str || isTeamName(str)) return;
-
-    const names = str.includes(',') ? str.split(',') : [str];
-    names.forEach(n => {
-      const trimmed = n.trim();
-      if (!trimmed || isTeamName(trimmed)) return;
-      if (leaderKeys.includes(cleanKey(trimmed))) return;
-
-      allSheetUsers.add(trimmed);
-
-      if (selectedGroup && isGroupMatch(group, selectedGroup)) {
-        teamMembers.add(trimmed);
-        const rClean = cleanKey(roleInfo || '');
-        const nClean = cleanKey(trimmed);
-        if (rClean.includes('totruong') || rClean.includes('topho') || rClean.includes('truong') || rClean.includes('pho') || rClean.includes('lead') || nClean.includes('totruong') || nClean.includes('topho')) {
-          teamLeadersAndDeputies.add(trimmed);
-        }
-      }
-    });
-  };
-
-  // Primary: Collect from appState.users (Sheet User / Nguoidung)
+  // 1. Extract ALL users from appState.users (Sheet User)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { name, group } = getUserNameAndGroup(u);
-      const role = getUserRole(u);
-      addName(name, group, role);
+      if (!name || name === 'ChÆ°a gÃ¡n' || isTeamName(name)) return;
+      const trimmed = String(name).trim();
+      if (leaderKeys.includes(cleanKey(trimmed))) return; // Exclude Center Leaders
+
+      allSheetUsersSet.add(trimmed);
+
+      if (selectedGroup && isGroupMatch(group, selectedGroup)) {
+        teamMembersSet.add(trimmed);
+      }
     });
   }
 
-  // Backup fallback: If appState.users has no records loaded, collect from tovien & tasks
-  if (allSheetUsers.size === 0) {
+  // Backup fallback if appState.users is empty or not loaded
+  if (allSheetUsersSet.size === 0) {
     if (appState.tovien && Array.isArray(appState.tovien)) {
       appState.tovien.forEach(row => {
         const info = getTovienRowInfo(row);
-        if (info.leaderName) addName(info.leaderName, info.group, 'totruong');
-        if (info.empName) addName(info.empName, info.group, '');
+        if (info.leaderName && !leaderKeys.includes(cleanKey(info.leaderName))) allSheetUsersSet.add(info.leaderName.trim());
+        if (info.empName && !leaderKeys.includes(cleanKey(info.empName))) allSheetUsersSet.add(info.empName.trim());
+        if (selectedGroup && isGroupMatch(info.group, selectedGroup)) {
+          if (info.leaderName) teamMembersSet.add(info.leaderName.trim());
+          if (info.empName) teamMembersSet.add(info.empName.trim());
+        }
       });
     }
     if (appState.tasks && Array.isArray(appState.tasks)) {
       appState.tasks.forEach(t => {
-        const tg = getTaskGroup(t) || t['Tá»• chá»§ trÃ¬ (AR)'] || t['Tá»•'] || '';
-        const tcg = getTaskCollaboratorGroup(t) || t['Tá»• (R)'] || t['Tá»• phá»‘i há»£p'] || '';
-        const aName = getTaskLeaderName(t) || t['TÃªn NV (A)'] || t['TÃªn tá»• trÆ°á»Ÿng'];
-        const rName = getTaskEmpRName(t) || getTaskAssignee(t) || t['TÃªn NV (R)'];
-        const cName = getTaskEmpCName(t) || getTaskCollaborator(t) || t['TÃªn NV (C)'];
-
-        if (aName) addName(aName, tg, 'totruong');
-        if (rName) addName(rName, tg, '');
-        if (cName) addName(cName, tcg || tg, '');
+        const aName = getTaskLeaderName(t) || t['TÃªn NV (A)'];
+        const rName = getTaskEmpRName(t) || t['TÃªn NV (R)'];
+        const cName = getTaskEmpCName(t) || t['TÃªn NV (C)'];
+        if (aName && !leaderKeys.includes(cleanKey(aName))) allSheetUsersSet.add(String(aName).trim());
+        if (rName && !leaderKeys.includes(cleanKey(rName))) allSheetUsersSet.add(String(rName).trim());
+        if (cName && !leaderKeys.includes(cleanKey(cName))) allSheetUsersSet.add(String(cName).trim());
       });
     }
   }
 
-  const resultList = [];
+  const result = [];
 
-  // Priority 1: Team Leader name for selected group
-  const teamLeaderName = findTeamLeaderName(selectedGroup);
-  if (teamLeaderName && !resultList.includes(teamLeaderName)) {
-    resultList.push(teamLeaderName);
+  // Priority 1: Team Leader for selected group
+  if (teamLeaderName && !result.includes(teamLeaderName)) {
+    result.push(teamLeaderName);
   }
 
-  // Priority 2: Team Leaders & Deputy Team Leaders of selected group
-  Array.from(teamLeadersAndDeputies).sort().forEach(n => {
-    if (!resultList.includes(n)) resultList.push(n);
+  // Priority 2: Members of selected group
+  Array.from(teamMembersSet).sort().forEach(m => {
+    if (!result.includes(m)) result.push(m);
   });
 
-  // Priority 3: Other members of selected group
-  Array.from(teamMembers).sort().forEach(m => {
-    if (!resultList.includes(m)) resultList.push(m);
+  // Priority 3: All other users from Sheet User (ensures entire list in Sheet User is available to pick)
+  Array.from(allSheetUsersSet).sort().forEach(u => {
+    if (!result.includes(u)) result.push(u);
   });
 
-  // Priority 4: All other non-leader employees (guarantees list is never empty)
-  Array.from(allSheetUsers).sort().forEach(u => {
-    if (!resultList.includes(u)) resultList.push(u);
-  });
-
-  return resultList;
+  return result;
 }
 
 function populateSelects() {
@@ -860,20 +838,26 @@ function populateSelects() {
   const phoiHopGrp = taskToPhoiHopSelect ? taskToPhoiHopSelect.value : '';
   const effectiveCollabGrp = phoiHopGrp || chuTriGrp;
 
-  appState.dropdownData.leadera = getEmployeesByGroup(chuTriGrp, true);
-  appState.dropdownData.chutri = getEmployeesByGroup(effectiveCollabGrp, false);
-  appState.dropdownData.phoihop = getEmployeesByGroup(effectiveCollabGrp, false);
+  appState.dropdownData.leadera = getEmployeesByGroup(chuTriGrp);
+  appState.dropdownData.chutri = getEmployeesByGroup(effectiveCollabGrp);
+  appState.dropdownData.phoihop = getEmployeesByGroup(effectiveCollabGrp);
 
   updateGlobalUserSelectOptions();
 }
 
 function handleModalGroupChange(selectedGroup) {
-  const leaderAUsers = getEmployeesByGroup(selectedGroup, true);
+  const leaderAUsers = getEmployeesByGroup(selectedGroup);
   const leadersList = ['Nguyá»…n CÃ´ng Hoan', 'Nguyá»…n Minh CÆ°á»ng', 'Nguyá»…n Trung KiÃªn'];
 
   if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
   appState.dropdownData.lanhdao = leadersList;
   appState.dropdownData.leadera = leaderAUsers;
+
+  const toCollabSelect = document.getElementById('task-tophoihop-input');
+  const collabGroup = toCollabSelect ? toCollabSelect.value : '';
+  const chuTriUsers = getEmployeesByGroup(collabGroup || selectedGroup);
+  appState.dropdownData.chutri = chuTriUsers;
+  appState.dropdownData.phoihop = chuTriUsers;
 
   const leadAInput = document.getElementById('task-leadera-input');
   if (leadAInput && selectedGroup) {
@@ -893,13 +877,6 @@ function handleModalGroupChange(selectedGroup) {
     }
   }
 
-  const toCollabSelect = document.getElementById('task-tophoihop-input');
-  if (!toCollabSelect || !toCollabSelect.value) {
-    const chuTriUsers = getEmployeesByGroup(selectedGroup, false);
-    appState.dropdownData.chutri = chuTriUsers;
-    appState.dropdownData.phoihop = chuTriUsers;
-  }
-
   const activeLeaderA = document.getElementById('dropdown-leadera');
   if (activeLeaderA && activeLeaderA.classList.contains('active')) {
     filterCustomDropdown('leadera', '');
@@ -907,9 +884,8 @@ function handleModalGroupChange(selectedGroup) {
 }
 
 function handleModalCollabGroupChange(selectedGroup) {
-  // Tá»• phá»‘i há»£p (C) governs TÃªn NV (R) AND TÃªn NV (C)
   const effectiveGrp = selectedGroup || document.getElementById('task-tochutri-input')?.value || '';
-  const collabUsers = getEmployeesByGroup(effectiveGrp, false);
+  const collabUsers = getEmployeesByGroup(effectiveGrp);
 
   if (!appState.dropdownData) appState.dropdownData = { lanhdao: [], leadera: [], chutri: [], phoihop: [] };
   appState.dropdownData.chutri = collabUsers;
