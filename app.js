@@ -632,8 +632,26 @@ function populateSelects() {
 
   if (taskToChuTriSelect) {
     const curVal = taskToChuTriSelect.value;
+    // Collect ALL groups from all sources for the modal dropdown
+    const modalGroups = new Set(hostGroups);
+    // Add groups from tovien (employee directory)
+    if (appState.tovien && Array.isArray(appState.tovien)) {
+      let lastGroup = '';
+      appState.tovien.forEach(row => {
+        const info = getTovienRowInfo(row);
+        if (info.group) lastGroup = info.group;
+        if (lastGroup) modalGroups.add(lastGroup);
+      });
+    }
+    // Add groups from totruonggiaoviec data
+    if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+      appState.totruonggiaoviec.forEach(t => {
+        const tg = t['Tổ'] || t['Tổ chủ trì'] || '';
+        if (tg) modalGroups.add(tg);
+      });
+    }
     const opts = ['<option value="">-- Tất cả tổ --</option>'];
-    Array.from(hostGroups).sort().forEach(g => {
+    Array.from(modalGroups).sort().forEach(g => {
       if (g) opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
     });
     taskToChuTriSelect.innerHTML = opts.join('');
