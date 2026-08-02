@@ -594,7 +594,6 @@ function isGroupMatch(userGroup, selectedGroup) {
 
   if (!uClean || !sClean) return true;
   if (uClean === sClean || uClean.includes(sClean) || sClean.includes(uClean)) return true;
-
   const stopWords = ['to', 'nhom', 'donvi', 'phong', 'ban'];
   const uTokens = uClean.split(/[^a-z0-9]/).filter(t => t && !stopWords.includes(t));
   const sTokens = sClean.split(/[^a-z0-9]/).filter(t => t && !stopWords.includes(t));
@@ -604,11 +603,60 @@ function isGroupMatch(userGroup, selectedGroup) {
   return uTokens.some(ut => sTokens.some(st => ut.includes(st) || st.includes(ut)));
 }
 
-// Get non-leader employees filtered by group STRICTLY from Sheet User (appState.users)
+function findTeamLeaderName(selectedGroup) {
+  if (!selectedGroup) return '';
+  const leaderKeys = ['nguyenconghoan', 'nguyenminhcuong', 'nguyentrungkien'];
+
+  if (appState.users && Array.isArray(appState.users)) {
+    for (let u of appState.users) {
+      const { name, group } = getUserNameAndGroup(u);
+      if (!name || isTeamName(name) || leaderKeys.includes(cleanKey(name))) continue;
+      if (isGroupMatch(group, selectedGroup) && isToTruongHoacToPho(u)) {
+        return name.trim();
+      }
+    }
+  }
+
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    for (let row of appState.tovien) {
+      const info = getTovienRowInfo(row);
+      if (info.leaderName && !leaderKeys.includes(cleanKey(info.leaderName)) && isGroupMatch(info.group, selectedGroup)) {
+        return info.leaderName.trim();
+      }
+    }
+  }
+
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    for (let t of appState.tasks) {
+      const tg = getTaskGroup(t) || t['Tổ chủ trì (AR)'] || t['Tổ'] || '';
+      if (isGroupMatch(tg, selectedGroup)) {
+        const aName = getTaskLeaderName(t) || t['Tên NV (A)'] || t['Tên tổ trưởng'];
+        if (aName && aName !== 'Chưa gán' && !isTeamName(aName) && !leaderKeys.includes(cleanKey(aName))) {
+          return String(aName).trim();
+        }
+      }
+    }
+  }
+
+  if (appState.users && Array.isArray(appState.users)) {
+    for (let u of appState.users) {
+      const { name, group } = getUserNameAndGroup(u);
+      if (name && name !== 'Chưa gán' && !isTeamName(name) && !leaderKeys.includes(cleanKey(name))) {
+        if (isGroupMatch(group, selectedGroup)) {
+          return name.trim();
+        }
+      }
+    }
+  }
+
+  return '';
+}
+
 function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
   const userSet = new Set();
   const leaderUserSet = new Set();
   const leaderKeys = ['nguyenconghoan', 'nguyenminhcuong', 'nguyentrungkien'];
+  const allSheetUsers = [];
 
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
@@ -617,47 +665,42 @@ function getEmployeesByGroup(selectedGroup, isLeaderAOnly = false) {
       const nameClean = cleanKey(name);
       if (leaderKeys.includes(nameClean)) return;
 
+      const trimmedName = String(name).trim();
+      allSheetUsers.push(trimmedName);
+
       if (isGroupMatch(group, selectedGroup)) {
-        userSet.add(String(name).trim());
+        userSet.add(trimmedName);
         if (isToTruongHoacToPho(u)) {
-          leaderUserSet.add(String(name).trim());
+          leaderUserSet.add(trimmedName);
         }
       }
     });
   }
 
-  // If searching for Tên NV (A) and team has explicit Tổ trưởng/Tổ phó in Sheet User, return them
-  if (isLeaderAOnly && leaderUserSet.size > 0) {
-    return Array.from(leaderUserSet).sort();
+  const resultList = [];
+  const teamLeaderName = findTeamLeaderName(selectedGroup);
+  if (teamLeaderName && !resultList.includes(teamLeaderName)) {
+    resultList.push(teamLeaderName);
   }
 
-  // Return matching employees for this group
-  if (userSet.size > 0) {
-    return Array.from(userSet).sort();
-  }
+  const teamMembers = Array.from(userSet).sort();
+  teamMembers.forEach(m => {
+    if (!resultList.includes(m)) resultList.push(m);
+  });
 
-  // Fallback: If no users in Sheet User match specific group, return ALL valid non-leader users from Sheet User
-  const fallbackSet = new Set();
-  if (appState.users && Array.isArray(appState.users)) {
-    appState.users.forEach(u => {
-      const { name } = getUserNameAndGroup(u);
-      if (name && name !== 'Chưa gán' && !isTeamName(name) && !leaderKeys.includes(cleanKey(name))) {
-        fallbackSet.add(String(name).trim());
-      }
-    });
-  }
+  const sortedAllUsers = Array.from(new Set(allSheetUsers)).sort();
+  sortedAllUsers.forEach(u => {
+    if (!resultList.includes(u)) resultList.push(u);
+  });
 
-  return Array.from(fallbackSet).filter(Boolean).sort();
+  return resultList;
 }
-
 
 function populateSelects() {
   const groupSelect = document.getElementById('global-group-select');
   const cvluuyGroupSelect = document.getElementById('cvluuy-group-select');
   const kanbanAssigneeSelect = document.getElementById('kanban-assignee-filter');
   const taskToChuTriSelect = document.getElementById('task-tochutri-input');
-  const taskChuTriSelect = document.getElementById('task-chutri-input');
-  const taskPhoiHopSelect = document.getElementById('task-phoihop-input');
   
   const hostGroups = new Set();
   const allGroups = new Set();
@@ -676,91 +719,37 @@ function populateSelects() {
 
   if (appState.tasks && Array.isArray(appState.tasks)) {
     appState.tasks.forEach(t => {
-      const a = getTaskAssignee(t);
-      const c = getTaskCollaborator(t);
       const tg = getTaskGroup(t);
-      const tcg = getTaskCollaboratorGroup(t);
-      
-      if (a && a !== 'Chưa gán') {
-        a.split(',').forEach(n => { if (n.trim()) assignees.add(n.trim()); });
-      }
-      if (c && String(c).trim()) {
-        c.split(',').forEach(n => { if (n.trim()) assignees.add(n.trim()); });
-      }
-      if (tg && String(tg).trim()) {
-        hostGroups.add(tg);
-        allGroups.add(tg);
-      }
-      if (tcg && String(tcg).trim()) allGroups.add(tcg);
-    });
-  }
-
-  if (appState.tovien && Array.isArray(appState.tovien)) {
-    let lastGroup = '';
-    appState.tovien.forEach(row => {
-      const info = getTovienRowInfo(row);
-      if (info.group) lastGroup = info.group;
-      if (lastGroup) {
-        hostGroups.add(lastGroup);
-        allGroups.add(lastGroup);
-      }
-    });
-  }
-
-  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
-    appState.totruonggiaoviec.forEach(t => {
-      const tg = getToTruongTaskGroup(t);
       if (tg) {
         hostGroups.add(tg);
         allGroups.add(tg);
       }
-    });
-  }
-
-  if (appState.cvluuy && Array.isArray(appState.cvluuy)) {
-    appState.cvluuy.forEach(item => {
-      for (let k in item) {
-        const ck = cleanKey(k);
-        if (ck.includes('to') && item[k] && typeof item[k] === 'string' && item[k].trim()) {
-          allGroups.add(item[k].trim());
-        }
+      const tcg = getTaskCollaboratorGroup(t);
+      if (tcg) {
+        allGroups.add(tcg);
       }
+      const assignee = getTaskAssignee(t);
+      if (assignee) assignees.add(assignee);
     });
   }
 
   if (groupSelect) {
     const curVal = groupSelect.value;
-    const opts = ['<option value="">Tất cả Tổ chủ trì (AR)</option>'];
-    Array.from(hostGroups).sort().forEach(g => {
-      if (g) opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
+    const sortedHost = Array.from(hostGroups).filter(Boolean).sort();
+    const opts = ['<option value="">Tất cả tổ</option>'];
+    sortedHost.forEach(g => {
+      opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
     });
     groupSelect.innerHTML = opts.join('');
     if (curVal) groupSelect.value = curVal;
   }
 
-  const collabGroupSelect = document.getElementById('global-collab-group-select');
-  if (collabGroupSelect) {
-    const curVal = collabGroupSelect.value;
-    const collabGroups = new Set();
-    if (appState.tasks && Array.isArray(appState.tasks)) {
-      appState.tasks.forEach(t => {
-        const tcg = getTaskCollaboratorGroup(t) || t['Tổ (R)'] || '';
-        if (tcg && String(tcg).trim()) collabGroups.add(String(tcg).trim());
-      });
-    }
-    const opts = ['<option value="">Tất cả Tổ (R)</option>'];
-    Array.from(collabGroups).sort().forEach(g => {
-      if (g) opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
-    });
-    collabGroupSelect.innerHTML = opts.join('');
-    if (curVal) collabGroupSelect.value = curVal;
-  }
-
   if (cvluuyGroupSelect) {
     const curVal = cvluuyGroupSelect.value;
+    const sortedAll = Array.from(allGroups).filter(Boolean).sort();
     const opts = ['<option value="">Tất cả tổ</option>'];
-    Array.from(allGroups).sort().forEach(g => {
-      if (g) opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
+    sortedAll.forEach(g => {
+      opts.push(`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`);
     });
     cvluuyGroupSelect.innerHTML = opts.join('');
     if (curVal) cvluuyGroupSelect.value = curVal;
@@ -831,30 +820,8 @@ function populateSelects() {
 
   updateGlobalUserSelectOptions();
 }
-function getUserCode(u) {
-  if (!u || typeof u !== 'object') return '';
-  if (u['Mã NV'] && String(u['Mã NV']).trim()) return String(u['Mã NV']).trim();
-  if (u['Mã LĐ'] && String(u['Mã LĐ']).trim()) return String(u['Mã LĐ']).trim();
-  if (u['Ma NV'] && String(u['Ma NV']).trim()) return String(u['Ma NV']).trim();
-  if (u['Ma LD'] && String(u['Ma LD']).trim()) return String(u['Ma LD']).trim();
-  if (u.manv && String(u.manv).trim()) return String(u.manv).trim();
-  if (u.empCode && String(u.empCode).trim()) return String(u.empCode).trim();
-  if (u.code && String(u.code).trim()) return String(u.code).trim();
-  if (u.ID && String(u.ID).trim() && String(u.ID).toUpperCase().startsWith('VNPT')) return String(u.ID).trim();
-  if (u.id && String(u.id).trim() && String(u.id).toUpperCase().startsWith('VNPT')) return String(u.id).trim();
-
-  for (let k in u) {
-    if (k.startsWith('_')) continue;
-    const ck = cleanKey(k);
-    if (ck === 'manv' || ck === 'manhanvien' || ck === 'mald' || ck === 'malanhdao' || ck === 'empcode' || ck === 'code' || ck === 'ma') {
-      if (u[k] && String(u[k]).trim()) return String(u[k]).trim();
-    }
-  }
-  return '';
-}
 
 function handleModalGroupChange(selectedGroup) {
-  // Tổ chủ trì (AR) governs Tên NV (A) [Tổ trưởng, Tổ phó]
   const leaderAUsers = getEmployeesByGroup(selectedGroup, true);
   const leadersList = ['Nguyễn Công Hoan', 'Nguyễn Minh Cường', 'Nguyễn Trung Kiên'];
 
@@ -862,20 +829,29 @@ function handleModalGroupChange(selectedGroup) {
   appState.dropdownData.lanhdao = leadersList;
   appState.dropdownData.leadera = leaderAUsers;
 
-  // Fallback chutri & phoihop to AR group if Tổ phối hợp (C) is unselected
+  const leadAInput = document.getElementById('task-leadera-input');
+  if (leadAInput && selectedGroup) {
+    const teamLeaderName = findTeamLeaderName(selectedGroup) || (leaderAUsers.length > 0 ? leaderAUsers[0] : '');
+    if (teamLeaderName) {
+      leadAInput.value = teamLeaderName;
+      const code = lookupEmpCodeByName(teamLeaderName);
+      const codeDisplay = document.getElementById('task-leadera-code-display');
+      if (codeDisplay) {
+        if (code) {
+          codeDisplay.innerHTML = `<span style="color:#00c897; font-weight:600;">Mã NV: ${escapeHtml(code)}</span>`;
+          codeDisplay.style.display = 'block';
+        } else {
+          codeDisplay.style.display = 'none';
+        }
+      }
+    }
+  }
+
   const toCollabSelect = document.getElementById('task-tophoihop-input');
   if (!toCollabSelect || !toCollabSelect.value) {
     const chuTriUsers = getEmployeesByGroup(selectedGroup, false);
     appState.dropdownData.chutri = chuTriUsers;
     appState.dropdownData.phoihop = chuTriUsers;
-  }
-
-  // Clear current NV (A) input if selected employee is not in the new team list
-  const leadAInput = document.getElementById('task-leadera-input');
-  if (leadAInput && leadAInput.value && !leaderAUsers.includes(leadAInput.value.trim())) {
-    leadAInput.value = '';
-    const codeDisplay = document.getElementById('task-leadera-code-display');
-    if (codeDisplay) { codeDisplay.style.display = 'none'; codeDisplay.innerHTML = ''; }
   }
 
   const activeLeaderA = document.getElementById('dropdown-leadera');
