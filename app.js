@@ -904,30 +904,28 @@ document.addEventListener('click', (e) => {
   }
 });
 
-function onGlobalGroupChange() {
-  updateGlobalUserSelectOptions();
-  handleGlobalFilter();
+/* HEADER SEARCHABLE CUSTOM DROPDOWN ENGINE */
+function isBanLanhDao(groupName, empName, roleName) {
+  const gClean = cleanKey(groupName || '');
+  const rClean = cleanKey(roleName || '');
+  const nClean = cleanKey(empName || '');
+  if (gClean === 'banlanhdao' || gClean === 'lanhdao' || gClean.includes('banlanhdao') || gClean.includes('bangiamboc')) {
+    return true;
+  }
+  if (rClean.includes('lanhdao') || rClean.includes('giamdoc')) {
+    return true;
+  }
+  if (nClean.includes('banlanhdao') || nClean.includes('bangiamboc')) {
+    return true;
+  }
+  return false;
 }
 
-function updateGlobalUserSelectOptions() {
-  const groupSelect = document.getElementById('global-group-select');
-  const collabGroupSelect = document.getElementById('global-collab-group-select');
-  const leaderSelect = document.getElementById('global-leader-select');
-  const userSelect = document.getElementById('global-user-select');
-  const collabUserSelect = document.getElementById('global-collab-user-select');
-  if (!groupSelect) return;
+function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
+  const selectedGroupClean = cleanKey(selectedGroupStr || '');
+  const userSet = new Set();
 
-  const selectedGroupClean = cleanKey(groupSelect.value || '');
-  const selectedCollabGroupClean = cleanKey(collabGroupSelect ? collabGroupSelect.value : '');
-  const currentLeader = leaderSelect ? leaderSelect.value : '';
-  const currentUser = userSelect ? userSelect.value : '';
-  const currentCollabUser = collabUserSelect ? collabUserSelect.value : '';
-
-  const leadersInGroup = new Set();
-  const usersInGroup = new Set();
-  const collabUsersInGroup = new Set();
-
-  // 1. Collect from appState.tovien (employee directory)
+  // 1. From appState.tovien (Sheet Users)
   if (appState.tovien && Array.isArray(appState.tovien)) {
     let currentGroup = '';
     appState.tovien.forEach(row => {
@@ -935,98 +933,241 @@ function updateGlobalUserSelectOptions() {
       if (info.group) currentGroup = info.group;
       
       const grpClean = cleanKey(currentGroup);
-      const matchHost = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
-      const matchCollab = !selectedCollabGroupClean || grpClean === selectedCollabGroupClean || grpClean.includes(selectedCollabGroupClean) || selectedCollabGroupClean.includes(grpClean);
+      if (isBanLanhDao(currentGroup, info.empName)) return;
 
-      if (matchHost) {
-        if (info.leaderName) leadersInGroup.add(info.leaderName);
-        if (info.empName) usersInGroup.add(info.empName);
-      }
-      if (matchCollab) {
-        if (info.empName) collabUsersInGroup.add(info.empName);
-      }
-    });
-  }
-
-  // 2. Collect from appState.tasks
-  if (appState.tasks && Array.isArray(appState.tasks)) {
-    appState.tasks.forEach(t => {
-      const taskGroupClean = cleanKey(getTaskGroup(t) || t['Tổ chủ trì (AR)'] || '');
-      const taskCollabGroupClean = cleanKey(getTaskCollaboratorGroup(t) || t['Tổ (R)'] || '');
-      
-      const matchHost = !selectedGroupClean || taskGroupClean === selectedGroupClean || taskGroupClean.includes(selectedGroupClean) || selectedGroupClean.includes(taskGroupClean);
-      const matchCollab = !selectedCollabGroupClean || taskCollabGroupClean === selectedCollabGroupClean || taskCollabGroupClean.includes(selectedCollabGroupClean) || selectedCollabGroupClean.includes(taskCollabGroupClean);
-
-      if (matchHost) {
-        const leaderName = getTaskLeaderName(t) || getTaskLanhDaoName(t);
-        const empRName = getTaskEmpRName(t) || getTaskAssignee(t);
-        if (leaderName && leaderName !== 'Chưa gán') leadersInGroup.add(leaderName);
-        if (empRName && empRName !== 'Chưa gán') usersInGroup.add(empRName);
-      }
-
-      if (matchCollab || matchHost) {
-        const collabName = getTaskEmpCName(t) || getTaskCollaborator(t);
-        if (collabName) collabUsersInGroup.add(collabName);
+      const isMatchGroup = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
+      if (isMatchGroup) {
+        if (info.empName && String(info.empName).trim()) {
+          userSet.add(String(info.empName).trim());
+        }
+        if (info.leaderName && String(info.leaderName).trim() && !isBanLanhDao(currentGroup, info.leaderName)) {
+          userSet.add(String(info.leaderName).trim());
+        }
       }
     });
   }
 
-  // 3. Collect from appState.users
+  // 2. From appState.users (Sheet Users)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { name, group } = getUserNameAndGroup(u);
       const grpClean = cleanKey(group);
-      if (name) {
-        if (!selectedGroupClean || grpClean === selectedGroupClean) usersInGroup.add(name);
-        if (!selectedCollabGroupClean || grpClean === selectedCollabGroupClean) collabUsersInGroup.add(name);
+      if (isBanLanhDao(group, name)) return;
+
+      const isMatchGroup = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
+      if (isMatchGroup && name && String(name).trim()) {
+        userSet.add(String(name).trim());
       }
     });
   }
 
-  // Populate leaderSelect (Tên NV A)
-  if (leaderSelect) {
-    const optsA = ['<option value="">Tất cả Tên NV (A)</option>'];
-    Array.from(leadersInGroup).sort().forEach(name => {
-      optsA.push(`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`);
+  return Array.from(userSet).sort();
+}
+
+function getHeaderGroupOptions() {
+  const hostGroups = new Set();
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    let lastGroup = '';
+    appState.tovien.forEach(row => {
+      const info = getTovienRowInfo(row);
+      if (info.group) lastGroup = info.group;
+      if (lastGroup && !isBanLanhDao(lastGroup)) hostGroups.add(lastGroup);
     });
-    leaderSelect.innerHTML = optsA.join('');
-    if (currentLeader && Array.from(leadersInGroup).some(n => n.toLowerCase() === currentLeader.toLowerCase())) {
-      leaderSelect.value = currentLeader;
+  }
+  if (appState.users && Array.isArray(appState.users)) {
+    appState.users.forEach(u => {
+      const { group } = getUserNameAndGroup(u);
+      if (group && !isBanLanhDao(group)) hostGroups.add(group);
+    });
+  }
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+    appState.totruonggiaoviec.forEach(t => {
+      const tg = getToTruongTaskGroup(t);
+      if (tg && !isBanLanhDao(tg)) hostGroups.add(tg);
+    });
+  }
+  return Array.from(hostGroups).sort();
+}
+
+function getHeaderCollabGroupOptions() {
+  const collabGroups = new Set();
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const tcg = getTaskCollaboratorGroup(t) || t['Tổ (R)'] || '';
+      if (tcg && String(tcg).trim() && !isBanLanhDao(tcg)) collabGroups.add(String(tcg).trim());
+    });
+  }
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    appState.tovien.forEach(row => {
+      const info = getTovienRowInfo(row);
+      if (info.group && !isBanLanhDao(info.group)) collabGroups.add(info.group);
+    });
+  }
+  return Array.from(collabGroups).sort();
+}
+
+function toggleHeaderDropdown(type, event) {
+  if (event) event.stopPropagation();
+  const menuEl = document.getElementById(`header-select-${type}-menu`);
+  const isActive = menuEl ? menuEl.classList.contains('active') : false;
+  
+  closeAllHeaderDropdowns();
+  closeAllCustomDropdowns();
+
+  if (!isActive && menuEl) {
+    renderHeaderDropdownItems(type);
+    menuEl.classList.add('active');
+    const searchInput = menuEl.querySelector('input');
+    if (searchInput) {
+      searchInput.value = '';
+      setTimeout(() => searchInput.focus(), 50);
+    }
+  }
+}
+
+function closeAllHeaderDropdowns() {
+  document.querySelectorAll('.header-search-select-menu').forEach(m => m.classList.remove('active'));
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.header-search-select-wrapper')) {
+    closeAllHeaderDropdowns();
+  }
+});
+
+function renderHeaderDropdownItems(type, filterQuery = '') {
+  const listEl = document.getElementById(`header-select-${type}-list`);
+  if (!listEl) return;
+
+  let items = [];
+  let currentVal = '';
+  let defaultLabel = '';
+
+  if (type === 'group') {
+    items = getHeaderGroupOptions();
+    currentVal = appState.filters.group || '';
+    defaultLabel = 'Tất cả Tổ chủ trì (AR)';
+  } else if (type === 'collabGroup') {
+    items = getHeaderCollabGroupOptions();
+    currentVal = appState.filters.collabGroup || '';
+    defaultLabel = 'Tất cả Tổ (R)';
+  } else if (type === 'leaderA') {
+    items = getNonLeaderUsersFromSheetUsers(appState.filters.group);
+    currentVal = appState.filters.leaderA || '';
+    defaultLabel = 'Tất cả Tên NV (A)';
+  } else if (type === 'user') {
+    items = getNonLeaderUsersFromSheetUsers(appState.filters.group);
+    currentVal = appState.filters.user || '';
+    defaultLabel = 'Tất cả Tên NV (R)';
+  } else if (type === 'collabUser') {
+    items = getNonLeaderUsersFromSheetUsers(appState.filters.collabGroup || appState.filters.group);
+    currentVal = appState.filters.collabUser || '';
+    defaultLabel = 'Tất cả Tên NV (C)';
+  }
+
+  const qClean = cleanKey(filterQuery);
+  if (qClean) {
+    items = items.filter(item => cleanKey(item).includes(qClean));
+  }
+
+  let html = `<div class="header-search-select-item ${!currentVal ? 'selected' : ''}" onclick="selectHeaderOption('${type}', '')">${escapeHtml(defaultLabel)}</div>`;
+  
+  if (items.length === 0) {
+    html += `<div class="header-search-select-empty">Không tìm thấy kết quả</div>`;
+  } else {
+    items.forEach(item => {
+      const isSel = currentVal.toLowerCase() === item.toLowerCase();
+      html += `<div class="header-search-select-item ${isSel ? 'selected' : ''}" onclick="selectHeaderOption('${type}', '${escapeHtml(item)}')">${escapeHtml(item)}</div>`;
+    });
+  }
+
+  listEl.innerHTML = html;
+}
+
+function filterHeaderDropdownItems(type, query) {
+  renderHeaderDropdownItems(type, query);
+}
+
+function selectHeaderOption(type, value) {
+  closeAllHeaderDropdowns();
+  
+  const hiddenSelectId = {
+    group: 'global-group-select',
+    collabGroup: 'global-collab-group-select',
+    leaderA: 'global-leader-select',
+    user: 'global-user-select',
+    collabUser: 'global-collab-user-select'
+  }[type];
+
+  const labelId = `header-select-${type}-label`;
+  const labelEl = document.getElementById(labelId);
+  const hiddenSelect = document.getElementById(hiddenSelectId);
+
+  const defaultLabels = {
+    group: 'Tất cả Tổ chủ trì (AR)',
+    collabGroup: 'Tất cả Tổ (R)',
+    leaderA: 'Tất cả Tên NV (A)',
+    user: 'Tất cả Tên NV (R)',
+    collabUser: 'Tất cả Tên NV (C)'
+  };
+
+  if (labelEl) {
+    labelEl.innerText = value || defaultLabels[type];
+    if (value) {
+      labelEl.style.color = '#38bdf8';
+      labelEl.style.fontWeight = '600';
     } else {
-      leaderSelect.value = '';
-      if (appState.filters) appState.filters.leaderA = '';
+      labelEl.style.color = '';
+      labelEl.style.fontWeight = '';
     }
   }
 
-  // Populate userSelect (Tên NV R)
-  if (userSelect) {
-    const optsR = ['<option value="">Tất cả Tên NV (R)</option>'];
-    Array.from(usersInGroup).sort().forEach(name => {
-      optsR.push(`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`);
-    });
-    userSelect.innerHTML = optsR.join('');
-    if (currentUser && Array.from(usersInGroup).some(n => n.toLowerCase() === currentUser.toLowerCase())) {
-      userSelect.value = currentUser;
-    } else {
-      userSelect.value = '';
-      if (appState.filters) appState.filters.user = '';
-    }
+  if (hiddenSelect) {
+    hiddenSelect.value = value;
   }
 
-  // Populate collabUserSelect (Tên NV C)
-  if (collabUserSelect) {
-    const optsC = ['<option value="">Tất cả Tên NV (C)</option>'];
-    Array.from(collabUsersInGroup).sort().forEach(name => {
-      optsC.push(`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`);
-    });
-    collabUserSelect.innerHTML = optsC.join('');
-    if (currentCollabUser && Array.from(collabUsersInGroup).some(n => n.toLowerCase() === currentCollabUser.toLowerCase())) {
-      collabUserSelect.value = currentCollabUser;
-    } else {
-      collabUserSelect.value = '';
-      if (appState.filters) appState.filters.collabUser = '';
-    }
+  if (type === 'group' || type === 'collabGroup') {
+    onGlobalGroupChange();
+  } else {
+    handleGlobalFilter();
   }
+}
+
+function onGlobalGroupChange() {
+  updateGlobalUserSelectOptions();
+  handleGlobalFilter();
+}
+
+function updateGlobalUserSelectOptions() {
+  ['leaderA', 'user', 'collabUser'].forEach(type => {
+    const hiddenSelectId = {
+      leaderA: 'global-leader-select',
+      user: 'global-user-select',
+      collabUser: 'global-collab-user-select'
+    }[type];
+    const hiddenSelect = document.getElementById(hiddenSelectId);
+    const labelEl = document.getElementById(`header-select-${type}-label`);
+    const val = hiddenSelect ? hiddenSelect.value : '';
+    const validUsers = getNonLeaderUsersFromSheetUsers(type === 'collabUser' ? appState.filters.collabGroup || appState.filters.group : appState.filters.group);
+    
+    if (val && !validUsers.some(u => u.toLowerCase() === val.toLowerCase())) {
+      if (hiddenSelect) hiddenSelect.value = '';
+      if (labelEl) {
+        labelEl.innerText = {
+          leaderA: 'Tất cả Tên NV (A)',
+          user: 'Tất cả Tên NV (R)',
+          collabUser: 'Tất cả Tên NV (C)'
+        }[type];
+        labelEl.style.color = '';
+        labelEl.style.fontWeight = '';
+      }
+      if (appState.filters) {
+        if (type === 'leaderA') appState.filters.leaderA = '';
+        if (type === 'user') appState.filters.user = '';
+        if (type === 'collabUser') appState.filters.collabUser = '';
+      }
+    }
+  });
 }
 
 function switchSidebarTab(tabName) {

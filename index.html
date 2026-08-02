@@ -86,25 +86,95 @@
             <input type="text" id="global-search-input" placeholder="Tìm kiếm công việc..." oninput="handleGlobalFilterDebounced()">
           </div>
 
-          <select class="header-select" id="global-group-select" onchange="onGlobalGroupChange()" onfocus="ensureSelectsPopulated()">
-            <option value="">Tất cả Tổ chủ trì (AR)</option>
-          </select>
+          <!-- 1. Tổ chủ trì (AR) -->
+          <div class="header-search-select-wrapper" id="header-select-group-wrapper">
+            <div class="header-search-select-btn" onclick="toggleHeaderDropdown('group', event)" title="Tổ chủ trì (AR)">
+              <span id="header-select-group-label">Tất cả Tổ chủ trì (AR)</span>
+              <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="header-search-select-menu" id="header-select-group-menu">
+              <div class="header-search-select-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" placeholder="Tìm tổ chủ trì..." oninput="filterHeaderDropdownItems('group', this.value)" onclick="event.stopPropagation()">
+              </div>
+              <div class="header-search-select-list" id="header-select-group-list"></div>
+            </div>
+            <select class="header-select" id="global-group-select" style="display:none;" onchange="onGlobalGroupChange()">
+              <option value="">Tất cả Tổ chủ trì (AR)</option>
+            </select>
+          </div>
 
-          <select class="header-select" id="global-collab-group-select" onchange="onGlobalGroupChange()" onfocus="ensureSelectsPopulated()">
-            <option value="">Tất cả Tổ (R)</option>
-          </select>
+          <!-- 2. Tổ (R) -->
+          <div class="header-search-select-wrapper" id="header-select-collabGroup-wrapper">
+            <div class="header-search-select-btn" onclick="toggleHeaderDropdown('collabGroup', event)" title="Tổ (R)">
+              <span id="header-select-collabGroup-label">Tất cả Tổ (R)</span>
+              <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="header-search-select-menu" id="header-select-collabGroup-menu">
+              <div class="header-search-select-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" placeholder="Tìm tổ phối hợp..." oninput="filterHeaderDropdownItems('collabGroup', this.value)" onclick="event.stopPropagation()">
+              </div>
+              <div class="header-search-select-list" id="header-select-collabGroup-list"></div>
+            </div>
+            <select class="header-select" id="global-collab-group-select" style="display:none;" onchange="onGlobalGroupChange()">
+              <option value="">Tất cả Tổ (R)</option>
+            </select>
+          </div>
 
-          <select class="header-select" id="global-leader-select" onchange="handleGlobalFilter()" onfocus="ensureSelectsPopulated()">
-            <option value="">Tất cả Tên NV (A)</option>
-          </select>
+          <!-- 3. Tên NV (A) -->
+          <div class="header-search-select-wrapper" id="header-select-leaderA-wrapper">
+            <div class="header-search-select-btn" onclick="toggleHeaderDropdown('leaderA', event)" title="Tên NV (A)">
+              <span id="header-select-leaderA-label">Tất cả Tên NV (A)</span>
+              <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="header-search-select-menu" id="header-select-leaderA-menu">
+              <div class="header-search-select-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" placeholder="Tìm tên NV (A)..." oninput="filterHeaderDropdownItems('leaderA', this.value)" onclick="event.stopPropagation()">
+              </div>
+              <div class="header-search-select-list" id="header-select-leaderA-list"></div>
+            </div>
+            <select class="header-select" id="global-leader-select" style="display:none;" onchange="handleGlobalFilter()">
+              <option value="">Tất cả Tên NV (A)</option>
+            </select>
+          </div>
 
-          <select class="header-select" id="global-user-select" onchange="handleGlobalFilter()" onfocus="ensureSelectsPopulated()">
-            <option value="">Tất cả Tên NV (R)</option>
-          </select>
+          <!-- 4. Tên NV (R) -->
+          <div class="header-search-select-wrapper" id="header-select-user-wrapper">
+            <div class="header-search-select-btn" onclick="toggleHeaderDropdown('user', event)" title="Tên NV (R)">
+              <span id="header-select-user-label">Tất cả Tên NV (R)</span>
+              <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="header-search-select-menu" id="header-select-user-menu">
+              <div class="header-search-select-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" placeholder="Tìm tên NV (R)..." oninput="filterHeaderDropdownItems('user', this.value)" onclick="event.stopPropagation()">
+              </div>
+              <div class="header-search-select-list" id="header-select-user-list"></div>
+            </div>
+            <select class="header-select" id="global-user-select" style="display:none;" onchange="handleGlobalFilter()">
+              <option value="">Tất cả Tên NV (R)</option>
+            </select>
+          </div>
 
-          <select class="header-select" id="global-collab-user-select" onchange="handleGlobalFilter()" onfocus="ensureSelectsPopulated()">
-            <option value="">Tất cả Tên NV (C)</option>
-          </select>
+          <!-- 5. Tên NV (C) -->
+          <div class="header-search-select-wrapper" id="header-select-collabUser-wrapper">
+            <div class="header-search-select-btn" onclick="toggleHeaderDropdown('collabUser', event)" title="Tên NV (C)">
+              <span id="header-select-collabUser-label">Tất cả Tên NV (C)</span>
+              <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="header-search-select-menu" id="header-select-collabUser-menu">
+              <div class="header-search-select-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" placeholder="Tìm tên NV (C)..." oninput="filterHeaderDropdownItems('collabUser', this.value)" onclick="event.stopPropagation()">
+              </div>
+              <div class="header-search-select-list" id="header-select-collabUser-list"></div>
+            </div>
+            <select class="header-select" id="global-collab-user-select" style="display:none;" onchange="handleGlobalFilter()">
+              <option value="">Tất cả Tên NV (C)</option>
+            </select>
+          </div>
 
           <button class="btn-icon-btn" onclick="appState.loadData(true)" title="Làm mới dữ liệu">
             <i class="fa-solid fa-rotate-right"></i>
