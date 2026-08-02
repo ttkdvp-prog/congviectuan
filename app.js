@@ -925,17 +925,62 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
   const selectedGroupClean = cleanKey(selectedGroupStr || '');
   const userSet = new Set();
 
-  // ONLY collect from appState.users (Sheet User)
+  const addIfValid = (name, group) => {
+    if (!name || name === 'Chưa gán') return;
+    const trimmed = String(name).trim();
+    if (!trimmed) return;
+    if (isBanLanhDao(group, trimmed)) return;
+
+    const grpClean = cleanKey(group || '');
+    const isMatchGroup = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
+    if (isMatchGroup) {
+      userSet.add(trimmed);
+    }
+  };
+
+  // 1. Collect from appState.users (Sheet User / Nguoidung)
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { name, group } = getUserNameAndGroup(u);
-      const grpClean = cleanKey(group);
-      if (isBanLanhDao(group, name)) return;
+      addIfValid(name, group);
+    });
+  }
 
-      const isMatchGroup = !selectedGroupClean || grpClean === selectedGroupClean || grpClean.includes(selectedGroupClean) || selectedGroupClean.includes(grpClean);
-      if (isMatchGroup && name && String(name).trim()) {
-        userSet.add(String(name).trim());
-      }
+  // 2. Collect from appState.totruonggiaoviec (Tab Tổ trưởng giao việc)
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+    appState.totruonggiaoviec.forEach(t => {
+      const tg = getToTruongTaskGroup(t);
+      const aName = t['Tên NV (A)'] || t['Tên NV A'] || t['Tên tổ trưởng'] || getTaskLeaderName(t);
+      const rName = t['Tên NV (R)'] || t['Tên NV R'] || t['Tên nhân viên'] || getTaskEmpRName(t);
+      const cName = t['Tên NV (C)'] || t['Tên NV C'] || getTaskEmpCName(t);
+      addIfValid(aName, tg);
+      addIfValid(rName, tg);
+      addIfValid(cName, tg);
+    });
+  }
+
+  // 3. Collect from appState.tovien (Sheet ToVien)
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    let currentGroup = '';
+    appState.tovien.forEach(row => {
+      const info = getTovienRowInfo(row);
+      if (info.group) currentGroup = info.group;
+      addIfValid(info.empName, currentGroup);
+      addIfValid(info.leaderName, currentGroup);
+    });
+  }
+
+  // 4. Fallback from appState.tasks (Sheet congviec)
+  if (userSet.size === 0 && appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => {
+      const tg = getTaskGroup(t);
+      const cg = getTaskCollaboratorGroup(t);
+      const aName = getTaskLeaderName(t);
+      const rName = getTaskEmpRName(t) || getTaskAssignee(t);
+      const cName = getTaskEmpCName(t) || getTaskCollaborator(t);
+      addIfValid(aName, tg);
+      addIfValid(rName, tg);
+      addIfValid(cName, cg || tg);
     });
   }
 
@@ -944,35 +989,61 @@ function getNonLeaderUsersFromSheetUsers(selectedGroupStr) {
 
 function getHeaderGroupOptions() {
   const hostGroups = new Set();
+  const addGroup = (g) => {
+    if (g && !isBanLanhDao(g)) hostGroups.add(String(g).trim());
+  };
+
   if (appState.users && Array.isArray(appState.users)) {
     appState.users.forEach(u => {
       const { group } = getUserNameAndGroup(u);
-      if (group && !isBanLanhDao(group)) hostGroups.add(group);
+      addGroup(group);
     });
   }
   if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
     appState.totruonggiaoviec.forEach(t => {
-      const tg = getToTruongTaskGroup(t);
-      if (tg && !isBanLanhDao(tg)) hostGroups.add(tg);
+      addGroup(getToTruongTaskGroup(t));
+      addGroup(t['Tổ chủ trì (AR)']);
     });
   }
+  if (appState.tovien && Array.isArray(appState.tovien)) {
+    let lastGroup = '';
+    appState.tovien.forEach(row => {
+      const info = getTovienRowInfo(row);
+      if (info.group) lastGroup = info.group;
+      addGroup(lastGroup);
+    });
+  }
+  if (appState.tasks && Array.isArray(appState.tasks)) {
+    appState.tasks.forEach(t => addGroup(getTaskGroup(t)));
+  }
+
   return Array.from(hostGroups).sort();
 }
 
 function getHeaderCollabGroupOptions() {
   const collabGroups = new Set();
+  const addGroup = (g) => {
+    if (g && !isBanLanhDao(g)) collabGroups.add(String(g).trim());
+  };
+
   if (appState.tasks && Array.isArray(appState.tasks)) {
     appState.tasks.forEach(t => {
-      const tcg = getTaskCollaboratorGroup(t) || t['Tổ (R)'] || '';
-      if (tcg && String(tcg).trim() && !isBanLanhDao(tcg)) collabGroups.add(String(tcg).trim());
+      addGroup(getTaskCollaboratorGroup(t));
+      addGroup(t['Tổ (R)']);
+    });
+  }
+  if (appState.totruonggiaoviec && Array.isArray(appState.totruonggiaoviec)) {
+    appState.totruonggiaoviec.forEach(t => {
+      addGroup(t['Tổ (R)']);
     });
   }
   if (appState.tovien && Array.isArray(appState.tovien)) {
     appState.tovien.forEach(row => {
       const info = getTovienRowInfo(row);
-      if (info.group && !isBanLanhDao(info.group)) collabGroups.add(info.group);
+      addGroup(info.group);
     });
   }
+
   return Array.from(collabGroups).sort();
 }
 
